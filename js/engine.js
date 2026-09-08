@@ -2,31 +2,49 @@
 // Todo vive en el objeto global `Engine`. No usa módulos para poder
 // abrirse el juego directamente con doble click (sin servidor).
 //
-// Estructura de la temporada (simplificada respecto al fútbol argentino real,
-// para que sea manejable en un simulador chico):
-// - Primera División: 30 clubes en 2 zonas de 15 (con 1 fecha libre por vuelta
-//   ya que 15 es impar). Fase de zonas a una rueda -> playoffs de octavos a
-//   la final con los 16 mejores de la tabla combinada ("tabla anual").
-// - Primera Nacional: 36 clubes en 2 zonas de 18, fase de zonas a una rueda,
-//   sin playoff propio.
-// - Copa Argentina: eliminación directa simultánea a la liga, abierta a
-//   clubes de ambas divisiones, con el rival sorteado al azar en cada ronda.
+// Estructura de la temporada (basada en el formato real de AFA 2026, con
+// algunas simplificaciones documentadas en el README):
+// - Primera División: 30 clubes en 2 zonas de 15. Se juegan DOS torneos por
+//   año —Apertura y Clausura—, cada uno con fase de zonas a una rueda y
+//   playoffs de octavos a la final (16 mejores de la tabla combinada de esa
+//   edición). Entre ambos torneos hay una ventana de pases.
+// - Primera Nacional: 36 clubes en 2 zonas de 18, un solo torneo anual a una
+//   rueda. Ascienden 2: el ganador de una Final directa entre los líderes de
+//   cada zona, y el ganador de un Torneo Reducido (2º a 8º de cada zona +
+//   el perdedor de la Final).
+// - Copa Argentina: eliminación directa simultánea a la Primera edición del
+//   año, abierta a clubes de ambas divisiones, con rival sorteado al azar.
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
-// - Cupos a copas internacionales: campeón del torneo -> Libertadores
-//   (grupos); subcampeón del torneo y campeón de la Copa Argentina ->
-//   Libertadores (previa); el resto de los cupos (1 Libertadores + 3
-//   Sudamericana) se reparten por la tabla anual, salteando clubes que ya
-//   clasificaron por otra vía (igual que en la vida real).
+// - Descienden 2 de Primera por año: el último de la Tabla Anual (suma de
+//   Apertura + Clausura) y el peor promedio de puntos por partido de las
+//   últimas 3 temporadas en Primera (si coinciden, el segundo descenso pasa
+//   al siguiente peor promedio).
+// - Cupos a copas internacionales: 6 a Libertadores (campeón Apertura,
+//   campeón Clausura, campeón Copa Argentina, 1º y 2º de la Tabla Anual, y
+//   un repechaje anclado en el 9º), y 6 a Sudamericana (del 3º al 8º de la
+//   Tabla Anual), salteando siempre clubes ya clasificados por otra vía. Si
+//   un campeón desciende esa misma temporada, pierde el cupo directo y este
+//   se reparte igual por tabla.
+// - La división en la que NO juega el usuario se simula completa e
+//   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
+//   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
 
-const SAVE_KEY = 'dt-simulador-save-v2';
+const SAVE_KEY = 'dt-simulador-save-v3';
 
 const FIFA_ROUNDS = [5, 11];
 const COPA_ROUNDS = [2, 4, 7, 10, 13];
 const COPA_STAGE_NAMES = ['Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
-const TRANSFER_ROUND = { D1: 8, D2: 9 }; // aprox. mitad de temporada de cada división
+const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su único torneo
 const TOTAL_ROUNDS = { D1: 15, D2: 17 };
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
+const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];
+const BRACKET_KIND_LABELS = {
+  apertura: 'Playoffs del Apertura',
+  clausura: 'Playoffs del Clausura',
+  'final-directa': 'Final por el Ascenso',
+  reducido: 'Torneo Reducido',
+};
 
 const Engine = {
   state: null,
@@ -164,34 +182,82 @@ const Engine = {
       .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
   },
 
-  // ---------- Ciclo de vida de la partida ----------
-
-  buildAllZones() {
-    const zones = {};
-    ['D1-A', 'D1-B', 'D2-A', 'D2-B'].forEach((key) => {
-      const [division, zone] = key.split('-');
-      const ids = this.state.clubs.filter((c) => c.division === division && c.zone === zone).map((c) => c.id);
-      zones[key] = {
-        clubIds: ids,
-        schedule: this.buildSchedule(ids),
-        table: Object.fromEntries(ids.map((id) => [id, this.emptyTableRow()])),
-        roundsPlayed: 0,
-      };
+  simulateRoundOntoTable(round, table) {
+    round.forEach((fixture) => {
+      const hs = this.clubStrength(fixture.home);
+      const as = this.clubStrength(fixture.away);
+      const score = this.simulateScore(hs, as, 4);
+      this.updateTableRow(table, fixture.home, score.homeGoals, score.awayGoals);
+      this.updateTableRow(table, fixture.away, score.awayGoals, score.homeGoals);
     });
-    return zones;
   },
+
+  combineEditionTables(apertura, clausura) {
+    const allRows = apertura.zoneATable.concat(apertura.zoneBTable, clausura.zoneATable, clausura.zoneBTable);
+    const byId = {};
+    allRows.forEach((r) => {
+      if (!byId[r.id]) byId[r.id] = { id: r.id, name: r.name, played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, pts: 0 };
+      const acc = byId[r.id];
+      acc.played += r.played; acc.win += r.win; acc.draw += r.draw; acc.loss += r.loss; acc.gf += r.gf; acc.ga += r.ga; acc.pts += r.pts;
+    });
+    return Object.values(byId).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+  },
+
+  // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
+
+  simulateFullDivisionYear(division) {
+    const s = this.state;
+    const idsA = s.clubs.filter((c) => c.division === division && c.zone === 'A').map((c) => c.id);
+    const idsB = s.clubs.filter((c) => c.division === division && c.zone === 'B').map((c) => c.id);
+
+    const runZoneStage = () => {
+      const tableA = Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()]));
+      const tableB = Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()]));
+      this.buildSchedule(idsA).forEach((round) => this.simulateRoundOntoTable(round, tableA));
+      this.buildSchedule(idsB).forEach((round) => this.simulateRoundOntoTable(round, tableB));
+      return { zoneATable: this.sortTable(tableA), zoneBTable: this.sortTable(tableB) };
+    };
+
+    if (division === 'D2') {
+      const { zoneATable, zoneBTable } = runZoneStage();
+      const finalWinner = this.resolveKnockout(zoneATable[0].id, zoneBTable[0].id);
+      const finalLoser = finalWinner === zoneATable[0].id ? zoneBTable[0].id : zoneATable[0].id;
+      const pool = zoneATable.slice(1, 8).concat(zoneBTable.slice(1, 8)).map((r) => r.id).concat([finalLoser]);
+      const reducidoWinner = this.simulateKnockoutPool(pool);
+      return { promoted: [finalWinner, reducidoWinner], zoneATable, zoneBTable };
+    }
+
+    const runEdition = () => {
+      const { zoneATable, zoneBTable } = runZoneStage();
+      const combined = zoneATable.concat(zoneBTable).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      const seeds = combined.slice(0, 16).map((r, i) => ({ id: r.id, seed: i + 1 }));
+      const { champion, runnerUp } = this.simulateSeedsToChampion(seeds);
+      return { zoneATable, zoneBTable, champion, runnerUp };
+    };
+    const apertura = runEdition();
+    const clausura = runEdition();
+    return {
+      tablaAnualYear: this.combineEditionTables(apertura, clausura),
+      aperturaChampion: apertura.champion,
+      aperturaRunnerUp: apertura.runnerUp,
+      clausuraChampion: clausura.champion,
+      clausuraRunnerUp: clausura.runnerUp,
+    };
+  },
+
+  // ---------- Ciclo de vida de la partida ----------
 
   newGame(clubId) {
     this.state = {
       screen: 'pre-match',
       clubId,
-      clubs: CLUB_TEMPLATES.map((c) => ({ ...c })),
+      clubs: CLUB_TEMPLATES.map((c) => ({ ...c, history: [] })),
       budget: 0,
       morale: 0,
       squad: null,
       season: null,
       copa: null,
-      playoff: null,
+      bracket: null,
       matchContext: null,
       currentDecision: null,
       lastDecisionNote: null,
@@ -204,46 +270,80 @@ const Engine = {
     const club = this.getClub(clubId);
     this.state.budget = this.startingBudget(club);
     this.state.squad = this.generateSquad(club);
-    this.startSeasonStructures();
-    this.enterRound();
-    this.save();
+    this.startNewSeason();
   },
 
-  startSeasonStructures() {
+  // Arranca un año nuevo completo: simula instantáneamente la división en la
+  // que el usuario no juega, y arranca la primera edición/etapa de la propia.
+  startNewSeason() {
     const s = this.state;
     const club = this.getClub(s.clubId);
+    const otherDivision = club.division === 'D1' ? 'D2' : 'D1';
+    const prevYear = s.season ? s.season.year : 0;
+
     s.season = {
-      year: (s.season && s.season.year) || 1,
+      year: prevYear + 1,
+      myDivision: club.division,
+      myZone: club.zone,
+      edition: null,
       roundIndex: 0,
       totalRounds: TOTAL_ROUNDS[club.division],
-      transferRound: TRANSFER_ROUND[club.division],
-      transferShown: false,
       fifaShown: [],
       copaShown: [],
-      zones: this.buildAllZones(),
+      transferShown: false,
+      transferReason: null,
+      zones: {},
+      myD1: club.division === 'D1' ? { apertura: null, clausura: null } : null,
+      myD2: club.division === 'D2' ? { zoneATable: null, zoneBTable: null, promotedDirect: null, promotedReducido: null } : null,
+      backgroundResult: null,
     };
     s.copa = { alive: true, champion: false, eliminatedAt: null, faced: [s.clubId] };
-    s.playoff = null;
+    s.bracket = null;
     s.lastSeasonSummary = null;
+
+    s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
+
+    this.startEdition(club.division === 'D1' ? 'apertura' : null);
   },
 
-  userZoneKey() {
-    const club = this.getClub(this.state.clubId);
-    return `${club.division}-${club.zone}`;
+  startEdition(edition) {
+    const s = this.state;
+    const season = s.season;
+    const club = this.getClub(s.clubId);
+    season.edition = edition;
+    season.roundIndex = 0;
+    season.fifaShown = [];
+    season.copaShown = [];
+
+    const zoneAId = `${club.division}-A`;
+    const zoneBId = `${club.division}-B`;
+    const idsA = s.clubs.filter((c) => c.division === club.division && c.zone === 'A').map((c) => c.id);
+    const idsB = s.clubs.filter((c) => c.division === club.division && c.zone === 'B').map((c) => c.id);
+    season.zones = {
+      [zoneAId]: { clubIds: idsA, schedule: this.buildSchedule(idsA), table: Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()])) },
+      [zoneBId]: { clubIds: idsB, schedule: this.buildSchedule(idsB), table: Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()])) },
+    };
+
+    this.enterEditionRound();
+  },
+
+  myZoneKey() {
+    const s = this.state;
+    return `${s.season.myDivision}-${s.season.myZone}`;
   },
 
   pickDecision() {
     this.state.currentDecision = DECISIONS[Math.floor(Math.random() * DECISIONS.length)];
   },
 
-  // ---------- Progreso de la liga, fecha a fecha ----------
+  // ---------- Progreso fecha a fecha dentro de una edición/etapa ----------
 
-  enterRound() {
+  enterEditionRound() {
     const s = this.state;
     const season = s.season;
 
     if (season.roundIndex >= season.totalRounds) {
-      this.enterPlayoffOrEnd();
+      this.enterEditionPlayoffOrFinish();
       return;
     }
 
@@ -255,7 +355,10 @@ const Engine = {
       return;
     }
 
-    if (COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copa.alive && !s.copa.champion) {
+    // La Copa Argentina corre una sola vez por año: en la primera etapa
+    // (Apertura para Primera, la única edición de la Nacional).
+    const copaEditionOk = season.edition !== 'clausura';
+    if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copa.alive && !s.copa.champion) {
       season.copaShown.push(season.roundIndex);
       const stageIndex = COPA_ROUNDS.indexOf(season.roundIndex);
       const opponentId = this.pickCopaOpponent();
@@ -266,15 +369,16 @@ const Engine = {
       return;
     }
 
-    if (season.roundIndex === season.transferRound && !season.transferShown) {
+    if (season.myDivision === 'D2' && season.roundIndex === TRANSFER_ROUND_D2 && !season.transferShown) {
       season.transferShown = true;
+      season.transferReason = 'mid-edition';
       s.market = this.generateMarket();
       s.screen = 'transfer';
       this.save();
       return;
     }
 
-    const zoneKey = this.userZoneKey();
+    const zoneKey = this.myZoneKey();
     const zone = season.zones[zoneKey];
     const round = zone.schedule[season.roundIndex];
     const userMatch = round.find((f) => f.home === s.clubId || f.away === s.clubId);
@@ -283,7 +387,7 @@ const Engine = {
       Object.keys(season.zones).forEach((k) => this.simulateZoneRound(k, season.roundIndex, null));
       s.log.unshift('Fecha libre para tu equipo.');
       season.roundIndex++;
-      this.enterRound();
+      this.enterEditionRound();
       return;
     }
 
@@ -313,19 +417,9 @@ const Engine = {
       this.updateTableRow(zone.table, fixture.home, score.homeGoals, score.awayGoals);
       this.updateTableRow(zone.table, fixture.away, score.awayGoals, score.homeGoals);
     });
-    zone.roundsPlayed++;
   },
 
-  catchUpAllZones() {
-    Object.keys(this.state.season.zones).forEach((k) => {
-      const zone = this.state.season.zones[k];
-      while (zone.roundsPlayed < zone.schedule.length) {
-        this.simulateZoneRound(k, zone.roundsPlayed, null);
-      }
-    });
-  },
-
-  // ---------- Un partido interactivo (liga, copa o playoff) ----------
+  // ---------- Un partido interactivo (liga, copa o cuadro eliminatorio) ----------
 
   chooseDecision(optionIndex) {
     const s = this.state;
@@ -414,7 +508,21 @@ const Engine = {
   finalizePendingScore() {
     const s = this.state;
     const m = s.pendingMatch;
-    if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
+    if (m.context !== 'league' && m.context !== 'copa' && m.homeGoals === m.awayGoals) {
+      const myStrength = this.squadStrength(s.squad);
+      const oppStrength = this.clubStrength(m.opponentId);
+      const userIsHomeSide = m.isHome;
+      const prob = Math.max(0.15, Math.min(0.85, 0.5 + (myStrength - oppStrength) / 100));
+      const userWinsShootout = Math.random() < prob;
+      const winnerGoals = 4 + Math.floor(Math.random() * 2);
+      const loserGoals = winnerGoals - (1 + Math.floor(Math.random() * 2));
+      m.shootout = {
+        userWon: userWinsShootout,
+        homeScore: userIsHomeSide === userWinsShootout ? winnerGoals : loserGoals,
+        awayScore: userIsHomeSide === userWinsShootout ? loserGoals : winnerGoals,
+      };
+    } else if (m.context === 'copa' && m.homeGoals === m.awayGoals) {
+      // La Copa Argentina también es eliminación directa: empate va a penales.
       const myStrength = this.squadStrength(s.squad);
       const oppStrength = this.clubStrength(m.opponentId);
       const userIsHomeSide = m.isHome;
@@ -468,7 +576,7 @@ const Engine = {
     this.developSquadAfterMatch(userWon, userLost);
 
     if (m.context === 'league') {
-      const zoneKey = this.userZoneKey();
+      const zoneKey = this.myZoneKey();
       const zone = s.season.zones[zoneKey];
       this.updateTableRow(zone.table, m.home, m.homeGoals, m.awayGoals);
       this.updateTableRow(zone.table, m.away, m.awayGoals, m.homeGoals);
@@ -478,7 +586,7 @@ const Engine = {
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
-      this.enterRound();
+      this.enterEditionRound();
     } else if (m.context === 'copa') {
       const stage = COPA_STAGE_NAMES[s.matchContext.stageIndex];
       s.copa.faced.push(m.opponentId);
@@ -495,40 +603,33 @@ const Engine = {
       }
       s.pendingMatch = null;
       s.matchContext = null;
-      this.enterRound();
-    } else if (m.context === 'playoff') {
-      this.resolveUserPlayoffMatch(userWon);
+      this.enterEditionRound();
+    } else if (m.context === 'bracket') {
+      this.resolveUserBracketMatch(userWon, false);
     }
     this.save();
   },
 
-  // ---------- Fin de la fase de zonas: playoffs (solo D1) ----------
+  // ---------- Fin de zona: playoffs (Primera) o Final+Reducido (Nacional) ----------
 
-  // Los playoffs y la tabla anual de Primera División se calculan siempre,
-  // sin importar en qué división esté jugando el usuario esta temporada,
-  // porque los cupos a copas internacionales dependen de ese resultado.
-  // Si el usuario juega en Primera Nacional (o no clasificó a los 16 mejores
-  // de Primera), esa fase se resuelve automáticamente en segundo plano.
-  enterPlayoffOrEnd() {
+  enterEditionPlayoffOrFinish() {
     const s = this.state;
-    this.catchUpAllZones();
+    const season = s.season;
+    const zoneA = season.zones[`${season.myDivision}-A`];
+    const zoneB = season.zones[`${season.myDivision}-B`];
+    const zoneATable = this.sortTable(zoneA.table);
+    const zoneBTable = this.sortTable(zoneB.table);
 
-    const combined = this.sortTable(s.season.zones['D1-A'].table)
-      .concat(this.sortTable(s.season.zones['D1-B'].table))
-      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-    s.season.tablaAnual = combined;
-
-    const seeds = combined.slice(0, 16).map((row, i) => ({ id: row.id, seed: i + 1 }));
-    const userQualified = seeds.some((x) => x.id === s.clubId);
-    s.playoff = { alive: seeds, stageIndex: 0, champion: null, runnerUp: null, userQualified };
-
-    if (!userQualified) {
-      this.simulatePlayoffFully();
-      this.endSeason();
-      return;
+    if (season.myDivision === 'D1') {
+      const combined = zoneATable.concat(zoneBTable).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      const seeds = combined.slice(0, 16).map((r, i) => ({ id: r.id, seed: i + 1 }));
+      season.myD1[season.edition] = { zoneATable, zoneBTable, champion: null, runnerUp: null };
+      this.startBracket(season.edition, seeds, PLAYOFF_STAGES);
+    } else {
+      season.myD2 = { zoneATable, zoneBTable, promotedDirect: null, promotedReducido: null };
+      const seeds = [{ id: zoneATable[0].id, seed: 1 }, { id: zoneBTable[0].id, seed: 2 }];
+      this.startBracket('final-directa', seeds, ['Final por el Ascenso']);
     }
-
-    this.resolvePlayoffStage();
   },
 
   pairStage(alive) {
@@ -539,6 +640,8 @@ const Engine = {
   },
 
   resolveKnockout(idA, idB) {
+    if (idA === null) return idB;
+    if (idB === null) return idA;
     const sa = this.clubStrength(idA);
     const sb = this.clubStrength(idB);
     const score = this.simulateScore(sa, sb, 2);
@@ -547,10 +650,52 @@ const Engine = {
     return Math.random() < prob ? idA : idB;
   },
 
-  // Se asume que el usuario sigue con vida en el playoff cuando se llama a esto.
-  resolvePlayoffStage() {
+  simulateSeedsToChampion(seeds) {
+    let alive = seeds;
+    let runnerUp = null;
+    while (alive.length > 1) {
+      const pairs = this.pairStage(alive);
+      const winners = pairs.map((pair) => {
+        const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
+        if (pairs.length === 1) {
+          const loser = pair.find((p) => p.id !== winnerId);
+          runnerUp = loser ? loser.id : null;
+        }
+        return pair.find((p) => p.id === winnerId);
+      });
+      alive = winners;
+    }
+    return { champion: alive[0] ? alive[0].id : null, runnerUp };
+  },
+
+  simulateKnockoutPool(ids) {
+    const seeds = ids.map((id, i) => ({ id, seed: i + 1 }));
+    let target = 2;
+    while (target < seeds.length) target *= 2;
+    while (seeds.length < target) seeds.push({ id: null, seed: seeds.length + 1 });
+    return this.simulateSeedsToChampion(seeds).champion;
+  },
+
+  bracketStageLabel() {
+    const b = this.state.bracket;
+    return `${BRACKET_KIND_LABELS[b.kind] || b.kind} — ${b.stageNames[b.stageIndex]}`;
+  },
+
+  startBracket(kind, seeds, stageNames) {
     const s = this.state;
-    const pairs = this.pairStage(s.playoff.alive);
+    s.bracket = { kind, alive: seeds, stageIndex: 0, champion: null, runnerUp: null, stageNames };
+    const userQualified = seeds.some((x) => x.id === s.clubId);
+    if (!userQualified) {
+      this.simulateBracketFully();
+      return;
+    }
+    this.resolveBracketStage();
+  },
+
+  // Se asume que el usuario sigue con vida en el cuadro cuando se llama a esto.
+  resolveBracketStage() {
+    const s = this.state;
+    const pairs = this.pairStage(s.bracket.alive);
     const winners = [];
     let userEntry = null;
     let opponentEntry = null;
@@ -566,110 +711,110 @@ const Engine = {
       winners.push(pair.find((p) => p.id === winnerId));
     });
 
-    s.playoff.pendingWinners = winners;
-    s.playoff.pendingIsFinal = pairs.length === 1;
-    s.playoff.pendingUserEntry = userEntry;
-    s.playoff.pendingOpponentEntry = opponentEntry;
+    s.bracket.pendingWinners = winners;
+    s.bracket.pendingIsFinal = pairs.length === 1;
+    s.bracket.pendingUserEntry = userEntry;
+    s.bracket.pendingOpponentEntry = opponentEntry;
 
-    s.matchContext = { context: 'playoff', opponentId: opponentEntry.id, isHome: userEntry.seed < opponentEntry.seed };
+    if (!opponentEntry || opponentEntry.id === null) {
+      s.log.unshift(`${this.bracketStageLabel()}: tenés fecha libre, pasás de ronda directo.`);
+      this.resolveUserBracketMatch(true, true);
+      return;
+    }
+
+    s.matchContext = { context: 'bracket', opponentId: opponentEntry.id, isHome: userEntry.seed < opponentEntry.seed };
     this.pickDecision();
     s.screen = 'pre-match';
     this.save();
   },
 
-  resolveUserPlayoffMatch(userWon) {
+  resolveUserBracketMatch(userWon, isBye) {
     const s = this.state;
-    const stageName = PLAYOFF_STAGES[s.playoff.stageIndex];
-    const clubName = (id) => this.getClub(id).name;
-    const m = s.pendingMatch;
-    const isFinal = s.playoff.pendingIsFinal;
+    const isFinal = s.bracket.pendingIsFinal;
 
-    if (userWon) {
-      s.log.unshift(`Playoffs (${stageName}): avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : ''}.`);
-    } else {
-      s.log.unshift(`Playoffs (${stageName}): quedaste eliminado ante ${clubName(m.opponentId)}.`);
+    if (!isBye) {
+      const m = s.pendingMatch;
+      const clubName = (id) => this.getClub(id).name;
+      const label = this.bracketStageLabel();
+      if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : ''}.`);
+      else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
     }
 
-    const advancingEntry = userWon ? s.playoff.pendingUserEntry : s.playoff.pendingOpponentEntry;
-    s.playoff.alive = s.playoff.pendingWinners.concat([advancingEntry]);
+    const advancingEntry = userWon ? s.bracket.pendingUserEntry : s.bracket.pendingOpponentEntry;
+    s.bracket.alive = s.bracket.pendingWinners.concat([advancingEntry]);
     s.pendingMatch = null;
     s.matchContext = null;
 
     if (isFinal) {
-      s.playoff.champion = advancingEntry.id;
-      s.playoff.runnerUp = userWon ? s.playoff.pendingOpponentEntry.id : s.clubId;
-      this.endSeason();
+      s.bracket.champion = advancingEntry.id;
+      s.bracket.runnerUp = userWon ? s.bracket.pendingOpponentEntry.id : s.clubId;
+      this.onBracketComplete();
       return;
     }
 
     if (!userWon) {
-      this.simulatePlayoffFully();
-      this.endSeason();
+      this.simulateBracketFully();
       return;
     }
 
-    s.playoff.stageIndex++;
-    this.resolvePlayoffStage();
+    s.bracket.stageIndex++;
+    this.resolveBracketStage();
   },
 
-  // Simula el resto del cuadro sin intervención del usuario (no clasificó o
-  // ya quedó eliminado) y define campeón y subcampeón.
-  simulatePlayoffFully() {
+  // Simula el resto del cuadro sin intervención del usuario (no clasificó,
+  // ya quedó eliminado, o le tocó un bye) y define campeón y subcampeón.
+  simulateBracketFully() {
     const s = this.state;
-    let alive = s.playoff.alive;
-    let runnerUp = s.playoff.runnerUp || null;
-    while (alive.length > 1) {
-      const pairs = this.pairStage(alive);
-      const winners = pairs.map((pair) => {
-        const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
-        if (pairs.length === 1) runnerUp = pair.find((p) => p.id !== winnerId).id;
-        return pair.find((p) => p.id === winnerId);
-      });
-      alive = winners;
+    const result = this.simulateSeedsToChampion(s.bracket.alive);
+    s.bracket.champion = result.champion;
+    s.bracket.runnerUp = result.runnerUp;
+    this.onBracketComplete();
+  },
+
+  onBracketComplete() {
+    const s = this.state;
+    const season = s.season;
+    const kind = s.bracket.kind;
+
+    if (kind === 'apertura' || kind === 'clausura') {
+      season.myD1[kind].champion = s.bracket.champion;
+      season.myD1[kind].runnerUp = s.bracket.runnerUp;
+      s.bracket = null;
+      if (kind === 'apertura') this.startTransferWindow();
+      else this.finishMyDivisionYear();
+      return;
     }
-    s.playoff.alive = alive;
-    s.playoff.champion = alive[0] ? alive[0].id : null;
-    s.playoff.runnerUp = runnerUp;
+
+    if (kind === 'final-directa') {
+      const winner = s.bracket.champion;
+      const loser = s.bracket.runnerUp;
+      season.myD2.promotedDirect = winner;
+      s.bracket = null;
+      const pool = season.myD2.zoneATable.slice(1, 8).concat(season.myD2.zoneBTable.slice(1, 8)).map((r) => r.id).concat([loser]);
+      const seeds = pool.map((id, i) => ({ id, seed: i + 1 }));
+      seeds.push({ id: null, seed: seeds.length + 1 }); // 15 equipos -> se completa a 16 con 1 bye
+      this.startBracket('reducido', seeds, REDUCIDO_STAGES);
+      return;
+    }
+
+    if (kind === 'reducido') {
+      season.myD2.promotedReducido = s.bracket.champion;
+      s.bracket = null;
+      this.finishMyDivisionYear();
+      return;
+    }
+    this.save();
   },
 
-  // ---------- Fechas FIFA ----------
+  // ---------- Ventana de pases ----------
 
-  buildFifaEvent() {
-    const callUps = this.state.squad.filter((p) => p.rating >= 78).map((p) => ({ ...p }));
-    return { callUps, resolved: callUps.length === 0, results: null };
-  },
-
-  resolveFifaEvent(careRequested) {
+  startTransferWindow() {
     const s = this.state;
-    const results = s.fifaEvent.callUps.map((p) => {
-      const injuryChance = careRequested ? 0.05 : 0.15;
-      const real = s.squad.find((sp) => sp.id === p.id);
-      if (Math.random() < injuryChance) {
-        real.rating = Math.max(35, real.rating - 3);
-        return `${p.name} volvió con una molestia física tras la fecha FIFA.`;
-      }
-      if (Math.random() < 0.25) {
-        real.rating = Math.min(99, real.rating + 1);
-        return `${p.name} hizo un gran partido con ${this.nationName(p.nation)} y sumó experiencia.`;
-      }
-      return `${p.name} sumó minutos con ${this.nationName(p.nation)} sin sobresaltos.`;
-    });
-    s.fifaEvent.results = results;
-    s.fifaEvent.resolved = true;
+    s.season.transferReason = 'between-editions';
+    s.market = this.generateMarket();
+    s.screen = 'transfer';
     this.save();
   },
-
-  nationName(code) {
-    const n = NATIONS.find((x) => x.code === code);
-    return n ? n.name : code;
-  },
-
-  continueFromFifa() {
-    this.enterRound();
-    this.save();
-  },
-
-  // ---------- Mercado de pases (ventana de mitad de temporada) ----------
 
   generateMarket() {
     const club = this.getClub(this.state.clubId);
@@ -708,22 +853,75 @@ const Engine = {
   },
 
   continueFromTransfer() {
-    this.enterRound();
+    const s = this.state;
+    if (s.season.transferReason === 'between-editions') this.startEdition('clausura');
+    else this.enterEditionRound();
     this.save();
   },
 
-  // ---------- Fin de temporada: copas, ascensos y descensos ----------
+  // ---------- Fechas FIFA ----------
 
-  bottomN(table, n) {
-    const sorted = this.sortTable(table);
-    return sorted.slice(-n).map((r) => r.id);
+  buildFifaEvent() {
+    const callUps = this.state.squad.filter((p) => p.rating >= 78).map((p) => ({ ...p }));
+    return { callUps, resolved: callUps.length === 0, results: null };
   },
 
-  topN(table, n) {
-    return this.sortTable(table).slice(0, n).map((r) => r.id);
+  resolveFifaEvent(careRequested) {
+    const s = this.state;
+    const results = s.fifaEvent.callUps.map((p) => {
+      const injuryChance = careRequested ? 0.05 : 0.15;
+      const real = s.squad.find((sp) => sp.id === p.id);
+      if (Math.random() < injuryChance) {
+        real.rating = Math.max(35, real.rating - 3);
+        return `${p.name} volvió con una molestia física tras la fecha FIFA.`;
+      }
+      if (Math.random() < 0.25) {
+        real.rating = Math.min(99, real.rating + 1);
+        return `${p.name} hizo un gran partido con ${this.nationName(p.nation)} y sumó experiencia.`;
+      }
+      return `${p.name} sumó minutos con ${this.nationName(p.nation)} sin sobresaltos.`;
+    });
+    s.fifaEvent.results = results;
+    s.fifaEvent.resolved = true;
+    this.save();
   },
 
-  assignQualification(tablaAnual) {
+  nationName(code) {
+    const n = NATIONS.find((x) => x.code === code);
+    return n ? n.name : code;
+  },
+
+  continueFromFifa() {
+    this.enterEditionRound();
+    this.save();
+  },
+
+  // ---------- Fin de año: promedios, ascensos/descensos y cupos a copas ----------
+
+  // Reparte de nuevo las zonas de una división para que queden equilibradas
+  // (15/15 en Primera, 18/18 en la Nacional) después de mover clubes por
+  // ascenso/descenso. Se mezcla al azar, igual que un sorteo de zonas real.
+  rebalanceZones(division, perZone) {
+    const clubs = this.state.clubs.filter((c) => c.division === division);
+    const shuffled = [...clubs];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    shuffled.forEach((club, i) => { club.zone = i < perZone ? 'A' : 'B'; });
+  },
+
+  updateClubHistories(tablaAnualD1) {
+    tablaAnualD1.forEach((row) => {
+      const club = this.getClub(row.id);
+      if (!club.history) club.history = [];
+      club.history.push({ points: row.pts, played: row.played });
+      if (club.history.length > 3) club.history.shift();
+    });
+  },
+
+  assignQualification(d1Data, relegatedD1Ids) {
+    const s = this.state;
     const assigned = new Set();
     const results = [];
     const grant = (clubId, comp, stage) => {
@@ -733,50 +931,97 @@ const Engine = {
       return true;
     };
 
-    const s = this.state;
-    if (s.playoff) {
-      grant(s.playoff.champion, 'Libertadores', 'Fase de grupos');
-      grant(s.playoff.runnerUp, 'Libertadores', 'Fase previa');
+    const relegatedSet = new Set(relegatedD1Ids);
+    let libertadoresPorTablaNeeded = 2; // 1° y 2° de la tabla anual
+    const grantTitle = (clubId) => {
+      if (!clubId) { libertadoresPorTablaNeeded++; return; }
+      if (relegatedSet.has(clubId)) { libertadoresPorTablaNeeded++; return; } // pierde el cupo por descenso
+      const granted = grant(clubId, 'Libertadores', 'Directo');
+      if (!granted) libertadoresPorTablaNeeded++; // ya clasificado por otro título: libera el cupo y se reparte por tabla
+    };
+
+    grantTitle(d1Data.aperturaChampion);
+    grantTitle(d1Data.clausuraChampion);
+    if (s.copa.champion) grantTitle(s.clubId);
+    else libertadoresPorTablaNeeded++; // no trackeamos al campeón real si no fue el usuario; ese cupo se reparte por tabla
+
+    const tablaAnual = d1Data.tablaAnualYear;
+
+    let cursor = 0;
+    while (libertadoresPorTablaNeeded > 0 && cursor < tablaAnual.length) {
+      if (!assigned.has(tablaAnual[cursor].id)) { grant(tablaAnual[cursor].id, 'Libertadores', 'Fase previa'); libertadoresPorTablaNeeded--; }
+      cursor++;
     }
 
-    // El cupo de la Copa Argentina solo se asigna si el usuario fue quien la
-    // ganó: no simulamos en segundo plano el resto del cuadro de esa copa
-    // (serían más de 60 clubes), así que si el jugador no es el campeón, ese
-    // cupo se reparte igual que el resto, por tabla anual.
-    let libLeft = 1;
-    let sudaLeft = 3;
-    if (s.copa.champion) grant(s.clubId, 'Libertadores', 'Fase previa');
-    else libLeft++;
+    let repechajeIdx = 8; // 9° puesto (índice 8)
+    while (repechajeIdx < tablaAnual.length && assigned.has(tablaAnual[repechajeIdx].id)) repechajeIdx++;
+    if (repechajeIdx < tablaAnual.length) grant(tablaAnual[repechajeIdx].id, 'Libertadores', 'Repechaje');
 
-    if (tablaAnual) {
-      for (const row of tablaAnual) {
-        if (libLeft <= 0 && sudaLeft <= 0) break;
-        if (assigned.has(row.id)) continue;
-        if (libLeft > 0) { grant(row.id, 'Libertadores', 'Fase previa'); libLeft--; }
-        else { grant(row.id, 'Sudamericana', 'Fase de grupos'); sudaLeft--; }
-      }
+    let sudaNeeded = 6;
+    let sudaIdx = 2; // 3° puesto (índice 2)
+    while (sudaNeeded > 0 && sudaIdx < tablaAnual.length) {
+      if (!assigned.has(tablaAnual[sudaIdx].id)) { grant(tablaAnual[sudaIdx].id, 'Sudamericana', 'Fase de grupos'); sudaNeeded--; }
+      sudaIdx++;
     }
+
     return results;
   },
 
-  endSeason() {
+  finishMyDivisionYear() {
     const s = this.state;
-    // Se capturan ANTES de mover clubes de división: si el usuario asciende o
-    // desciende, this.getClub(s.clubId).division y userZoneKey() cambian, y
-    // necesitamos la zona/división en la que jugó esta temporada, no la que
-    // le toca en la próxima.
-    const divisionThisSeason = this.getClub(s.clubId).division;
-    const zoneKeyThisSeason = this.userZoneKey();
+    const season = s.season;
+    const divisionThisSeason = season.myDivision;
+    // Se captura ANTES de rebalancear zonas: el rebalanceo reasigna la zona
+    // de todos los clubes, así que consultar club.zone después ya no sirve
+    // para saber quién jugó en tu zona ESTA temporada.
+    const myZoneClubIds = new Set(season.zones[this.myZoneKey()].clubIds);
 
-    // Ascensos y descensos se calculan siempre para las 4 zonas, sea cual
-    // sea la división del usuario, porque la liga completa se mueve entera
-    // de una temporada a la otra.
-    const relegated = this.bottomN(s.season.zones['D1-A'].table, 2).concat(this.bottomN(s.season.zones['D1-B'].table, 2));
-    const promoted = this.topN(s.season.zones['D2-A'].table, 2).concat(this.topN(s.season.zones['D2-B'].table, 2));
+    let myYearResult;
+    if (divisionThisSeason === 'D1') {
+      myYearResult = {
+        tablaAnualYear: this.combineEditionTables(season.myD1.apertura, season.myD1.clausura),
+        aperturaChampion: season.myD1.apertura.champion,
+        clausuraChampion: season.myD1.clausura.champion,
+      };
+    } else {
+      myYearResult = {
+        promoted: [season.myD2.promotedDirect, season.myD2.promotedReducido],
+        zoneATable: season.myD2.zoneATable,
+        zoneBTable: season.myD2.zoneBTable,
+      };
+    }
+
+    const bg = season.backgroundResult;
+    const d1Data = divisionThisSeason === 'D1' ? myYearResult : bg;
+    const d2Data = divisionThisSeason === 'D2' ? myYearResult : bg;
+
+    const tablaAnualD1 = d1Data.tablaAnualYear;
+    this.updateClubHistories(tablaAnualD1);
+    const lastByTable = tablaAnualD1[tablaAnualD1.length - 1].id;
+    const promedios = tablaAnualD1.map((row) => {
+      const club = this.getClub(row.id);
+      const totalPts = club.history.reduce((sum, h) => sum + h.points, 0);
+      const totalPlayed = club.history.reduce((sum, h) => sum + h.played, 0);
+      return { id: row.id, coef: totalPlayed > 0 ? totalPts / totalPlayed : 0 };
+    }).sort((a, b) => a.coef - b.coef);
+    let worstPromedio = promedios[0].id;
+    if (worstPromedio === lastByTable) worstPromedio = promedios[1] ? promedios[1].id : null;
+    const relegated = worstPromedio && worstPromedio !== lastByTable ? [lastByTable, worstPromedio] : [lastByTable];
+
+    const promoted = d2Data.promoted.filter((id) => !!id);
+
     relegated.forEach((id) => { this.getClub(id).division = 'D2'; });
     promoted.forEach((id) => { this.getClub(id).division = 'D1'; });
 
-    const qualification = this.assignQualification(s.season.tablaAnual || null);
+    // Como el descenso (tabla anual + promedios) y el ascenso (Final directa +
+    // Reducido) no respetan las zonas de origen, hay que volver a repartir las
+    // zonas para que queden 15/15 en Primera y 18/18 en la Nacional. Los
+    // clubes que no se movieron pueden cambiar de zona igual: en la vida real
+    // la AFA también rearma las zonas cada temporada.
+    this.rebalanceZones('D1', 15);
+    this.rebalanceZones('D2', 18);
+
+    const qualification = this.assignQualification(d1Data, relegated);
 
     const userRelegated = relegated.includes(s.clubId);
     const userPromoted = promoted.includes(s.clubId);
@@ -784,12 +1029,12 @@ const Engine = {
     if (userRelegated) {
       const penalty = Math.round(s.budget * 0.25);
       s.budget -= penalty;
-      economyNote = `Por el descenso, el presupuesto bajó ${penalty.toLocaleString('es-AR')} para la próxima temporada.`;
+      economyNote = `Por el descenso, el presupuesto bajó $${penalty.toLocaleString('es-AR')} para la próxima temporada.`;
     } else if (userPromoted) {
       s.budget += 400000;
       economyNote = 'Por el ascenso, la dirigencia sumó un refuerzo económico de $400.000.';
-    } else if (divisionThisSeason === 'D1' && s.season.tablaAnual) {
-      const pos = s.season.tablaAnual.findIndex((r) => r.id === s.clubId) + 1;
+    } else if (divisionThisSeason === 'D1') {
+      const pos = tablaAnualD1.findIndex((r) => r.id === s.clubId) + 1;
       const bonus = Math.max(0, Math.round((31 - pos) * 120000));
       s.budget += bonus;
       economyNote = `Premio por terminar ${pos}° en la tabla anual: $${bonus.toLocaleString('es-AR')}.`;
@@ -800,9 +1045,20 @@ const Engine = {
 
     s.lastSeasonSummary = {
       division: divisionThisSeason,
-      zoneTable: this.sortTable(s.season.zones[zoneKeyThisSeason].table),
-      tablaAnual: s.season.tablaAnual || null,
-      playoff: s.playoff,
+      isD1: divisionThisSeason === 'D1',
+      // tablaAnualD1 ya viene ordenada por puntos: filtrar preserva el orden relativo.
+      myZoneTable: divisionThisSeason === 'D1'
+        ? tablaAnualD1.filter((r) => myZoneClubIds.has(r.id))
+        : (season.myZone === 'A' ? season.myD2.zoneATable : season.myD2.zoneBTable),
+      tablaAnualD1,
+      aperturaChampion: d1Data.aperturaChampion ? this.getClub(d1Data.aperturaChampion).name : null,
+      clausuraChampion: d1Data.clausuraChampion ? this.getClub(d1Data.clausuraChampion).name : null,
+      userWasAperturaChampion: d1Data.aperturaChampion === s.clubId,
+      userWasClausuraChampion: d1Data.clausuraChampion === s.clubId,
+      d2PromotedDirect: d2Data.promoted[0] ? this.getClub(d2Data.promoted[0]).name : null,
+      d2PromotedReducido: d2Data.promoted[1] ? this.getClub(d2Data.promoted[1]).name : null,
+      userPromotedDirect: d2Data.promoted[0] === s.clubId,
+      userPromotedReducido: d2Data.promoted[1] === s.clubId,
       copa: s.copa,
       qualification,
       relegated: relegated.map((id) => this.getClub(id).name),
@@ -814,16 +1070,6 @@ const Engine = {
 
     s.squad.forEach((p) => { p.age++; });
     s.screen = 'season-end';
-    this.save();
-  },
-
-  startNewSeason() {
-    const s = this.state;
-    const year = s.season.year + 1;
-    s.season = null;
-    this.startSeasonStructures();
-    s.season.year = year;
-    this.enterRound();
     this.save();
   },
 };

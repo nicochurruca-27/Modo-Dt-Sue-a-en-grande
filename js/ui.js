@@ -63,16 +63,19 @@ function competitionLabel() {
   const s = Engine.state;
   const ctx = s.matchContext;
   if (!ctx) return '';
-  if (ctx.context === 'league') return `Liga — Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}`;
+  if (ctx.context === 'league') {
+    const editionLabel = s.season.edition ? `${s.season.edition === 'apertura' ? 'Apertura' : 'Clausura'} — ` : '';
+    return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}`;
+  }
   if (ctx.context === 'copa') return `Copa Argentina — ${COPA_STAGE_NAMES[ctx.stageIndex]}`;
-  if (ctx.context === 'playoff') return `Playoffs de Primera — ${PLAYOFF_STAGES[s.playoff.stageIndex]}`;
+  if (ctx.context === 'bracket') return Engine.bracketStageLabel();
   return '';
 }
 
 function header() {
   const s = Engine.state;
   const club = Engine.getClub(s.clubId);
-  const zoneKey = Engine.userZoneKey();
+  const zoneKey = Engine.myZoneKey();
   const table = Engine.sortTable(s.season.zones[zoneKey].table);
   const pos = table.findIndex((r) => r.id === s.clubId) + 1;
   const divisionName = club.division === 'D1' ? 'Primera División' : 'Primera Nacional';
@@ -183,7 +186,7 @@ function renderMatchResult() {
     ? `Definición por penales: ${home.name} ${m.shootout.homeScore} - ${m.shootout.awayScore} ${away.name}.`
     : '';
 
-  const contextLabel = m.context === 'copa' ? 'Copa Argentina' : m.context === 'playoff' ? 'Playoffs' : 'Liga';
+  const contextLabel = m.context === 'copa' ? 'Copa Argentina' : m.context === 'bracket' ? competitionLabel() : 'Liga';
 
   app.innerHTML = `
     ${header()}
@@ -201,10 +204,13 @@ function renderMatchResult() {
 
 function renderTransfer() {
   const s = Engine.state;
+  const windowLabel = s.season.transferReason === 'between-editions'
+    ? 'Mercado de pases — ventana entre el Apertura y el Clausura'
+    : 'Mercado de pases — ventana de mitad de temporada';
   app.innerHTML = `
     ${header()}
     <div class="card">
-      <h2>Mercado de pases — ventana de mitad de temporada</h2>
+      <h2>${windowLabel}</h2>
       <p class="muted">Podés comprar refuerzos si el presupuesto alcanza, y vender jugadores del plantel.</p>
       <h3>Ofertas disponibles</h3>
       <div class="options" id="market-list">
@@ -290,35 +296,42 @@ function renderFifaBreak() {
 function renderSeasonEnd() {
   const s = Engine.state;
   const sum = s.lastSeasonSummary;
-  const pos = sum.zoneTable.findIndex((r) => r.id === s.clubId) + 1;
+  const pos = sum.myZoneTable.findIndex((r) => r.id === s.clubId) + 1;
 
-  let playoffText;
-  const championName = sum.playoff.champion ? Engine.getClub(sum.playoff.champion).name : '—';
-  if (sum.playoff.champion === s.clubId) playoffText = '¡Sos el campeón del torneo de Primera División!';
-  else if (sum.playoff.runnerUp === s.clubId) playoffText = `Fuiste subcampeón del torneo. Campeón: ${championName}.`;
-  else playoffText = `Campeón del torneo de Primera División: ${championName}.`;
+  let torneosText;
+  if (sum.userWasAperturaChampion && sum.userWasClausuraChampion) torneosText = '¡Ganaste el Apertura Y el Clausura!';
+  else if (sum.userWasAperturaChampion) torneosText = `¡Ganaste el Apertura! Clausura: campeón ${sum.clausuraChampion}.`;
+  else if (sum.userWasClausuraChampion) torneosText = `¡Ganaste el Clausura! Apertura: campeón ${sum.aperturaChampion}.`;
+  else torneosText = `Campeón del Apertura: ${sum.aperturaChampion || '—'}. Campeón del Clausura: ${sum.clausuraChampion || '—'}.`;
 
   let copaText;
   if (sum.copa.champion) copaText = '¡Sos el campeón de la Copa Argentina!';
   else if (sum.copa.eliminatedAt) copaText = `Quedaste eliminado de la Copa Argentina en ${sum.copa.eliminatedAt}.`;
   else copaText = 'No llegaste a disputar partidos de Copa Argentina esta temporada.';
 
+  let ascensoText = '';
+  if (!sum.isD1) {
+    if (sum.userPromotedDirect) ascensoText = '¡Ascendiste ganando la Final directa entre líderes de zona!';
+    else if (sum.userPromotedReducido) ascensoText = '¡Ascendiste ganando el Torneo Reducido!';
+    else ascensoText = `Ascenso directo: ${sum.d2PromotedDirect}. Ascenso por Reducido: ${sum.d2PromotedReducido}.`;
+  }
+
   const movementText = sum.userRelegated
-    ? `Descendiste a ${sum.division === 'D1' ? 'Primera Nacional' : 'una categoría inferior'} para la próxima temporada.`
+    ? 'Descendiste a Primera Nacional para la próxima temporada.'
     : sum.userPromoted
       ? '¡Lograste el ascenso a Primera División!'
-      : `Seguís en ${sum.division === 'D1' ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
+      : `Seguís en ${sum.isD1 ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
 
   app.innerHTML = `
     <div class="card">
       <h1>Fin de temporada — Año ${s.season.year}</h1>
-      <p>Terminaste ${pos}° en tu zona (${sum.zoneTable[pos - 1].pts} puntos).</p>
-      <h3>Tabla de tu zona</h3>
+      <p>Terminaste ${pos}° en tu zona (${sum.myZoneTable[pos - 1].pts} puntos en el año).</p>
+      <h3>Tabla de tu zona (temporada completa)</h3>
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
           <tbody>
-            ${sum.zoneTable.map((r, i) => `
+            ${sum.myZoneTable.map((r, i) => `
               <tr class="${r.id === s.clubId ? 'me' : ''}">
                 <td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td><td>${r.gf}</td><td>${r.ga}</td><td>${r.pts}</td>
               </tr>
@@ -327,8 +340,10 @@ function renderSeasonEnd() {
         </table>
       </div>
 
-      <h3>Playoffs de Primera División</h3>
-      <p>${playoffText}</p>
+      <h3>Torneos de Primera División</h3>
+      <p>${torneosText}</p>
+
+      ${!sum.isD1 ? `<h3>Ascenso a Primera División</h3><p>${ascensoText}</p>` : ''}
 
       <h3>Copa Argentina</h3>
       <p>${copaText}</p>
@@ -340,10 +355,10 @@ function renderSeasonEnd() {
         </ul>
       ` : ''}
 
-      <h3>Ascensos y descensos</h3>
+      <h3>Ascensos y descensos de Primera División</h3>
       <p><strong>${movementText}</strong></p>
-      <p class="muted">Descendieron: ${sum.relegated.join(', ')}.</p>
-      <p class="muted">Ascendieron: ${sum.promoted.join(', ')}.</p>
+      <p class="muted">Descendieron (último de la tabla anual + peor promedio): ${sum.relegated.join(', ')}.</p>
+      <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
       <p class="muted">${sum.economyNote}</p>
 
       <button class="option-btn" id="continue-season-btn">Comenzar nueva temporada</button>

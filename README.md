@@ -16,53 +16,68 @@ abrir seguís donde quedaste.
 
 - **Primera División y Primera Nacional**: 30 clubes reales en Primera (2
   zonas de 15) y 36 en la Nacional (2 zonas de 18). Podés arrancar tu carrera
-  en cualquiera de las dos.
+  en cualquiera de las dos. Las zonas se vuelven a sortear cada temporada
+  (como en la vida real) para mantener siempre ese reparto.
 - **Sin escudos por ahora**: se muestra solo el nombre de cada club. Se
   descartó generar escudos propios a pedido tuyo — cuando quieras sumar los
   oficiales, es cuestión de agregar las imágenes y un par de líneas en
   `ui.js` para mostrarlas.
-- **Liga**: fase de zonas a una rueda (con 1 fecha libre en Primera, porque
-  15 es impar). En Primera, los 16 mejores de la tabla combinada de ambas
-  zonas ("tabla anual") juegan playoffs de octavos a la final para coronar
-  campeón del torneo.
-- **Copa Argentina**: eliminación directa en paralelo a la liga, abierta a
-  clubes de las dos divisiones, con rival sorteado al azar en cada ronda
-  (dieciseisavos, octavos, cuartos, semifinal y final).
+- **Apertura y Clausura**: en Primera se juegan dos torneos por año, cada uno
+  con fase de zonas a una rueda y playoffs de octavos a la final (16 mejores
+  de la tabla combinada de esa edición), con una ventana de pases entre
+  ambos. La Nacional juega un solo torneo anual a una rueda.
+- **Copa Argentina**: eliminación directa en paralelo al Apertura (o al único
+  torneo de la Nacional), abierta a clubes de las dos divisiones, con rival
+  sorteado al azar en cada ronda (dieciseisavos, octavos, cuartos, semifinal
+  y final).
 - **Fechas FIFA**: pausan la liga; tus jugadores mejor valorados pueden ser
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
-- **Cupos a copas internacionales**: campeón del torneo → Copa Libertadores
-  (grupos); subcampeón y campeón de la Copa Argentina → Libertadores
-  (previa); el resto de los cupos (Libertadores y Sudamericana) se reparten
-  por la tabla anual, salteando a los clubes que ya clasificaron por otra
-  vía — igual que en la vida real.
-- **Ascensos y descensos**: a fin de temporada bajan los últimos 2 de cada
-  zona de Primera y suben los primeros 2 de cada zona de la Nacional.
-- **Mercado de pases**: una sola ventana, a mitad de temporada.
+- **Cupos a copas internacionales** (según el formato real de AFA): 6 a
+  Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
+  Copa Argentina, 1º y 2º de la Tabla Anual, y un repechaje anclado en el
+  9º— y 6 a Sudamericana (del 3º al 8º de la Tabla Anual). Siempre se
+  saltea a un club ya clasificado por otra vía, y si un campeón desciende
+  esa misma temporada pierde el cupo directo (se reparte igual por tabla).
+- **Ascensos y descensos** (a fin de año, 2 de cada): en Primera descienden
+  el último de la Tabla Anual y el club con peor promedio de puntos por
+  partido de las últimas 3 temporadas (si coinciden, el segundo descenso
+  pasa al siguiente peor promedio); en la Nacional ascienden el ganador de
+  una Final directa entre los líderes de cada zona, y el ganador de un
+  Torneo Reducido (2º a 8º de cada zona + el perdedor de la Final).
+- **Mercado de pases**: en Primera, una ventana entre el Apertura y el
+  Clausura; en la Nacional, una ventana a mitad de su único torneo.
 - **Valoración de jugadores**: cada jugador tiene una valoración (0-100) que
   puede subir o bajar con el tiempo por edad (los jóvenes mejoran, los
   grandes bajan), por rendimiento en cancha y por tus decisiones de
   entrenamiento.
 - **Penales**: elegís quién patea y la dirección (o la del arquero cuando el
   penal es en contra). En instancias de eliminación directa que terminan
-  empatadas, se resuelve por penales.
+  empatadas (Copa Argentina, playoffs, Final por el ascenso, Reducido), se
+  resuelve por penales.
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 
-El fútbol argentino real tiene reglas bastante más intrincadas que cambian
-de temporada en temporada. Para que el simulador sea jugable, se
+El fútbol argentino real tiene reglas bastante más intrincadas y que además
+cambian de temporada en temporada. Para que el simulador sea jugable, se
 simplificó así:
 
-- El torneo es a una sola rueda (no ida y vuelta), y el playoff es a partido
-  único (no ida y vuelta), con definición por penales en caso de empate.
-- El descenso usa la tabla de la zona de esa única temporada, no el sistema
-  real de promedios de varios años.
+- Cada torneo es a una sola rueda (no ida y vuelta), y los cuadros
+  eliminatorios (playoffs, Copa Argentina, Final por el ascenso, Reducido)
+  son a partido único, con definición por penales en caso de empate — en
+  vez de partidos de ida y vuelta.
 - La Copa Argentina solo trackea el recorrido de TU club: no se simula en
   segundo plano el resto del cuadro (son más de 60 equipos), así que si no
   la ganás vos, ese cupo a Libertadores se reparte por tabla anual en su
   lugar.
+- No se simula que un club argentino sea el actual campeón vigente de la
+  Libertadores o la Sudamericana (eso requeriría simular esas copas
+  también), así que esa excepción de cupo directo no está implementada.
 - Los rivales tienen una "fuerza" abstracta basada en su reputación (no
   tienen plantel jugador por jugador como el tuyo): simular 66 planteles
-  completos no aportaba nada jugable y sí mucho costo.
+  completos no aportaba nada jugable y sí mucho costo. Por eso, la división
+  en la que NO jugás se resuelve entera e instantáneamente al arrancar el
+  año (no hay nada interactivo ahí, pero sus resultados sí importan para los
+  cupos a copas y los ascensos/descensos).
 - Los nombres de jugadores son generados al azar, no son futbolistas reales.
 
 ## Stack técnico usado
