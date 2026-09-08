@@ -4,7 +4,6 @@
 
 const app = document.getElementById('app');
 
-let selectDivision = 'D1';
 let selectZone = 'A';
 
 function money(n) {
@@ -24,15 +23,11 @@ function render() {
 }
 
 function renderClubSelect() {
-  const clubs = CLUB_TEMPLATES.filter((c) => c.division === selectDivision && c.zone === selectZone);
+  const clubs = CLUB_TEMPLATES.filter((c) => c.division === 'D1' && c.zone === selectZone);
   app.innerHTML = `
     <div class="card">
       <h1>Elegí tu club</h1>
-      <p class="muted">Dirigís una temporada completa: liga (con playoffs si jugás en Primera), Copa Argentina, fechas FIFA y mercado de pases a mitad de año.</p>
-      <div class="tabs">
-        <button class="tab-btn ${selectDivision === 'D1' ? 'active' : ''}" data-division="D1">Primera División</button>
-        <button class="tab-btn ${selectDivision === 'D2' ? 'active' : ''}" data-division="D2">Primera Nacional</button>
-      </div>
+      <p class="muted">Dirigís una temporada completa de Primera División: Apertura y Clausura con playoffs, Copa Argentina, fechas FIFA y mercado de pases entre torneos.</p>
       <div class="tabs">
         <button class="tab-btn ${selectZone === 'A' ? 'active' : ''}" data-zone="A">Zona A</button>
         <button class="tab-btn ${selectZone === 'B' ? 'active' : ''}" data-zone="B">Zona B</button>
@@ -48,9 +43,6 @@ function renderClubSelect() {
       </div>
     </div>
   `;
-  app.querySelectorAll('[data-division]').forEach((btn) => {
-    btn.addEventListener('click', () => { selectDivision = btn.dataset.division; render(); });
-  });
   app.querySelectorAll('[data-zone]').forEach((btn) => {
     btn.addEventListener('click', () => { selectZone = btn.dataset.zone; render(); });
   });
@@ -77,10 +69,9 @@ function header() {
   const zoneKey = Engine.myZoneKey();
   const table = Engine.sortTable(s.season.zones[zoneKey].table);
   const pos = table.findIndex((r) => r.id === s.clubId) + 1;
-  const divisionName = club.division === 'D1' ? 'Primera División' : 'Primera Nacional';
   return `
     <div class="topbar">
-      <div><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></div>
+      <div><strong>${club.name}</strong> <span class="muted">— Primera División, Zona ${club.zone}</span></div>
       <div class="muted">${competitionLabel()}</div>
       <div class="muted">Presupuesto: ${money(s.budget)} · Posición en zona: ${pos}°/${table.length} · Ánimo: ${s.morale}</div>
     </div>
@@ -325,18 +316,10 @@ function renderSeasonEnd() {
     ? '¡Sos el campeón de la Copa Argentina!'
     : `Campeón de la Copa Argentina: ${sum.copaChampionName || '—'}.`;
 
-  let ascensoText = '';
-  if (!sum.isD1) {
-    if (sum.userPromotedDirect) ascensoText = '¡Ascendiste ganando la Final directa entre líderes de zona!';
-    else if (sum.userPromotedReducido) ascensoText = '¡Ascendiste ganando el Torneo Reducido!';
-    else ascensoText = `Ascenso directo: ${sum.d2PromotedDirect}. Ascenso por Reducido: ${sum.d2PromotedReducido}.`;
-  }
-
-  const movementText = sum.userRelegated
-    ? 'Descendiste a Primera Nacional para la próxima temporada.'
-    : sum.userPromoted
-      ? '¡Lograste el ascenso a Primera División!'
-      : `Seguís en ${sum.isD1 ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
+  // Tu club nunca puede ser uno de los 2 descensos (ver finishMyDivisionYear
+  // en engine.js): sin Primera Nacional jugable, no habría dónde competir la
+  // temporada siguiente. Los otros 29 sí bajan y suben normalmente.
+  const movementText = `Seguís en Primera División la próxima temporada (terminaste ${pos}° en la tabla anual).`;
 
   app.innerHTML = `
     <div class="card">
@@ -359,8 +342,6 @@ function renderSeasonEnd() {
       <h3>Torneos de Primera División</h3>
       <p>${torneosText}</p>
 
-      ${!sum.isD1 ? `<h3>Ascenso a Primera División</h3><p>${ascensoText}</p>` : ''}
-
       <h3>Copa Argentina</h3>
       <p>${copaText}</p>
 
@@ -371,10 +352,10 @@ function renderSeasonEnd() {
         </ul>
       ` : ''}
 
-      <h3>Ascensos y descensos de Primera División</h3>
+      <h3>Ascensos y descensos</h3>
       <p><strong>${movementText}</strong></p>
       <p class="muted">Descendieron (último de la tabla anual + peor promedio): ${sum.relegated.join(', ')}.</p>
-      <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
+      <p class="muted">Ascendieron desde la reserva: ${sum.promoted.join(', ')}.</p>
       <p class="muted">${sum.economyNote}</p>
 
       <button class="option-btn" id="continue-season-btn">Comenzar nueva temporada</button>
