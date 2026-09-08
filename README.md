@@ -57,7 +57,10 @@ abrir seguís donde quedaste.
   una Final directa entre los líderes de cada zona, y el ganador de un
   Torneo Reducido (2º a 8º de cada zona + el perdedor de la Final).
 - **Mercado de pases**: en Primera, una ventana entre el Apertura y el
-  Clausura; en la Nacional, una ventana a mitad de su único torneo.
+  Clausura; en la Nacional, una ventana a mitad de su único torneo. Justo
+  antes de abrir el mercado, si algún jugador de tu plantel tiene el
+  contrato por vencer a fin de esa temporada, te avisa para que decidas
+  renovarlo (con costo) o dejarlo ir a fin de año.
 - **Valoración de jugadores**: cada jugador tiene una valoración (0-100) que
   puede subir o bajar con el tiempo por edad (los jóvenes mejoran, los
   grandes bajan), por rendimiento en cancha y por tus decisiones de

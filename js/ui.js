@@ -18,6 +18,7 @@ function render() {
   if (s.screen === 'pre-match') return renderPreMatch();
   if (s.screen === 'penalty') return renderPenalty();
   if (s.screen === 'match-result') return renderMatchResult();
+  if (s.screen === 'contract-renewal') return renderContractRenewal();
   if (s.screen === 'transfer') return renderTransfer();
   if (s.screen === 'fifa-break') return renderFifaBreak();
   if (s.screen === 'season-end') return renderSeasonEnd();
@@ -219,6 +220,31 @@ function renderMatchResult() {
   document.getElementById('continue-btn').addEventListener('click', () => { Engine.finishMatchAndAdvance(); render(); });
 }
 
+function renderContractRenewal() {
+  const s = Engine.state;
+  const playerId = s.contractQueue[0];
+  const player = s.squad.find((p) => p.id === playerId);
+  const renewCost = Math.round(player.rating * 8000);
+  const canRelease = s.squad.length > 12;
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card">
+      <h2>Contrato por vencer</h2>
+      <p>El contrato de <strong>${player.name}</strong> (${player.pos}, ${player.rating}, ${player.age} años) termina a fin de esta temporada.</p>
+      <div class="options">
+        <button class="option-btn" id="renew-btn">Renovar por ${money(renewCost)}</button>
+        <button class="option-btn danger" id="release-btn" ${canRelease ? '' : 'disabled'}>Dejarlo ir a fin de año</button>
+      </div>
+      ${!canRelease ? '<p class="muted">No podés dejarlo ir: el plantel ya está en el mínimo jugable.</p>' : ''}
+    </div>
+  `;
+  document.getElementById('renew-btn').addEventListener('click', () => { Engine.resolveContractDecision(true); render(); });
+  if (canRelease) {
+    document.getElementById('release-btn').addEventListener('click', () => { Engine.resolveContractDecision(false); render(); });
+  }
+}
+
 function renderTransfer() {
   const s = Engine.state;
   const windowLabel = s.season.transferReason === 'between-editions'
@@ -243,7 +269,7 @@ function renderTransfer() {
       <div class="options" id="squad-list">
         ${s.squad.map((p, i) => `
           <div class="pick-row">
-            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años)</span>
+            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — contrato hasta fin de ${p.contractYears > 1 ? `${p.contractYears} temporadas` : '1 temporada'}</span>
             <button class="option-btn small danger" data-i="${i}">Vender</button>
           </div>
         `).join('')}

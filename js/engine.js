@@ -115,7 +115,8 @@ const Engine = {
       const rating = Math.max(35, Math.min(90, Math.round(base + (Math.random() * 16 - 8))));
       const age = Math.round(17 + Math.random() * 18);
       const nation = this.rollNation();
-      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation };
+      const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
+      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears };
     });
   },
 
@@ -856,9 +857,43 @@ const Engine = {
 
   // ---------- Ventana de pases ----------
 
+  // A mitad de temporada (ventana entre Apertura y Clausura) es cuando en la
+  // vida real empiezan a preocupar los contratos que vencen a fin de año:
+  // por eso el aviso de renovación aparece acá, antes de abrir el mercado.
   startTransferWindow() {
     const s = this.state;
     s.season.transferReason = 'between-editions';
+    s.contractQueue = s.squad.filter((p) => p.contractYears <= 1).map((p) => p.id);
+    this.showNextContractDecision();
+  },
+
+  showNextContractDecision() {
+    const s = this.state;
+    if (!s.contractQueue || !s.contractQueue.length) {
+      this.openTransferMarket();
+      return;
+    }
+    s.screen = 'contract-renewal';
+    this.save();
+  },
+
+  resolveContractDecision(renew) {
+    const s = this.state;
+    const playerId = s.contractQueue.shift();
+    const player = s.squad.find((p) => p.id === playerId);
+    // No se puede dejar ir a nadie si el plantel ya está en el mínimo jugable.
+    if (player && (renew || s.squad.length <= 12)) {
+      const cost = Math.round(player.rating * 8000);
+      s.budget -= cost;
+      player.contractYears = 2 + Math.floor(Math.random() * 2);
+    } else if (player) {
+      s.squad = s.squad.filter((p) => p.id !== playerId);
+    }
+    this.showNextContractDecision();
+  },
+
+  openTransferMarket() {
+    const s = this.state;
     s.market = this.generateMarket();
     s.screen = 'transfer';
     this.save();
@@ -884,7 +919,7 @@ const Engine = {
     const samePos = s.squad.filter((p) => p.pos === offer.pos);
     const target = (samePos.length ? samePos : s.squad).sort((a, b) => a.rating - b.rating)[0];
     const idx = s.squad.findIndex((p) => p.id === target.id);
-    s.squad[idx] = { id: offer.id, name: offer.name, pos: offer.pos, rating: offer.rating, age: offer.age, nation: offer.nation };
+    s.squad[idx] = { id: offer.id, name: offer.name, pos: offer.pos, rating: offer.rating, age: offer.age, nation: offer.nation, contractYears: 3 };
     s.market.splice(marketIndex, 1);
     this.save();
     return true;
@@ -1116,7 +1151,7 @@ const Engine = {
       economyNote,
     };
 
-    s.squad.forEach((p) => { p.age++; });
+    s.squad.forEach((p) => { p.age++; p.contractYears = Math.max(0, p.contractYears - 1); });
     s.screen = 'season-end';
     this.save();
   },
