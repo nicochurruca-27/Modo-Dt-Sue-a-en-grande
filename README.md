@@ -94,7 +94,19 @@ simplificó así:
   en la que NO jugás se resuelve entera e instantáneamente al arrancar el
   año (no hay nada interactivo ahí, pero sus resultados sí importan para los
   cupos a copas y los ascensos/descensos).
-- Los nombres de jugadores son generados al azar, no son futbolistas reales.
+- Los nombres de jugadores son generados al azar, salvo que el club tenga
+  un plantel real cargado (ver abajo).
+
+## En progreso
+
+- **Jugadores reales**: `js/players.js` tiene los planteles reales que ya
+  se investigaron (nombre, edad, nacionalidad, contrato y una valoración
+  estimada), club por club. Un club sin entrada ahí sigue usando el
+  generador de jugadores al azar — no rompe nada mientras se van sumando
+  el resto. Ya está cargado: River Plate (28 jugadores).
+- **Escudos reales**: pendientes de que se sumen las imágenes (son marca
+  registrada de cada club, así que no se pueden generar ni bajar de
+  internet sin más).
 
 ## Stack técnico usado
 
@@ -113,6 +125,8 @@ index.html    → esqueleto de la página
 style.css     → estilos visuales
 js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
+js/players.js → planteles reales investigados club por club (se van
+                sumando de a poco; sin entrada ahí = jugadores al azar)
 js/engine.js  → toda la lógica: arma planteles, arma el calendario de cada
                 zona, simula partidos y playoffs, aplica decisiones,
                 administra ascensos/descensos y cupos a copas

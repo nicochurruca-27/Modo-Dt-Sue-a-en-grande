@@ -109,7 +109,15 @@ const Engine = {
     return table[tier] || table[1];
   },
 
+  // Si el club tiene un plantel real cargado en players.js, se usa ese en
+  // vez de generar jugadores al azar. Ver REAL_ROSTERS en ese archivo.
   generateSquad(club) {
+    const real = REAL_ROSTERS[club.id];
+    if (real && real.length >= 11) {
+      return real.map((p, i) => ({
+        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears,
+      }));
+    }
     return SQUAD_POSITIONS.map((pos, i) => {
       const base = 44 + club.reputation * 6;
       const rating = Math.max(35, Math.min(90, Math.round(base + (Math.random() * 16 - 8))));
