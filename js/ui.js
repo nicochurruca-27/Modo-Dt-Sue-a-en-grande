@@ -67,7 +67,6 @@ function competitionLabel() {
     const editionLabel = s.season.edition ? `${s.season.edition === 'apertura' ? 'Apertura' : 'Clausura'} — ` : '';
     return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}`;
   }
-  if (ctx.context === 'copa') return `Copa Argentina — ${COPA_STAGE_NAMES[ctx.stageIndex]}`;
   if (ctx.context === 'bracket') return Engine.bracketStageLabel();
   return '';
 }
@@ -186,7 +185,7 @@ function renderMatchResult() {
     ? `Definición por penales: ${home.name} ${m.shootout.homeScore} - ${m.shootout.awayScore} ${away.name}.`
     : '';
 
-  const contextLabel = m.context === 'copa' ? 'Copa Argentina' : m.context === 'bracket' ? competitionLabel() : 'Liga';
+  const contextLabel = m.context === 'bracket' ? competitionLabel() : 'Liga';
 
   app.innerHTML = `
     ${header()}
@@ -304,10 +303,9 @@ function renderSeasonEnd() {
   else if (sum.userWasClausuraChampion) torneosText = `¡Ganaste el Clausura! Apertura: campeón ${sum.aperturaChampion}.`;
   else torneosText = `Campeón del Apertura: ${sum.aperturaChampion || '—'}. Campeón del Clausura: ${sum.clausuraChampion || '—'}.`;
 
-  let copaText;
-  if (sum.copa.champion) copaText = '¡Sos el campeón de la Copa Argentina!';
-  else if (sum.copa.eliminatedAt) copaText = `Quedaste eliminado de la Copa Argentina en ${sum.copa.eliminatedAt}.`;
-  else copaText = 'No llegaste a disputar partidos de Copa Argentina esta temporada.';
+  const copaText = sum.userWonCopa
+    ? '¡Sos el campeón de la Copa Argentina!'
+    : `Campeón de la Copa Argentina: ${sum.copaChampionName || '—'}.`;
 
   let ascensoText = '';
   if (!sum.isD1) {

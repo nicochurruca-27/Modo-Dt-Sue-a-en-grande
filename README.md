@@ -26,10 +26,13 @@ abrir seguís donde quedaste.
   con fase de zonas a una rueda y playoffs de octavos a la final (16 mejores
   de la tabla combinada de esa edición), con una ventana de pases entre
   ambos. La Nacional juega un solo torneo anual a una rueda.
-- **Copa Argentina**: eliminación directa en paralelo al Apertura (o al único
-  torneo de la Nacional), abierta a clubes de las dos divisiones, con rival
-  sorteado al azar en cada ronda (dieciseisavos, octavos, cuartos, semifinal
-  y final).
+- **Copa Argentina**: al arrancar el año se sortea un cuadro de 32 (los 30
+  clubes de Primera + 2 de la Nacional, garantizando que tu club esté
+  adentro) y se juega en paralelo al Apertura (o al único torneo de la
+  Nacional): dieciseisavos, octavos, cuartos, semifinal y final — las mismas
+  rondas que tiene la competencia real desde la fase de los 32. El resto del
+  cuadro se resuelve solo según la fuerza de cada club, así que siempre hay
+  un campeón real al final, lo ganes vos o no.
 - **Fechas FIFA**: pausan la liga; tus jugadores mejor valorados pueden ser
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
@@ -65,10 +68,11 @@ simplificó así:
   eliminatorios (playoffs, Copa Argentina, Final por el ascenso, Reducido)
   son a partido único, con definición por penales en caso de empate — en
   vez de partidos de ida y vuelta.
-- La Copa Argentina solo trackea el recorrido de TU club: no se simula en
-  segundo plano el resto del cuadro (son más de 60 equipos), así que si no
-  la ganás vos, ese cupo a Libertadores se reparte por tabla anual en su
-  lugar.
+- El cuadro de la Copa Argentina son 32 equipos (30 de Primera + 2 de la
+  Nacional), no los más de 200 clubes de todas las categorías que compiten
+  en la vida real a través de fases regionales previas. Es la parte de la
+  competencia que sí modelamos (desde los dieciseisavos), simplificando todo
+  lo anterior.
 - No se simula que un club argentino sea el actual campeón vigente de la
   Libertadores o la Sudamericana (eso requeriría simular esas copas
   también), así que esa excepción de cupo directo no está implementada.

@@ -12,8 +12,12 @@
 //   rueda. Ascienden 2: el ganador de una Final directa entre los líderes de
 //   cada zona, y el ganador de un Torneo Reducido (2º a 8º de cada zona +
 //   el perdedor de la Final).
-// - Copa Argentina: eliminación directa simultánea a la Primera edición del
-//   año, abierta a clubes de ambas divisiones, con rival sorteado al azar.
+// - Copa Argentina: se sortea un cuadro de 32 al arrancar el año (los 30
+//   clubes de Primera + 2 de la Nacional, garantizando que tu club esté
+//   adentro), y se juega en simultáneo con la primera edición del año
+//   (dieciseisavos a la final). El resto del cuadro se resuelve solo según
+//   la fuerza de cada club; si no la ganás vos, sale campeón el que gane esa
+//   simulación (no queda "vacante").
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
 // - Descienden 2 de Primera por año: el último de la Tabla Anual (suma de
@@ -42,6 +46,7 @@ const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', '
 const BRACKET_KIND_LABELS = {
   apertura: 'Playoffs del Apertura',
   clausura: 'Playoffs del Clausura',
+  copa: 'Copa Argentina',
   'final-directa': 'Final por el Ascenso',
   reducido: 'Torneo Reducido',
 };
@@ -256,7 +261,7 @@ const Engine = {
       morale: 0,
       squad: null,
       season: null,
-      copa: null,
+      copaBracket: null,
       bracket: null,
       matchContext: null,
       currentDecision: null,
@@ -297,13 +302,39 @@ const Engine = {
       myD2: club.division === 'D2' ? { zoneATable: null, zoneBTable: null, promotedDirect: null, promotedReducido: null } : null,
       backgroundResult: null,
     };
-    s.copa = { alive: true, champion: false, eliminatedAt: null, faced: [s.clubId] };
     s.bracket = null;
     s.lastSeasonSummary = null;
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
+    this.setupCopaBracket();
 
     this.startEdition(club.division === 'D1' ? 'apertura' : null);
+  },
+
+  // Sortea el cuadro de 32 de la Copa Argentina para todo el año: los 30
+  // clubes de Primera + 2 de la Nacional. Si tu club juega en la Nacional,
+  // se le garantiza un lugar (en la vida real muy pocos equipos de la
+  // Nacional llegan tan lejos en la clasificación, pero así te aseguramos
+  // que siempre tengas partidos de copa para jugar).
+  setupCopaBracket() {
+    const s = this.state;
+    const club = this.getClub(s.clubId);
+    const d1Ids = s.clubs.filter((c) => c.division === 'D1').map((c) => c.id);
+    const d2Pool = s.clubs.filter((c) => c.division === 'D2' && c.id !== s.clubId).map((c) => c.id);
+    for (let i = d2Pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [d2Pool[i], d2Pool[j]] = [d2Pool[j], d2Pool[i]];
+    }
+
+    const entrants = d1Ids.slice();
+    if (club.division === 'D2') entrants.push(s.clubId);
+    while (entrants.length < 32) entrants.push(d2Pool.shift());
+
+    for (let i = entrants.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [entrants[i], entrants[j]] = [entrants[j], entrants[i]];
+    }
+    s.copaBracket = { alive: entrants.map((id, i) => ({ id, seed: i + 1 })), stageIndex: 0, champion: null, runnerUp: null };
   },
 
   startEdition(edition) {
@@ -355,17 +386,14 @@ const Engine = {
       return;
     }
 
-    // La Copa Argentina corre una sola vez por año: en la primera etapa
-    // (Apertura para Primera, la única edición de la Nacional).
+    // La Copa Argentina corre una sola vez por año, en simultáneo con la
+    // primera etapa (Apertura para Primera, la única edición de la Nacional).
+    // Cada uno de los 5 checkpoints hace avanzar el cuadro exactamente una
+    // ronda (dieciseisavos, octavos, cuartos, semifinal, final).
     const copaEditionOk = season.edition !== 'clausura';
-    if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copa.alive && !s.copa.champion) {
+    if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copaBracket.alive.length > 1) {
       season.copaShown.push(season.roundIndex);
-      const stageIndex = COPA_ROUNDS.indexOf(season.roundIndex);
-      const opponentId = this.pickCopaOpponent();
-      s.matchContext = { context: 'copa', opponentId, isHome: Math.random() < 0.5, stageIndex };
-      this.pickDecision();
-      s.screen = 'pre-match';
-      this.save();
+      this.advanceCopaBracket();
       return;
     }
 
@@ -398,11 +426,31 @@ const Engine = {
     this.save();
   },
 
-  pickCopaOpponent() {
+  // Hace avanzar el cuadro de la Copa Argentina exactamente una ronda. Si el
+  // usuario ya no está en carrera (o nunca lo estuvo), esa ronda se resuelve
+  // sola; si sigue con vida, se juega de forma interactiva.
+  advanceCopaBracket() {
     const s = this.state;
-    const candidates = s.clubs.map((c) => c.id).filter((id) => !s.copa.faced.includes(id));
-    const pool = candidates.length ? candidates : s.clubs.map((c) => c.id).filter((id) => id !== s.clubId);
-    return pool[Math.floor(Math.random() * pool.length)];
+    const cb = s.copaBracket;
+    const userInvolved = cb.alive.some((x) => x.id === s.clubId);
+
+    if (!userInvolved) {
+      const pairs = this.pairStage(cb.alive);
+      cb.alive = pairs.map((pair) => {
+        const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
+        return pair.find((p) => p.id === winnerId);
+      });
+      cb.stageIndex++;
+      if (cb.alive.length === 1) {
+        cb.champion = cb.alive[0].id;
+        s.log.unshift(`Copa Argentina: salió campeón ${this.getClub(cb.champion).name}.`);
+      }
+      this.enterEditionRound();
+      return;
+    }
+
+    s.bracket = { kind: 'copa', alive: cb.alive, stageIndex: cb.stageIndex, champion: null, runnerUp: null, stageNames: COPA_STAGE_NAMES, oneRoundAtATime: true };
+    this.resolveBracketStage();
   },
 
   simulateZoneRound(zoneKey, roundIndex, excludeMatch) {
@@ -508,21 +556,10 @@ const Engine = {
   finalizePendingScore() {
     const s = this.state;
     const m = s.pendingMatch;
-    if (m.context !== 'league' && m.context !== 'copa' && m.homeGoals === m.awayGoals) {
-      const myStrength = this.squadStrength(s.squad);
-      const oppStrength = this.clubStrength(m.opponentId);
-      const userIsHomeSide = m.isHome;
-      const prob = Math.max(0.15, Math.min(0.85, 0.5 + (myStrength - oppStrength) / 100));
-      const userWinsShootout = Math.random() < prob;
-      const winnerGoals = 4 + Math.floor(Math.random() * 2);
-      const loserGoals = winnerGoals - (1 + Math.floor(Math.random() * 2));
-      m.shootout = {
-        userWon: userWinsShootout,
-        homeScore: userIsHomeSide === userWinsShootout ? winnerGoals : loserGoals,
-        awayScore: userIsHomeSide === userWinsShootout ? loserGoals : winnerGoals,
-      };
-    } else if (m.context === 'copa' && m.homeGoals === m.awayGoals) {
-      // La Copa Argentina también es eliminación directa: empate va a penales.
+    // Liga: los empates quedan como empate. Cualquier otro contexto (Copa
+    // Argentina, playoffs, Final por el ascenso, Reducido) es eliminación
+    // directa: un empate se define por penales.
+    if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
       const myStrength = this.squadStrength(s.squad);
       const oppStrength = this.clubStrength(m.opponentId);
       const userIsHomeSide = m.isHome;
@@ -586,23 +623,6 @@ const Engine = {
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
-      this.enterEditionRound();
-    } else if (m.context === 'copa') {
-      const stage = COPA_STAGE_NAMES[s.matchContext.stageIndex];
-      s.copa.faced.push(m.opponentId);
-      if (userWon) {
-        s.log.unshift(`Copa Argentina (${stage}): ganaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : ''}.`);
-        if (s.matchContext.stageIndex === COPA_STAGE_NAMES.length - 1) {
-          s.copa.champion = true;
-          s.log.unshift('¡Sos campeón de la Copa Argentina!');
-        }
-      } else {
-        s.copa.alive = false;
-        s.copa.eliminatedAt = stage;
-        s.log.unshift(`Copa Argentina (${stage}): quedaste eliminado ante ${clubName(m.opponentId)}.`);
-      }
-      s.pendingMatch = null;
-      s.matchContext = null;
       this.enterEditionRound();
     } else if (m.context === 'bracket') {
       this.resolveUserBracketMatch(userWon, false);
@@ -758,6 +778,14 @@ const Engine = {
     }
 
     s.bracket.stageIndex++;
+    if (s.bracket.oneRoundAtATime) {
+      // Copa Argentina: guardar el progreso y volver a la liga. El próximo
+      // checkpoint retoma esta misma ronda del cuadro.
+      s.copaBracket = { alive: s.bracket.alive, stageIndex: s.bracket.stageIndex, champion: null, runnerUp: null };
+      s.bracket = null;
+      this.enterEditionRound();
+      return;
+    }
     this.resolveBracketStage();
   },
 
@@ -801,6 +829,14 @@ const Engine = {
       season.myD2.promotedReducido = s.bracket.champion;
       s.bracket = null;
       this.finishMyDivisionYear();
+      return;
+    }
+
+    if (kind === 'copa') {
+      s.copaBracket = { alive: [{ id: s.bracket.champion, seed: 1 }], stageIndex: s.bracket.stageIndex, champion: s.bracket.champion, runnerUp: s.bracket.runnerUp };
+      s.log.unshift(`Copa Argentina: salió campeón ${this.getClub(s.bracket.champion).name}.`);
+      s.bracket = null;
+      this.enterEditionRound();
       return;
     }
     this.save();
@@ -942,8 +978,7 @@ const Engine = {
 
     grantTitle(d1Data.aperturaChampion);
     grantTitle(d1Data.clausuraChampion);
-    if (s.copa.champion) grantTitle(s.clubId);
-    else libertadoresPorTablaNeeded++; // no trackeamos al campeón real si no fue el usuario; ese cupo se reparte por tabla
+    grantTitle(s.copaBracket.champion);
 
     const tablaAnual = d1Data.tablaAnualYear;
 
@@ -1059,7 +1094,8 @@ const Engine = {
       d2PromotedReducido: d2Data.promoted[1] ? this.getClub(d2Data.promoted[1]).name : null,
       userPromotedDirect: d2Data.promoted[0] === s.clubId,
       userPromotedReducido: d2Data.promoted[1] === s.clubId,
-      copa: s.copa,
+      copaChampionName: s.copaBracket.champion ? this.getClub(s.copaBracket.champion).name : null,
+      userWonCopa: s.copaBracket.champion === s.clubId,
       qualification,
       relegated: relegated.map((id) => this.getClub(id).name),
       promoted: promoted.map((id) => this.getClub(id).name),
