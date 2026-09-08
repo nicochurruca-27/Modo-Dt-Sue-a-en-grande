@@ -137,6 +137,18 @@ h1, h2, h3 {
   margin: 12px 0;
 }
 
+.outcome-banner {
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.shootout-line {
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

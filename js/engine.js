@@ -95,10 +95,18 @@ const Engine = {
     return `${first} ${last}`;
   },
 
+  // El presupuesto usa budgetTier si el club lo tiene definido (situación
+  // económica real, que puede no coincidir con su nivel deportivo — el caso
+  // típico es un club grande pero con problemas de plata) y si no, cae a su
+  // reputation. La escala tiene bastante más diferencia entre el tier 5 y el
+  // 1 que entre niveles deportivos intermedios, para reflejar que los
+  // ingresos de los clubes grandes son varias veces los de uno chico.
   startingBudget(club) {
-    return club.division === 'D1'
-      ? Math.round(1500000 + club.reputation * 1300000)
-      : Math.round(500000 + club.reputation * 450000);
+    const tier = club.budgetTier || club.reputation;
+    const table = club.division === 'D1'
+      ? { 5: 16000000, 4: 8000000, 3: 5000000, 2: 3000000, 1: 1800000 }
+      : { 3: 1800000, 2: 1100000, 1: 650000 };
+    return table[tier] || table[1];
   },
 
   generateSquad(club) {
@@ -598,6 +606,10 @@ const Engine = {
       if (m.shootout.userWon) return userIsHome ? m.home : m.away;
       return userIsHome ? m.away : m.home;
     }
+    // Salvaguarda: una instancia de eliminación directa nunca puede terminar
+    // sin ganador. Si por algún motivo no se calculó el shootout, se decide
+    // acá al azar en vez de dejar el partido sin resolver.
+    if (m.context !== 'league') return Math.random() < 0.5 ? m.home : m.away;
     return null;
   },
 

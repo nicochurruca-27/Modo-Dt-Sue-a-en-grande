@@ -167,6 +167,7 @@ function renderMatchResult() {
   const userWon = winner === s.clubId;
   const draw = winner === null;
   const resultClass = draw ? 'result-draw' : userWon ? 'result-win' : 'result-loss';
+  const isFinalStage = m.context === 'bracket' && s.bracket && s.bracket.pendingIsFinal;
 
   let penaltyText = '';
   if (m.penalty) {
@@ -182,18 +183,35 @@ function renderMatchResult() {
   }
 
   const shootoutText = m.shootout
-    ? `Definición por penales: ${home.name} ${m.shootout.homeScore} - ${m.shootout.awayScore} ${away.name}.`
+    ? `Se definió por penales: ${home.name} ${m.shootout.homeScore} - ${m.shootout.awayScore} ${away.name}.`
     : '';
 
   const contextLabel = m.context === 'bracket' ? competitionLabel() : 'Liga';
+
+  // Cabecera bien visible del desenlace: quién sale campeón si es la final,
+  // o directamente si ganaste/empataste/perdiste. Esto además deja clarísimo
+  // que un empate en una instancia eliminatoria SIEMPRE termina definido por
+  // penales (nunca queda un partido "sin ganador").
+  let outcomeBanner;
+  if (isFinalStage) {
+    const championName = Engine.getClub(winner).name;
+    outcomeBanner = userWon ? `🏆 ¡SOS CAMPEÓN! ${championName} se queda con el título.` : `🏆 Campeón: ${championName}.`;
+  } else if (m.context === 'bracket') {
+    outcomeBanner = userWon ? '✅ Avanzás de ronda' : '❌ Quedás eliminado';
+  } else if (draw) {
+    outcomeBanner = '🤝 Empate';
+  } else {
+    outcomeBanner = userWon ? '⚽ ¡Victoria!' : '😔 Derrota';
+  }
 
   app.innerHTML = `
     ${header()}
     <div class="card ${resultClass}">
       <h2>Resultado — ${contextLabel}</h2>
+      <p class="outcome-banner">${outcomeBanner}</p>
       <div class="scoreline">${home.name} <strong>${m.homeGoals}</strong> - <strong>${m.awayGoals}</strong> ${away.name}</div>
       ${penaltyText ? `<p class="muted">${penaltyText}</p>` : ''}
-      ${shootoutText ? `<p class="muted">${shootoutText}</p>` : ''}
+      ${shootoutText ? `<p class="shootout-line">${shootoutText}</p>` : ''}
       ${s.lastDecisionNote ? `<p class="muted">${s.lastDecisionNote}</p>` : ''}
       <button class="option-btn" id="continue-btn">Continuar</button>
     </div>
