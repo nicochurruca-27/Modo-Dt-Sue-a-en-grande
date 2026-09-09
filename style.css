@@ -323,14 +323,20 @@ h1, h2, h3 {
   border-radius: 10px;
   /* Padding fijo en px: como los jugadores ya no se achican para entrar
      (ver .player-chip), la cancha mide lo que su fila mas ancha necesite
-     (width: max-content mas abajo) y este padding le sobra de margen en
-     cualquier caso -- no depende de a cuantas columnas termine midiendo. */
+     y este padding le sobra de margen en cualquier caso -- no depende de a
+     cuantas columnas termine midiendo.
+     El ancho mínimo necesario para que la fila más ancha entre sin
+     achicarse se calcula en JS (ver renderSquadPanel en ui.js) y se pone
+     como min-width inline en el propio elemento — a propósito, en vez de
+     usar alguna propiedad de CSS "moderna" para que el contenedor mida su
+     contenido (se probaron un par y en algunos navegadores de celular no
+     terminaban de funcionar bien). Un min-width en px es lo más viejo y
+     compatible que hay.
+  */
   padding: 30px 32px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: max-content;
-  min-width: 100%;
 }
 
 .pitch-row {

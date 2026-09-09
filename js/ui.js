@@ -193,6 +193,18 @@ function renderSquadPanel() {
 
   const chip = (p) => playerChip(p, club, p.id === selectedPlayerId);
 
+  // El ancho mínimo de la cancha se calcula a mano (en vez de dejar que el
+  // CSS lo infiera solo): la fila más ancha de la formación actual tiene
+  // que entrar siempre a su tamaño fijo (ver .player-chip), así que el
+  // mínimo es exactamente el que necesita esa fila más el padding de la
+  // cancha. Estas constantes tienen que coincidir con el CSS (.pitch,
+  // .pitch-row, .player-chip) — están comentadas ahí también.
+  const CHIP_WIDTH = 52;
+  const CHIP_GAP = 6;
+  const PITCH_PADDING_X = 32;
+  const maxCols = Math.max(xi.gk.length, xi.def.length, xi.med.length, xi.off.length, xi.del.length, 1);
+  const pitchMinWidth = maxCols * CHIP_WIDTH + (maxCols - 1) * CHIP_GAP + 2 * PITCH_PADDING_X;
+
   squadPanel.innerHTML = `
     <div class="card side-card">
       <h3>Estilo</h3>
@@ -204,7 +216,7 @@ function renderSquadPanel() {
         ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
       </div>
       <div class="pitch-scroll">
-        <div class="pitch">
+        <div class="pitch" style="min-width: ${pitchMinWidth}px">
           <div class="pitch-row">${xi.del.map(chip).join('')}</div>
           ${xi.off.length ? `<div class="pitch-row">${xi.off.map(chip).join('')}</div>` : ''}
           <div class="pitch-row">${xi.med.map(chip).join('')}</div>
