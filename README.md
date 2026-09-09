@@ -84,13 +84,16 @@ abrir seguís donde quedaste.
   pantalla, no solo al final de la temporada; a la derecha tu plantel sobre
   una cancha, con el arquero abajo y subiendo hacia los delanteros, más una
   lista de suplentes.
-- **Formaciones y estilo táctico**: 14 formaciones agrupadas en 3 estilos
+- **Formaciones y estilo táctico**: 17 formaciones agrupadas en 3 estilos
   elegibles con un click (Defensiva, Equilibrada, Ofensiva). Elegir un
   estilo selecciona una formación de ese grupo y muestra el resto de las
   formaciones de esa familia para elegir la exacta.
   - Defensivas: 5-4-1, 5-3-2, 5-2-3, 5-2-1-2, 4-5-1.
-  - Equilibradas: 4-3-3, 4-3-1-2, 3-4-1-2.
-  - Ofensivas: 4-2-4, 4-3-3, 3-4-3, 4-2-3-1, 3-5-2, 3-2-5.
+  - Equilibradas: 4-4-2, 4-3-3, 4-3-1-2, 3-4-1-2.
+  - Ofensivas: 4-2-4, 4-3-3, 3-4-3, 4-2-3-1, 3-5-2, 4-1-4-1, 4-2-2-2, 3-2-5.
+
+  (La 4-4-2 en rombo/diamante, otra formación clásica muy conocida, ya
+  estaba cubierta desde antes: es la misma forma que nuestra 4-3-1-2.)
 
   Formaciones como 4-3-1-2 o 3-2-5 tienen una cuarta línea entre el
   mediocampo y el ataque (el enganche/las mediapuntas) que se dibuja como

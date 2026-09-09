@@ -104,6 +104,7 @@ const FORMATIONS = [
   { id: '5212', name: '5-2-1-2', def: 5, med: 2, off: 1, del: 2, style: 'Defensiva', mod: -2 },
   { id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1 },
   // Equilibradas
+  { id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0 },
   { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Equilibrada', mod: 1 },
   { id: '4312', name: '4-3-1-2', def: 4, med: 3, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
   { id: '3412', name: '3-4-1-2', def: 3, med: 4, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
@@ -113,6 +114,8 @@ const FORMATIONS = [
   { id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3 },
   { id: '4231', name: '4-2-3-1', def: 4, med: 2, off: 3, del: 1, style: 'Ofensiva', mod: 2 },
   { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Ofensiva', mod: 2 },
+  { id: '4141', name: '4-1-4-1', def: 4, med: 1, off: 4, del: 1, style: 'Ofensiva', mod: 3 },
+  { id: '4222', name: '4-2-2-2', def: 4, med: 2, off: 2, del: 2, style: 'Ofensiva', mod: 4 },
   { id: '325', name: '3-2-5', def: 3, med: 2, off: 4, del: 1, style: 'Ofensiva', mod: 5 },
 ];
 
