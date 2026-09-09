@@ -403,7 +403,12 @@ h1, h2, h3 {
   max-width: 360px;
   margin: 14px auto 0;
   padding-bottom: 60%;
-  background: linear-gradient(#1a2e1a, #16281b);
+  /* Red del arco: dos tramas diagonales de líneas finas (rombos), como una
+     red de verdad, sobre el fondo verde oscuro de siempre. */
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0, rgba(255, 255, 255, 0.16) 1px, transparent 1px, transparent 11px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0, rgba(255, 255, 255, 0.16) 1px, transparent 1px, transparent 11px),
+    linear-gradient(#1a2e1a, #16281b);
   border-radius: 8px;
   overflow: hidden;
 }

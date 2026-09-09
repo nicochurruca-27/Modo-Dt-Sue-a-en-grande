@@ -838,8 +838,8 @@ const Engine = {
       pen.keeperZone = guess; // a dónde se tiró el arquero rival
     } else {
       const matched = guess === direction;
-      const chance = Math.max(0.03, Math.min(0.8, (matched ? 0.35 : 0.05) + (shooterOrKeeper.rating - 70) / 300));
-      scored = !(Math.random() < chance);
+      const chance = Math.max(0.05, Math.min(0.95, (matched ? 0.25 : 0.85) - (shooterOrKeeper.rating - 70) / 300));
+      scored = Math.random() < chance;
       pen.keeperName = shooterOrKeeper.name;
       pen.direction = direction; // a dónde se tiró tu arquero
       pen.shooterZone = guess; // a dónde pateó el rival
