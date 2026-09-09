@@ -47,12 +47,57 @@ body {
   flex-basis: 340px;
 }
 
-@media (max-width: 960px) {
+#mobile-tabs {
+  display: none;
+}
+
+/* Celular en vertical: en vez de apilar los 3 paneles uno abajo del otro
+   (obligando a hacer scroll para llegar a la formación), se muestra uno
+   solo por vez y se cambia con esta barra de pestañas, como una app. */
+@media (max-width: 960px) and (orientation: portrait) {
+  #mobile-tabs {
+    display: flex;
+    gap: 6px;
+    max-width: 1400px;
+    margin: 0 auto 12px;
+  }
+
+  #mobile-tabs button {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #111827;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #mobile-tabs button.active {
+    background: var(--accent);
+    color: #04220f;
+    border-color: var(--accent);
+  }
+
   .layout { flex-direction: column; }
-  #app { max-width: 100%; margin: 0; order: 1; }
-  #table-panel { order: 2; }
-  #squad-panel { order: 3; }
+  #app { max-width: 100%; margin: 0; }
   .side-panel { flex: 1 1 auto; width: 100%; position: static; }
+
+  .layout[data-view="app"] #table-panel,
+  .layout[data-view="app"] #squad-panel { display: none; }
+  .layout[data-view="table"] #app,
+  .layout[data-view="table"] #squad-panel { display: none; }
+  .layout[data-view="squad"] #app,
+  .layout[data-view="squad"] #table-panel { display: none; }
+}
+
+/* Celular en horizontal: el ancho ya alcanza para las 3 columnas como en
+   PC, así que se mantiene ese layout completo (solo se achican un poco los
+   paneles laterales para que entre todo sin scroll horizontal). */
+@media (max-width: 960px) and (orientation: landscape) {
+  .side-panel { flex-basis: 200px; }
+  #squad-panel { flex-basis: 230px; }
+  .player-chip { max-width: 42px; }
 }
 
 h1, h2, h3 {
@@ -254,7 +299,11 @@ h1, h2, h3 {
 }
 
 .pitch {
-  background: linear-gradient(180deg, #1e7a3a, #15602e);
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTYwIj4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIHN0cm9rZS13aWR0aD0iMS4yIj4KICAgIDxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSI5NCIgaGVpZ2h0PSIxNTQiIHJ4PSIyIiAvPgogICAgPGxpbmUgeDE9IjMiIHkxPSI4MCIgeDI9Ijk3IiB5Mj0iODAiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjgwIiByPSIxNCIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iODAiIHI9IjEuMyIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxyZWN0IHg9IjIyIiB5PSIzIiB3aWR0aD0iNTYiIGhlaWdodD0iMjQiIC8+CiAgICA8cmVjdCB4PSIzNyIgeT0iMyIgd2lkdGg9IjI2IiBoZWlnaHQ9IjEwIiAvPgogICAgPGNpcmNsZSBjeD0iNTAiIGN5PSIxOSIgcj0iMS4zIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNTUpIiAvPgogICAgPHBhdGggZD0iTSAzNyAyNyBBIDE0IDE0IDAgMCAwIDYzIDI3IiAvPgogICAgPHJlY3QgeD0iMjIiIHk9IjEzMyIgd2lkdGg9IjU2IiBoZWlnaHQ9IjI0IiAvPgogICAgPHJlY3QgeD0iMzciIHk9IjE0NyIgd2lkdGg9IjI2IiBoZWlnaHQ9IjEwIiAvPgogICAgPGNpcmNsZSBjeD0iNTAiIGN5PSIxNDEiIHI9IjEuMyIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzcgMTMzIEEgMTQgMTQgMCAwIDEgNjMgMTMzIiAvPgogICAgPHBhdGggZD0iTSAzIDkgQSA2IDYgMCAwIDAgOSAzIiAvPgogICAgPHBhdGggZD0iTSA5MSAzIEEgNiA2IDAgMCAwIDk3IDkiIC8+CiAgICA8cGF0aCBkPSJNIDMgMTUxIEEgNiA2IDAgMCAxIDkgMTU3IiAvPgogICAgPHBhdGggZD0iTSA5NyAxNTEgQSA2IDYgMCAwIDEgOTEgMTU3IiAvPgogIDwvZz4KPC9zdmc+"),
+    linear-gradient(180deg, #1e7a3a, #15602e);
+  background-size: 100% 100%, 100% 100%;
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
   border: 2px solid #0d3d1c;
   border-radius: 10px;
   padding: 12px 6px;
@@ -333,4 +382,10 @@ h1, h2, h3 {
   margin: 0;
   text-align: center;
   flex: 1;
+}
+
+.swap-notice {
+  color: #fbbf24;
+  font-size: 0.85em;
+  margin: 4px 0 0;
 }

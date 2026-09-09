@@ -10,6 +10,7 @@ let selectDivision = 'D1';
 let selectZone = 'A';
 let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
 let selectedPlayerId = null; // jugador tocado en la cancha/banco, esperando el segundo toque para cambiarlo
+let swapNotice = null; // aviso corto si el último intento de cambio no se pudo hacer
 
 function money(n) {
   return '$' + Math.round(n).toLocaleString('es-AR');
@@ -144,12 +145,24 @@ function playerChip(p, club, selected) {
 }
 
 function handlePlayerTap(id) {
+  const s = Engine.state;
   if (selectedPlayerId === null || selectedPlayerId === id) {
     selectedPlayerId = selectedPlayerId === id ? null : id;
-  } else {
-    const ok = Engine.swapPlayers(selectedPlayerId, id);
-    selectedPlayerId = ok ? null : id;
+    swapNotice = null;
+    render();
+    return;
   }
+  const bothSameGroup = s.startingIds.includes(selectedPlayerId) === s.startingIds.includes(id);
+  if (bothSameGroup) {
+    // Tocar dos titulares o dos suplentes entre sí no cambia nada: solo se mueve la selección.
+    selectedPlayerId = id;
+    swapNotice = null;
+    render();
+    return;
+  }
+  const ok = Engine.swapPlayers(selectedPlayerId, id);
+  selectedPlayerId = ok ? null : id;
+  swapNotice = ok ? null : 'Tienen que ser de la misma posición para cambiarse (así no se te altera la formación).';
   render();
 }
 
@@ -183,6 +196,7 @@ function renderSquadPanel() {
         <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
       </div>
       <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. También podés arrastrar uno encima del otro.</p>
+      ${swapNotice ? `<p class="swap-notice">${swapNotice}</p>` : ''}
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
@@ -213,8 +227,9 @@ function renderSquadPanel() {
       ev.preventDefault();
       const draggedId = ev.dataTransfer.getData('text/plain');
       if (draggedId && draggedId !== el.dataset.player) {
-        Engine.swapPlayers(draggedId, el.dataset.player);
+        const ok = Engine.swapPlayers(draggedId, el.dataset.player);
         selectedPlayerId = null;
+        swapNotice = ok ? null : 'Tienen que ser de la misma posición para cambiarse (así no se te altera la formación).';
         render();
       }
     });
@@ -610,12 +625,27 @@ function renderSeasonEnd() {
   document.getElementById('restart-btn').addEventListener('click', () => { Engine.resetGame(); render(); });
 }
 
+// Barra de pestañas de solo celular (vertical): cambia cuál de los 3
+// paneles se ve sin tener que scrollear. En PC / celular horizontal esta
+// barra está oculta y los 3 paneles se ven siempre juntos (ver style.css).
+function setupMobileTabs() {
+  const layout = document.querySelector('.layout');
+  const buttons = document.querySelectorAll('#mobile-tabs button');
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      layout.dataset.view = btn.dataset.view;
+      buttons.forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
+}
+
 function init() {
   if (Engine.hasSave()) {
     Engine.load();
   } else {
     Engine.state = { screen: 'club-select' };
   }
+  setupMobileTabs();
   render();
 }
 

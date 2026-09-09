@@ -7,7 +7,12 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="layout">
+  <nav id="mobile-tabs">
+    <button data-view="table">Tabla</button>
+    <button data-view="app" class="active">Partido</button>
+    <button data-view="squad">Plantel</button>
+  </nav>
+  <div class="layout" data-view="app">
     <aside id="table-panel" class="side-panel"></aside>
     <main id="app"></main>
     <aside id="squad-panel" class="side-panel"></aside>

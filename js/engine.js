@@ -211,6 +211,10 @@ const Engine = {
   // Intercambia un titular por un suplente (uno de los dos ids tiene que
   // estar en cancha y el otro en el banco). Es lo que dispara tocar/arrastrar
   // un jugador de la cancha y después uno del banco (o al revés) en la UI.
+  // Se exige la misma posición a propósito: la formación (cuántos defensores,
+  // mediocampistas y delanteros hay) la elige el usuario a mano con el
+  // selector de formación, y un simple cambio de titular no la tiene que
+  // alterar sin que se lo pidan.
   swapPlayers(idA, idB) {
     const s = this.state;
     if (!s.startingIds || idA === idB) return false;
@@ -219,7 +223,9 @@ const Engine = {
     if (aStarts === bStarts) return false;
     const starterId = aStarts ? idA : idB;
     const benchId = aStarts ? idB : idA;
-    if (!s.squad.some((p) => p.id === benchId)) return false;
+    const starterPlayer = s.squad.find((p) => p.id === starterId);
+    const benchPlayer = s.squad.find((p) => p.id === benchId);
+    if (!starterPlayer || !benchPlayer || starterPlayer.pos !== benchPlayer.pos) return false;
     s.startingIds = s.startingIds.map((id) => (id === starterId ? benchId : id));
     this.save();
     return true;
