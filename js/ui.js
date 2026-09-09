@@ -114,12 +114,16 @@ function clubKit(club) {
   return c || { shirt: 'var(--accent)', band: null, trim: '#04220f' };
 }
 
+// Sin width/height fijos a propósito: el tamaño lo maneja 100% el CSS
+// (.player-chip svg), y el aspect-ratio sale solo del viewBox. Poner un
+// tamaño fijo en el propio SVG puede ganarle al CSS en algunos navegadores
+// de celular y hacer que la camiseta no se achique junto con el resto.
 function jerseySvg(kit, label) {
   const bandPath = kit.band
     ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
     : '';
   return `
-    <svg width="40" height="40" viewBox="0 0 44 44">
+    <svg viewBox="0 0 44 44">
       <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
       ${bandPath}
       <text x="22" y="29" text-anchor="middle" font-size="11" font-weight="700" fill="${kit.trim}">${label}</text>
