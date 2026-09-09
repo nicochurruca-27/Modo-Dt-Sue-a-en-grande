@@ -79,10 +79,17 @@ abrir seguís donde quedaste.
   puede subir o bajar con el tiempo por edad (los jóvenes mejoran, los
   grandes bajan), por rendimiento en cancha y por tus decisiones de
   entrenamiento.
-- **Penales**: elegís quién patea y la dirección (o la del arquero cuando el
-  penal es en contra). En instancias de eliminación directa que terminan
-  empatadas (Copa Argentina, playoffs, Final por el ascenso, Reducido), se
-  resuelve por penales.
+- **Penales, con arquito y cinemática**: cuando hay un penal a favor, elegís
+  primero quién lo patea y después tocás una de las 6 zonas del arco
+  (izquierda/centro/derecha, arriba/abajo) donde querés que apunte; la
+  pelota y el arquero rival se mueven cada uno a su zona (la del arquero
+  sale al azar) y, si entra, la pelota queda clavada adentro del arco con
+  un cartel de "¡GOL!" como confirmación — si no, se ve "¡ATAJADA!". Cuando
+  el penal es en contra, aparece tu propio arquero (con la camiseta real de
+  tu club si está cargada) y elegís vos hacia dónde se tira para intentar
+  atajarlo. El mismo arquito se usa en instancias de eliminación directa
+  que terminan empatadas (Copa Argentina, playoffs, Final por el ascenso,
+  Reducido) para resolver la definición por penales.
 - **Pantalla con 3 paneles**: a la izquierda una tabla de posiciones con
   flechitas para recorrer tu zona, la otra zona de tu misma división y un
   resumen de la última clasificación a copas internacionales; en el medio el

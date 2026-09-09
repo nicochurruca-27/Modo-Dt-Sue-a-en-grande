@@ -391,3 +391,83 @@ h1, h2, h3 {
   text-align: center;
   flex: 1;
 }
+
+/* ---- Arquito de los penales ---- */
+/* Mismo criterio que la cancha: nada de "aspect-ratio" moderno. Se usa el
+   truco viejo de padding-bottom en % para fijar la proporción del arco, y
+   la pelota/arquero se mueven con left/top en % + transition, soportado
+   hace muchísimos años y sin depender de flexbox/grid intrínseco. */
+.goal-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  margin: 14px auto 0;
+  padding-bottom: 60%;
+  background: linear-gradient(#1a2e1a, #16281b);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.goal-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.goal-zone {
+  position: absolute;
+  width: 33.33%;
+  height: 50%;
+  cursor: pointer;
+}
+
+.goal-zone:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.goal-keeper,
+.goal-ball {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  transition: left 0.6s ease-out, top 0.6s ease-out;
+}
+
+.goal-ball {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.goal-result-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  font-size: 1.6em;
+  font-weight: 800;
+  opacity: 0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.goal-result-banner.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.goal-result-banner.gol {
+  background: rgba(34, 197, 94, 0.9);
+  color: #04220f;
+}
+
+.goal-result-banner.atajada {
+  background: rgba(239, 68, 68, 0.9);
+  color: #2a0a0a;
+}
+
+.option-btn.active {
+  outline: 3px solid #38bdf8;
+}

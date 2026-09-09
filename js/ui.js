@@ -15,6 +15,11 @@ function money(n) {
   return '$' + Math.round(n).toLocaleString('es-AR');
 }
 
+function zoneLabel(id) {
+  const z = PENALTY_ZONES.find((p) => p.id === id);
+  return z ? z.label : '';
+}
+
 function render() {
   const s = Engine.state;
   if (!s) return;
@@ -484,51 +489,150 @@ function renderPreMatch() {
   });
 }
 
+// ---------- Arquito de los penales ----------
+//
+// Mismo criterio que la cancha: nada de "aspect-ratio" moderno ni
+// transform de CSS (que fallaron antes en el celular real del usuario).
+// El arquito usa el truco viejo de padding-bottom en % para mantener la
+// proporción, y la pelota/arquero se mueven con left/top en % + transition,
+// que es soportado hace muchísimos años.
+function goalZoneCenter(zoneId) {
+  const z = PENALTY_ZONES.find((p) => p.id === zoneId);
+  const leftPct = 18 + z.col * 32; // 3 columnas: 18%, 50%, 82%
+  const topPct = z.row === 0 ? 28 : 68; // arriba / abajo dentro del arco
+  return { leftPct, topPct };
+}
+
+function keeperIconSvg(shirt, trim) {
+  return `
+    <svg viewBox="0 0 24 30" width="30" height="38">
+      <circle cx="12" cy="5" r="4" fill="#e8b48c" />
+      <path d="M12 9 L4 6 M12 9 L20 6" stroke="${trim || '#0a0a0a'}" stroke-width="2" fill="none" stroke-linecap="round" />
+      <rect x="6" y="9" width="12" height="14" rx="3" fill="${shirt}" stroke="${trim || '#0a0a0a'}" stroke-width="1" />
+      <path d="M12 23 L8 30 M12 23 L16 30" stroke="${trim || '#0a0a0a'}" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
+function goalWidgetHtml(keeperKit) {
+  return `
+    <div class="goal-wrap" id="goal-wrap">
+      <svg class="goal-frame" viewBox="0 0 100 60" preserveAspectRatio="none">
+        <rect x="4" y="4" width="92" height="52" fill="none" stroke="#e2e8f0" stroke-width="3" />
+        <line x1="27.3" y1="4" x2="27.3" y2="56" stroke="#94a3b8" stroke-width="0.6" />
+        <line x1="50.7" y1="4" x2="50.7" y2="56" stroke="#94a3b8" stroke-width="0.6" />
+        <line x1="74" y1="4" x2="74" y2="56" stroke="#94a3b8" stroke-width="0.6" />
+        <line x1="4" y1="30" x2="96" y2="30" stroke="#94a3b8" stroke-width="0.6" />
+      </svg>
+      ${PENALTY_ZONES.map((z) => `<div class="goal-zone" data-zone="${z.id}" style="left:${z.col * 33.33}%;top:${z.row * 50}%;"></div>`).join('')}
+      <div class="goal-keeper" id="goal-keeper" style="left:50%;top:48%;">${keeperIconSvg(keeperKit.shirt, keeperKit.trim)}</div>
+      <div class="goal-ball" id="goal-ball" style="left:50%;top:96%;">⚽</div>
+      <div class="goal-result-banner" id="goal-banner"></div>
+    </div>
+  `;
+}
+
+function wireGoalZones(onZoneClick) {
+  const zones = document.querySelectorAll('#goal-wrap .goal-zone');
+  let done = false;
+  zones.forEach((z) => {
+    z.addEventListener('click', () => {
+      if (done) return;
+      done = true;
+      zones.forEach((zz) => { zz.style.pointerEvents = 'none'; });
+      onZoneClick(z.getAttribute('data-zone'));
+    });
+  });
+}
+
+function animatePenaltyResult(side) {
+  const s = Engine.state;
+  const pen = s.pendingMatch.penalty;
+  const ball = document.getElementById('goal-ball');
+  const keeper = document.getElementById('goal-keeper');
+  const banner = document.getElementById('goal-banner');
+  if (!ball || !keeper || !banner) return;
+
+  const shotZone = side === 'user' ? pen.direction : pen.shooterZone;
+  const keeperZone = side === 'user' ? pen.keeperZone : pen.direction;
+  const ballTarget = goalZoneCenter(shotZone);
+  const keeperTarget = goalZoneCenter(keeperZone);
+
+  ball.style.left = `${ballTarget.leftPct}%`;
+  ball.style.top = `${ballTarget.topPct}%`;
+  keeper.style.left = `${keeperTarget.leftPct}%`;
+  keeper.style.top = `${keeperTarget.topPct}%`;
+
+  setTimeout(() => {
+    if (pen.scored) {
+      banner.textContent = '¡GOL!';
+      banner.className = 'goal-result-banner show gol';
+      // La pelota queda clavada adentro del arco como confirmación visual del gol.
+      ball.style.top = `${ballTarget.topPct}%`;
+    } else {
+      banner.textContent = '¡ATAJADA!';
+      banner.className = 'goal-result-banner show atajada';
+    }
+  }, 650);
+
+  setTimeout(() => { render(); }, 2000);
+}
+
+let penaltyShooterId = null;
+
 function renderPenalty() {
+  penaltyShooterId = null;
+  drawPenalty();
+}
+
+function drawPenalty() {
   const s = Engine.state;
   const pen = s.pendingMatch.penalty;
   const opponent = Engine.getClub(s.pendingMatch.opponentId);
 
   if (pen.side === 'user') {
     const shooters = Engine.getPenaltyShooters();
+    const rivalKit = { shirt: '#6b7280', trim: '#111827' };
     app.innerHTML = `
       ${header()}
       <div class="card">
         <h2>¡Penal a favor!</h2>
-        <p>Elegí quién lo patea y hacia dónde.</p>
+        <p>Elegí quién lo patea.</p>
         <div class="options" id="shooter-list">
           ${shooters.map((p) => `
-            <div class="pick-row">
-              <span>${p.name} (${p.rating})</span>
-              <div class="options inline">
-                ${PENALTY_DIRECTIONS.map((dir) => `<button class="option-btn small" data-player="${p.id}" data-dir="${dir}">${dir}</button>`).join('')}
-              </div>
-            </div>
+            <button class="option-btn small${p.id === penaltyShooterId ? ' active' : ''}" data-player="${p.id}">${p.name} (${p.rating})</button>
           `).join('')}
         </div>
+        ${penaltyShooterId ? `<p class="muted">Ahora tocá el lugar del arco donde quiere patear ${shooters.find((p) => p.id === penaltyShooterId).name}.</p>${goalWidgetHtml(rivalKit)}` : ''}
       </div>
     `;
     app.querySelectorAll('#shooter-list .option-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const shooter = shooters.find((p) => p.id === btn.dataset.player);
-        Engine.resolvePenalty(btn.dataset.dir, shooter);
-        render();
+        penaltyShooterId = btn.dataset.player;
+        drawPenalty();
       });
     });
+    if (penaltyShooterId) {
+      const shooter = shooters.find((p) => p.id === penaltyShooterId);
+      wireGoalZones((zoneId) => {
+        Engine.resolvePenalty(zoneId, shooter);
+        animatePenaltyResult('user');
+      });
+    }
   } else {
     const keeper = Engine.getUserKeeper();
+    const kit = clubKit(Engine.getClub(s.clubId));
     app.innerHTML = `
       ${header()}
       <div class="card">
         <h2>Penal en contra</h2>
         <p>${opponent.name} va a patear. Elegí para dónde se tira ${keeper.name}.</p>
-        <div class="options">
-          ${PENALTY_DIRECTIONS.map((dir) => `<button class="option-btn" data-dir="${dir}">${dir}</button>`).join('')}
-        </div>
+        ${goalWidgetHtml(kit)}
       </div>
     `;
-    app.querySelectorAll('.options .option-btn').forEach((btn) => {
-      btn.addEventListener('click', () => { Engine.resolvePenalty(btn.dataset.dir, keeper); render(); });
+    wireGoalZones((zoneId) => {
+      Engine.resolvePenalty(zoneId, keeper);
+      animatePenaltyResult('rival');
     });
   }
 }
@@ -546,14 +650,15 @@ function renderMatchResult() {
 
   let penaltyText = '';
   if (m.penalty) {
+    const dirLabel = zoneLabel(m.penalty.direction);
     if (m.penalty.side === 'user') {
       penaltyText = m.penalty.scored
-        ? `${m.penalty.shooterName} pateó a la ${m.penalty.direction.toLowerCase()} y marcó el penal.`
-        : `${m.penalty.shooterName} pateó a la ${m.penalty.direction.toLowerCase()} y el arquero lo contuvo.`;
+        ? `${m.penalty.shooterName} pateó ${dirLabel} y marcó el penal.`
+        : `${m.penalty.shooterName} pateó ${dirLabel} y el arquero lo contuvo.`;
     } else {
       penaltyText = m.penalty.scored
-        ? 'El arquero se tiró al lado equivocado y llegó el gol de penal rival.'
-        : 'Tu arquero adivinó el remate y ¡atajó el penal!';
+        ? `Tu arquero se tiró ${dirLabel} y no llegó: gol de penal rival.`
+        : `Tu arquero se tiró ${dirLabel} y ¡atajó el penal!`;
     }
   }
 

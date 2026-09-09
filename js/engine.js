@@ -817,10 +817,16 @@ const Engine = {
     return [...this.state.squad].filter((p) => p.pos === 'POR').sort((a, b) => b.rating - a.rating)[0];
   },
 
+  // direction es el id de una de las PENALTY_ZONES: dónde apunta el
+  // usuario (pateando) o a dónde se tira su arquero (atajando). `guess` es
+  // la zona a la que se tira el otro lado al azar (el arquero rival, o el
+  // remate del rival) — decide la probabilidad, y se guarda también para
+  // que la UI pueda animar la cinemática del penal con la posición real de
+  // cada uno.
   resolvePenalty(direction, shooterOrKeeper) {
     const s = this.state;
     const pen = s.pendingMatch.penalty;
-    const guess = PENALTY_DIRECTIONS[Math.floor(Math.random() * PENALTY_DIRECTIONS.length)];
+    const guess = PENALTY_ZONES[Math.floor(Math.random() * PENALTY_ZONES.length)].id;
     let scored;
 
     if (pen.side === 'user') {
@@ -828,13 +834,15 @@ const Engine = {
       const chance = Math.max(0.05, Math.min(0.97, (matched ? 0.3 : 0.9) + (shooterOrKeeper.rating - 70) / 300));
       scored = Math.random() < chance;
       pen.shooterName = shooterOrKeeper.name;
-      pen.direction = direction;
+      pen.direction = direction; // dónde pateó el usuario
+      pen.keeperZone = guess; // a dónde se tiró el arquero rival
     } else {
       const matched = guess === direction;
       const chance = Math.max(0.03, Math.min(0.8, (matched ? 0.35 : 0.05) + (shooterOrKeeper.rating - 70) / 300));
       scored = !(Math.random() < chance);
       pen.keeperName = shooterOrKeeper.name;
-      pen.direction = direction;
+      pen.direction = direction; // a dónde se tiró tu arquero
+      pen.shooterZone = guess; // a dónde pateó el rival
     }
 
     pen.resolved = true;

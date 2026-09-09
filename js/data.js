@@ -222,4 +222,14 @@ const DECISIONS = [
   },
 ];
 
-const PENALTY_DIRECTIONS = ['Izquierda', 'Centro', 'Derecha'];
+// Las 6 zonas del arco para los penales: 3 columnas (izquierda/centro/
+// derecha) x 2 alturas (arriba/abajo). col/row ubican cada zona dentro del
+// arco que se dibuja en pantalla (ver goalZoneCenter en ui.js).
+const PENALTY_ZONES = [
+  { id: 'AI', label: 'arriba a la izquierda', col: 0, row: 0 },
+  { id: 'AC', label: 'arriba al medio', col: 1, row: 0 },
+  { id: 'AD', label: 'arriba a la derecha', col: 2, row: 0 },
+  { id: 'BI', label: 'abajo a la izquierda', col: 0, row: 1 },
+  { id: 'BC', label: 'abajo al medio', col: 1, row: 1 },
+  { id: 'BD', label: 'abajo a la derecha', col: 2, row: 1 },
+];
