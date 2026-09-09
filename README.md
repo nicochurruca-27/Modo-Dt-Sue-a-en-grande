@@ -32,11 +32,13 @@ abrir seguís donde quedaste.
   directo al próximo partido — aparece un calendario con la fecha real
   (arranca el 1° de febrero). Tocás "Avanzar" una vez y pasa de largo
   todos los días sin nada (no hace falta tocarlo día por día): se frena
-  solo en el primer día con algo, ya sea un mensaje del club —de la
-  dirigencia, el cuerpo técnico, tu representante o algún jugador, con
-  pedidos, reclamos o novedades— que respondés antes de poder seguir, o
-  el día del partido (o de la fecha FIFA, la ventana de pases, etc.), que
-  revela la pantalla correspondiente directamente.
+  solo en el primer día con algo, ya sea un mensaje del club (19 mensajes
+  distintos en `INBOX_MESSAGES` de `js/data.js`, de la dirigencia, el
+  cuerpo técnico, jugadores con pedidos o reclamos, tu representante, la
+  prensa, sponsors, el capitán, el preparador físico, un ídolo del club,
+  y más) que respondés antes de poder seguir, o el día del partido (o de
+  la fecha FIFA, la ventana de pases, etc.), que revela la pantalla
+  correspondiente directamente.
 - **Primera División y Primera Nacional**: 30 clubes reales en Primera (2
   zonas de 15) y 36 en la Nacional (2 zonas de 18), con la composición
   actual verificada (incluye los últimos ascensos/descensos: Colón, Godoy

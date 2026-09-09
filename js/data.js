@@ -343,6 +343,69 @@ const INBOX_MESSAGES = [
       { label: 'Comentarlo con humor en la conferencia', moraleMod: 2, note: 'La hinchada valora que no te lo tomes tan en serio.' },
     ],
   },
+  {
+    from: 'Un periodista',
+    subject: 'Pedido de entrevista',
+    body: 'Un periodista de un programa deportivo te pide unos minutos para una nota en profundidad sobre el momento del equipo.',
+    options: [
+      { label: 'Aceptar la entrevista', moraleMod: 2, note: 'La nota sale bien y deja una buena imagen del cuerpo técnico.' },
+      { label: 'Declinar por ahora', moraleMod: 0, note: 'Preferís mantener perfil bajo esta semana.' },
+    ],
+  },
+  {
+    from: 'Coordinador de inferiores',
+    subject: 'Informe de las divisiones juveniles',
+    body: 'El coordinador de las inferiores te avisa que hay un juvenil de la Séptima que viene destacándose en los entrenamientos con la Reserva.',
+    options: [
+      { label: 'Pedir que lo sumen a algún entrenamiento con el plantel', moraleMod: 2, note: 'El chico se entusiasma con la posibilidad, y el club valora la mirada a las inferiores.' },
+      { label: 'Dejarlo en su categoría por ahora', moraleMod: 0, note: 'Preferís no apurar los tiempos del juvenil.' },
+    ],
+  },
+  {
+    from: 'Sponsor del club',
+    subject: 'Pedido de un auspiciante',
+    body: 'Uno de los sponsors del club pide que el plantel participe de una producción de fotos para su próxima campaña.',
+    options: [
+      { label: 'Coordinar la actividad con el plantel', moraleMod: 1, note: 'Los jugadores lo toman con buena onda, es una tarde distinta.' },
+      { label: 'Pedir que se reprograme para otra semana', moraleMod: 0, note: 'El sponsor entiende, no hay problema en mover la fecha.' },
+    ],
+  },
+  {
+    from: 'El capitán del equipo',
+    subject: 'Charla con el capitán',
+    body: 'El capitán del equipo te pide una charla a solas para transmitirte cómo ve el clima del grupo de cara a lo que viene.',
+    options: [
+      { label: 'Escucharlo con atención', moraleMod: 3, note: 'El capitán se siente parte de las decisiones del cuerpo técnico.' },
+      { label: 'Decirle que confíe, vos manejás el grupo', moraleMod: -1, note: 'El capitán queda con la sensación de que no lo tuviste en cuenta.' },
+    ],
+  },
+  {
+    from: 'Preparador físico',
+    subject: 'Reporte de cargas de entrenamiento',
+    body: 'El preparador físico te comenta que algunos jugadores están acumulando bastante carga de partidos seguidos y sugiere bajarles la intensidad de los trabajos.',
+    options: [
+      { label: 'Seguir la sugerencia del preparador', moraleMod: 2, note: 'El plantel agradece que se cuide el desgaste físico.' },
+      { label: 'Mantener la carga habitual', moraleMod: -1, note: 'El preparador físico insiste, pero respeta la decisión.' },
+    ],
+  },
+  {
+    from: 'Un ex-jugador del club',
+    subject: 'Saludo de un ídolo de la institución',
+    body: 'Un histórico ídolo del club te manda un mensaje deseándote lo mejor y ofreciéndose para lo que necesites.',
+    options: [
+      { label: 'Agradecerle e invitarlo a un entrenamiento', moraleMod: 3, note: 'Su visita entusiasma mucho al plantel.' },
+      { label: 'Agradecerle brevemente', moraleMod: 1, note: 'Un gesto lindo, sin mayores consecuencias.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Problema personal de un jugador',
+    body: 'Un jugador te comenta que está atravesando un problema familiar y te pide discreción y comprensión estos días.',
+    options: [
+      { label: 'Darle el espacio y la privacidad que pide', moraleMod: 3, note: 'El jugador agradece profundamente la contención del club.' },
+      { label: 'Pedirle que igual esté disponible para entrenar', moraleMod: -2, note: 'El jugador siente que no se entendió su situación.' },
+    ],
+  },
 ];
 
 // Las 6 zonas del arco para los penales: 3 columnas (izquierda/centro/
