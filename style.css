@@ -25,7 +25,7 @@ body {
 .layout {
   display: flex;
   gap: 16px;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   align-items: flex-start;
 }
@@ -41,6 +41,10 @@ body {
   flex: 0 0 250px;
   position: sticky;
   top: 16px;
+}
+
+#squad-panel {
+  flex-basis: 340px;
 }
 
 @media (max-width: 960px) {
@@ -261,17 +265,37 @@ h1, h2, h3 {
 
 .pitch-row {
   display: flex;
-  justify-content: space-around;
-  flex-wrap: wrap;
-  gap: 4px;
+  justify-content: space-evenly;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .player-chip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 56px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60px;
   text-align: center;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 2px 0;
+}
+
+.player-chip svg {
+  width: 100%;
+  max-width: 40px;
+  height: auto;
+}
+
+.player-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-chip.selected {
+  background: rgba(34, 197, 94, 0.35);
+  outline: 2px solid var(--accent);
 }
 
 .player-chip span {
@@ -279,8 +303,34 @@ h1, h2, h3 {
   line-height: 1.1;
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .bench-list {
   margin-top: 6px;
+}
+
+.player-chip-row {
+  cursor: pointer;
+}
+
+.player-chip-row.selected {
+  background: rgba(34, 197, 94, 0.25);
+  border-radius: 6px;
+}
+
+.panel-tab-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.panel-tab-switch h3 {
+  margin: 0;
+  text-align: center;
+  flex: 1;
 }

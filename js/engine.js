@@ -115,7 +115,7 @@ const Engine = {
     const real = REAL_ROSTERS[club.id];
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
-        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears,
+        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number,
       }));
     }
     return SQUAD_POSITIONS.map((pos, i) => {
@@ -208,16 +208,19 @@ const Engine = {
     return [...s.squad].filter((p) => !startingSet.has(p.id)).sort((a, b) => b.rating - a.rating);
   },
 
-  // Pone a un suplente de titular, sacando al peor de su misma línea (así el
-  // usuario elige QUIÉN entra sin tener que armar el once entero a mano).
-  swapToStarting(benchPlayerId) {
+  // Intercambia un titular por un suplente (uno de los dos ids tiene que
+  // estar en cancha y el otro en el banco). Es lo que dispara tocar/arrastrar
+  // un jugador de la cancha y después uno del banco (o al revés) en la UI.
+  swapPlayers(idA, idB) {
     const s = this.state;
-    const benchPlayer = s.squad.find((p) => p.id === benchPlayerId);
-    if (!benchPlayer || !s.startingIds) return false;
-    const startersOfSamePos = s.startingIds.map((id) => s.squad.find((p) => p.id === id)).filter((p) => p && p.pos === benchPlayer.pos);
-    if (!startersOfSamePos.length) return false;
-    const weakest = startersOfSamePos.sort((a, b) => a.rating - b.rating)[0];
-    s.startingIds = s.startingIds.map((id) => (id === weakest.id ? benchPlayer.id : id));
+    if (!s.startingIds || idA === idB) return false;
+    const aStarts = s.startingIds.includes(idA);
+    const bStarts = s.startingIds.includes(idB);
+    if (aStarts === bStarts) return false;
+    const starterId = aStarts ? idA : idB;
+    const benchId = aStarts ? idB : idA;
+    if (!s.squad.some((p) => p.id === benchId)) return false;
+    s.startingIds = s.startingIds.map((id) => (id === starterId ? benchId : id));
     this.save();
     return true;
   },
@@ -975,8 +978,12 @@ const Engine = {
     const s = this.state;
     const playerId = s.contractQueue.shift();
     const player = s.squad.find((p) => p.id === playerId);
-    // No se puede dejar ir a nadie si el plantel ya está en el mínimo jugable.
-    if (player && (renew || s.squad.length <= 12)) {
+    // No se puede dejar ir a nadie si el plantel ya está en el mínimo jugable,
+    // ni tampoco si es el único jugador que le queda al equipo en su
+    // posición (por ejemplo, el último arquero: dejarlo ir rompería
+    // cualquier pantalla que necesite un arquero, como los penales).
+    const soleAtPosition = player && s.squad.filter((p) => p.pos === player.pos).length <= 1;
+    if (player && (renew || s.squad.length <= 12 || soleAtPosition)) {
       const cost = Math.round(player.rating * 8000);
       s.budget -= cost;
       player.contractYears = 2 + Math.floor(Math.random() * 2);

@@ -8,6 +8,8 @@ const squadPanel = document.getElementById('squad-panel');
 
 let selectDivision = 'D1';
 let selectZone = 'A';
+let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
+let selectedPlayerId = null; // jugador tocado en la cancha/banco, esperando el segundo toque para cambiarlo
 
 function money(n) {
   return '$' + Math.round(n).toLocaleString('es-AR');
@@ -26,19 +28,59 @@ function render() {
   else if (s.screen === 'season-end') renderSeasonEnd();
   renderTablePanel();
   renderSquadPanel();
+  const endCareerBtn = document.getElementById('end-career-btn');
+  if (endCareerBtn) {
+    endCareerBtn.addEventListener('click', () => {
+      if (confirm('¿Seguro que querés terminar esta carrera ahora y empezar una nueva? Se pierde el progreso actual.')) {
+        Engine.resetGame();
+        render();
+      }
+    });
+  }
 }
 
 // Los paneles laterales no existen todavía en la pantalla de elegir club
 // (no hay temporada armada). Se limpian ahí y se dibujan en cualquier otra.
+//
+// El panel tiene 3 vistas que se recorren con flechas: tu zona, la otra zona
+// de tu misma división (las dos están siempre simuladas en paralelo), y un
+// resumen de la última clasificación a copas internacionales (Libertadores /
+// Sudamericana todavía no se juegan partido a partido, así que no hay una
+// "tabla" en vivo — se muestra el resultado de la última vez que se definió).
 function renderTablePanel() {
   const s = Engine.state;
   if (!s || !s.season) { tablePanel.innerHTML = ''; return; }
   const club = Engine.getClub(s.clubId);
-  const zoneKey = Engine.myZoneKey();
-  const table = Engine.sortTable(s.season.zones[zoneKey].table);
-  tablePanel.innerHTML = `
-    <div class="card side-card">
-      <h3>Tabla — Zona ${club.zone}</h3>
+  const myZoneLetter = s.season.myZone;
+  const otherZoneLetter = myZoneLetter === 'A' ? 'B' : 'A';
+
+  const tabs = [
+    { id: 'mine', label: `Zona ${myZoneLetter}` },
+    { id: 'other', label: `Zona ${otherZoneLetter}` },
+    { id: 'copas', label: 'Copas' },
+  ];
+  const activeIndex = tabs.findIndex((t) => t.id === tablePanelTab);
+  const prevTab = tabs[(activeIndex - 1 + tabs.length) % tabs.length];
+  const nextTab = tabs[(activeIndex + 1) % tabs.length];
+
+  let body;
+  if (tablePanelTab === 'copas') {
+    const sum = s.lastSeasonSummary;
+    if (sum && sum.qualification && sum.qualification.length) {
+      body = `
+        <p class="muted">Clasificación definida a fin de la temporada anterior (Libertadores/Sudamericana no se juegan partido a partido todavía):</p>
+        <ul>
+          ${sum.qualification.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
+        </ul>
+      `;
+    } else {
+      body = '<p class="muted">Todavía no se definió ninguna clasificación a copas internacionales (se sabe recién a fin de temporada).</p>';
+    }
+  } else {
+    const zoneKey = `${s.season.myDivision}-${tablePanelTab === 'mine' ? myZoneLetter : otherZoneLetter}`;
+    const zoneData = s.season.zones[zoneKey];
+    const table = zoneData ? Engine.sortTable(zoneData.table) : [];
+    body = `
       <div class="table-wrap">
         <table class="table compact">
           <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
@@ -47,63 +89,135 @@ function renderTablePanel() {
           </tbody>
         </table>
       </div>
+    `;
+  }
+
+  const heading = tablePanelTab === 'copas' ? 'Copas' : `Tabla — ${tabs[activeIndex].label}`;
+  tablePanel.innerHTML = `
+    <div class="card side-card">
+      <div class="panel-tab-switch">
+        <button class="option-btn small" id="table-prev-btn">◀</button>
+        <h3>${heading}</h3>
+        <button class="option-btn small" id="table-next-btn">▶</button>
+      </div>
+      ${body}
     </div>
   `;
+  document.getElementById('table-prev-btn').addEventListener('click', () => { tablePanelTab = prevTab.id; renderTablePanel(); });
+  document.getElementById('table-next-btn').addEventListener('click', () => { tablePanelTab = nextTab.id; renderTablePanel(); });
 }
 
-function jerseySvg(label) {
+// Colores reales si el club los tiene cargados (ver CLUB_COLORS en
+// players.js); si no, cae al verde genérico de siempre.
+function clubKit(club) {
+  const c = (typeof CLUB_COLORS !== 'undefined' && CLUB_COLORS[club.id]) || null;
+  return c || { shirt: 'var(--accent)', band: null, trim: '#04220f' };
+}
+
+function jerseySvg(kit, label) {
+  const bandPath = kit.band
+    ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
+    : '';
   return `
     <svg width="40" height="40" viewBox="0 0 44 44">
-      <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="var(--accent)" stroke="#04220f" stroke-width="1.5" />
-      <text x="22" y="27" text-anchor="middle" font-size="11" font-weight="700" fill="#04220f">${label}</text>
+      <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
+      ${bandPath}
+      <text x="22" y="29" text-anchor="middle" font-size="11" font-weight="700" fill="${kit.trim}">${label}</text>
     </svg>
   `;
 }
 
-function playerChip(p) {
+// Cada jugador es tocable/arrastrable: `data-player` identifica el id para
+// el intercambio (ver handlePlayerTap/los listeners de drag en
+// renderSquadPanel). El dorsal real se muestra si lo tenemos cargado; si no,
+// se sigue mostrando la valoración como antes.
+function playerChip(p, club, selected) {
   const lastName = p.name.trim().split(' ').slice(-1)[0];
+  const kit = clubKit(club);
+  const label = p.number != null ? p.number : p.rating;
   return `
-    <div class="player-chip">
-      ${jerseySvg(p.rating)}
+    <div class="player-chip ${selected ? 'selected' : ''}" data-player="${p.id}" draggable="true">
+      ${jerseySvg(kit, label)}
       <span>${lastName}</span>
     </div>
   `;
 }
 
+function handlePlayerTap(id) {
+  if (selectedPlayerId === null || selectedPlayerId === id) {
+    selectedPlayerId = selectedPlayerId === id ? null : id;
+  } else {
+    const ok = Engine.swapPlayers(selectedPlayerId, id);
+    selectedPlayerId = ok ? null : id;
+  }
+  render();
+}
+
 function renderSquadPanel() {
   const s = Engine.state;
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
+  const club = Engine.getClub(s.clubId);
   const xi = Engine.getStartingXI();
   const bench = Engine.getBench();
+
+  const styles = ['Defensiva', 'Equilibrada', 'Ofensiva'];
+  const activeStyle = xi.formation.style;
+  const visibleFormations = FORMATIONS.filter((f) => f.style === activeStyle);
+
+  const chip = (p) => playerChip(p, club, p.id === selectedPlayerId);
+
   squadPanel.innerHTML = `
     <div class="card side-card">
+      <h3>Estilo</h3>
+      <div class="formation-select">
+        ${styles.map((st) => `<button class="tab-btn ${st === activeStyle ? 'active' : ''}" data-style="${st}">${st}</button>`).join('')}
+      </div>
       <h3>Formación</h3>
       <div class="formation-select">
-        ${FORMATIONS.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
+        ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
       </div>
-      <p class="muted formation-style">Estilo: ${xi.formation.style}</p>
       <div class="pitch">
-        <div class="pitch-row">${xi.del.map(playerChip).join('')}</div>
-        <div class="pitch-row">${xi.med.map(playerChip).join('')}</div>
-        <div class="pitch-row">${xi.def.map(playerChip).join('')}</div>
-        <div class="pitch-row">${xi.gk.map(playerChip).join('')}</div>
+        <div class="pitch-row">${xi.del.map(chip).join('')}</div>
+        <div class="pitch-row">${xi.med.map(chip).join('')}</div>
+        <div class="pitch-row">${xi.def.map(chip).join('')}</div>
+        <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
       </div>
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. También podés arrastrar uno encima del otro.</p>
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
-          <div class="pick-row">
-            <span>${p.name} — ${p.pos} (${p.rating})</span>
-            <button class="option-btn small" data-bench="${p.id}">Poner de titular</button>
+          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}" draggable="true">
+            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos} (${p.rating})</span>
           </div>
         `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
       </div>
     </div>
   `;
+
+  squadPanel.querySelectorAll('[data-style]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const first = FORMATIONS.find((f) => f.style === btn.dataset.style);
+      if (first) { Engine.setFormation(first.id); render(); }
+    });
+  });
   squadPanel.querySelectorAll('[data-formation]').forEach((btn) => {
     btn.addEventListener('click', () => { Engine.setFormation(btn.dataset.formation); render(); });
   });
-  squadPanel.querySelectorAll('[data-bench]').forEach((btn) => {
-    btn.addEventListener('click', () => { Engine.swapToStarting(btn.dataset.bench); render(); });
+
+  const playerEls = squadPanel.querySelectorAll('[data-player]');
+  playerEls.forEach((el) => {
+    el.addEventListener('click', () => handlePlayerTap(el.dataset.player));
+    el.addEventListener('dragstart', (ev) => { ev.dataTransfer.setData('text/plain', el.dataset.player); });
+    el.addEventListener('dragover', (ev) => ev.preventDefault());
+    el.addEventListener('drop', (ev) => {
+      ev.preventDefault();
+      const draggedId = ev.dataTransfer.getData('text/plain');
+      if (draggedId && draggedId !== el.dataset.player) {
+        Engine.swapPlayers(draggedId, el.dataset.player);
+        selectedPlayerId = null;
+        render();
+      }
+    });
   });
 }
 
@@ -167,6 +281,7 @@ function header() {
       <div><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></div>
       <div class="muted">${competitionLabel()}</div>
       <div class="muted">Presupuesto: ${money(s.budget)} · Posición en zona: ${pos}°/${table.length} · Ánimo: ${s.morale}</div>
+      <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
     </div>
   `;
 }
@@ -308,7 +423,8 @@ function renderContractRenewal() {
   const playerId = s.contractQueue[0];
   const player = s.squad.find((p) => p.id === playerId);
   const renewCost = Math.round(player.rating * 8000);
-  const canRelease = s.squad.length > 12;
+  const soleAtPosition = s.squad.filter((p) => p.pos === player.pos).length <= 1;
+  const canRelease = s.squad.length > 12 && !soleAtPosition;
 
   app.innerHTML = `
     ${header()}
@@ -319,7 +435,7 @@ function renderContractRenewal() {
         <button class="option-btn" id="renew-btn">Renovar por ${money(renewCost)}</button>
         <button class="option-btn danger" id="release-btn" ${canRelease ? '' : 'disabled'}>Dejarlo ir a fin de año</button>
       </div>
-      ${!canRelease ? '<p class="muted">No podés dejarlo ir: el plantel ya está en el mínimo jugable.</p>' : ''}
+      ${!canRelease ? `<p class="muted">No podés dejarlo ir: ${soleAtPosition ? 'es el único que te queda en esa posición' : 'el plantel ya está en el mínimo jugable'}.</p>` : ''}
     </div>
   `;
   document.getElementById('renew-btn').addEventListener('click', () => { Engine.resolveContractDecision(true); render(); });

@@ -94,12 +94,17 @@ const CLUB_TEMPLATES = [
 // empujón a favor o en contra según qué tan ofensiva o defensiva es la
 // formación, que se suma a la fuerza del equipo en cada partido.
 const FORMATIONS = [
+  { id: '541', name: '5-4-1', def: 5, med: 4, del: 1, style: 'Defensiva', mod: -3 },
   { id: '532', name: '5-3-2', def: 5, med: 3, del: 2, style: 'Defensiva', mod: -2 },
+  { id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1 },
   { id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0 },
-  { id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Equilibrada', mod: -1 },
+  { id: '361', name: '3-6-1', def: 3, med: 6, del: 1, style: 'Equilibrada', mod: 0 },
   { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Equilibrada', mod: 1 },
+  { id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Ofensiva', mod: 2 },
   { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 2 },
+  { id: '424', name: '4-2-4', def: 4, med: 2, del: 4, style: 'Ofensiva', mod: 4 },
   { id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3 },
+  { id: '334', name: '3-3-4', def: 3, med: 3, del: 4, style: 'Ofensiva', mod: 5 },
 ];
 
 // Distribución de nacionalidades de los jugadores generados. La liga es
@@ -142,11 +147,13 @@ const NAMES_BY_NATION = {
   },
 };
 
-// 16 jugadores por plantel: 2 arqueros, 5 defensores, 5 mediocampistas, 4 delanteros.
+// 18 jugadores por plantel: 2 arqueros, 6 defensores, 6 mediocampistas, 4
+// delanteros — deja margen suficiente de suplentes para todas las formaciones
+// (incluidas las más pobladas de una línea, como 5-4-1 o 3-6-1).
 const SQUAD_POSITIONS = [
   'POR', 'POR',
-  'DEF', 'DEF', 'DEF', 'DEF', 'DEF',
-  'MED', 'MED', 'MED', 'MED', 'MED',
+  'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF',
+  'MED', 'MED', 'MED', 'MED', 'MED', 'MED',
   'DEL', 'DEL', 'DEL', 'DEL',
 ];
 

@@ -69,16 +69,24 @@ abrir seguís donde quedaste.
   penal es en contra). En instancias de eliminación directa que terminan
   empatadas (Copa Argentina, playoffs, Final por el ascenso, Reducido), se
   resuelve por penales.
-- **Pantalla con 3 paneles**: a la izquierda la tabla de posiciones de tu
-  zona, actualizada fecha a fecha; en el medio el juego en sí (decisiones,
-  partidos, mercado, etc.); a la derecha tu plantel sobre una cancha, con el
-  arquero abajo y subiendo hacia los delanteros, más una lista de
-  suplentes con un botón para poner a cualquiera de titular.
-- **Formaciones**: 5-3-2, 4-4-2, 4-5-1, 3-5-2, 4-3-3 y 3-4-3, cada una
-  etiquetada como defensiva, equilibrada u ofensiva. La formación decide
+- **Pantalla con 3 paneles**: a la izquierda una tabla de posiciones con
+  flechitas para recorrer tu zona, la otra zona de tu misma división y un
+  resumen de la última clasificación a copas internacionales; en el medio el
+  juego en sí (decisiones, partidos, mercado, etc.), con un botón para
+  terminar la carrera actual y arrancar una de cero desde cualquier
+  pantalla, no solo al final de la temporada; a la derecha tu plantel sobre
+  una cancha, con el arquero abajo y subiendo hacia los delanteros, más una
+  lista de suplentes.
+- **Formaciones y estilo táctico**: 11 formaciones (5-4-1, 5-3-2, 4-5-1,
+  4-4-2, 3-6-1, 3-5-2, 5-2-3, 4-3-3, 4-2-4, 3-4-3, 3-3-4), agrupadas en 3
+  estilos elegibles con un click (Defensiva, Equilibrada, Ofensiva). Elegir
+  un estilo selecciona una formación de ese grupo y muestra el resto de las
+  formaciones de esa familia para elegir la exacta. La formación decide
   cuántos jugadores de cada línea entran al once (los mejores de cada una
   según su valoración) y da un pequeño empujón o resta a tu fuerza en el
   partido según qué tan ofensiva sea.
+- **Cambios de titulares**: se tocan (o se arrastran) dos jugadores — uno de
+  la cancha y uno del banco — para intercambiarlos, sin un botón intermedio.
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 
@@ -114,6 +122,11 @@ simplificó así:
   estimada), club por club. Un club sin entrada ahí sigue usando el
   generador de jugadores al azar — no rompe nada mientras se van sumando
   el resto. Ya está cargado: River Plate (28 jugadores).
+- **Dorsales y colores reales**: se van completando junto con cada plantel.
+  De River ya se cargaron los dorsales que confirmó el club para 2026 (los
+  que no se pudieron confirmar con una fuente oficial quedan sin número, no
+  se inventan) y su camiseta real (blanco con banda roja). Un jugador sin
+  dorsal cargado sigue mostrando su valoración, como antes.
 - **Escudos reales**: pendientes de que se sumen las imágenes (son marca
   registrada de cada club, así que no se pueden generar ni bajar de
   internet sin más).
