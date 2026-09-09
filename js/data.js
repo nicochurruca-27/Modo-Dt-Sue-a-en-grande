@@ -239,10 +239,19 @@ const INBOX_MESSAGES = [
   {
     from: 'Presidente del club',
     subject: 'Un mensaje de la dirigencia',
-    body: 'Che, te escribo para decirte que la comisión está conforme con tu trabajo. Seguí así.',
+    body: 'Estimado DT: la comisión directiva le hace llegar su satisfacción por el trabajo realizado hasta el momento. Continúe en esta línea.',
     options: [
       { label: 'Agradecer el gesto', moraleMod: 3, note: 'El respaldo de arriba te da tranquilidad.' },
       { label: 'Responder con formalidad', moraleMod: 0, note: 'Un intercambio breve y cordial, nada más.' },
+    ],
+  },
+  {
+    from: 'Presidente del club',
+    subject: 'Comunicado de la comisión directiva',
+    body: 'Estimado DT: la institución le solicita mesura en las declaraciones públicas de las últimas semanas, para cuidar la imagen del club.',
+    options: [
+      { label: 'Tomar el pedido con respeto', moraleMod: 0, note: 'Aceptás el pedido sin mayores problemas.' },
+      { label: 'Responder que usted decide qué declarar', moraleMod: -2, note: 'La dirigencia no queda conforme con la respuesta.' },
     ],
   },
   {
@@ -279,6 +288,42 @@ const INBOX_MESSAGES = [
     options: [
       { label: 'Llamarlo para explicarle su situación', moraleMod: 2, note: 'El jugador se queda más tranquilo tras la charla.' },
       { label: 'No responder por ahora', moraleMod: -2, note: 'El jugador queda con la bronca adentro.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Pedido de un jugador',
+    body: 'Un jugador te escribe pidiendo unos días libres extra: dice que se siente cansado y necesita despejarse un poco.',
+    options: [
+      { label: 'Darle los días libres', moraleMod: 3, note: 'El jugador agradece la consideración con su descanso.' },
+      { label: 'Explicarle que no es el momento', moraleMod: -2, note: 'El jugador entiende, pero se queda algo incómodo.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Consulta de un jugador',
+    body: 'Un jugador te consulta si puede cambiar de posición: dice sentirse más cómodo jugando en otro lugar de la cancha.',
+    options: [
+      { label: 'Evaluar el pedido con el cuerpo técnico', moraleMod: 2, note: 'El jugador valora que lo escuches, más allá de lo que se decida.' },
+      { label: 'Decirle que siga en su puesto habitual', moraleMod: -1, note: 'El jugador acata la decisión sin mucho entusiasmo.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Malestar físico de un jugador',
+    body: 'Uno de tus jugadores te avisa que viene sintiendo una molestia física leve y no sabe si va a poder rendir al ciento por ciento.',
+    options: [
+      { label: 'Mandarlo a revisión con el cuerpo médico', moraleMod: 2, note: 'El jugador se siente cuidado por el club.' },
+      { label: 'Pedirle que aguante, lo necesitás disponible', moraleMod: -3, note: 'El jugador queda preocupado por su físico.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Pedido personal de un jugador',
+    body: 'Un jugador te comenta que le gustaría tener alguna chance de ser tenido en cuenta por su selección, y te pide que lo ayudes a mostrarse.',
+    options: [
+      { label: 'Darle minutos para que se muestre', moraleMod: 3, note: 'El jugador te agradece la oportunidad.' },
+      { label: 'Decirle que eso no depende de vos', moraleMod: -1, note: 'El jugador se resigna, algo desanimado.' },
     ],
   },
   {

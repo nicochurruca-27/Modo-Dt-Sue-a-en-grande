@@ -701,24 +701,29 @@ const Engine = {
     this.save();
   },
 
+  // Un solo toque de "Avanzar" pasa de largo todos los días sin nada (no
+  // hace falta tocarlo una vez por día) y se frena recién en el primer día
+  // con algo: un mensaje, o el final de la semana (que revela el próximo
+  // partido/evento).
   advanceCalendarDay() {
     const s = this.state;
     const cal = s.calendar;
-    cal.dayInWeek++;
-    cal.dayCount++;
 
-    if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
-      cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
-      this.save();
-      return;
+    while (true) {
+      cal.dayInWeek++;
+      cal.dayCount++;
+
+      if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
+        cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
+        this.save();
+        return;
+      }
+
+      if (cal.dayInWeek >= 7) {
+        this[cal.nextAction]();
+        return;
+      }
     }
-
-    if (cal.dayInWeek >= 7) {
-      this[cal.nextAction]();
-      return;
-    }
-
-    this.save();
   },
 
   answerCalendarMessage(optionIndex) {
