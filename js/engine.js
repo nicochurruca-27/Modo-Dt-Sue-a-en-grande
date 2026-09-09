@@ -159,7 +159,7 @@ const Engine = {
   // positionFit/effectiveRating más abajo.
 
   currentFormation() {
-    return FORMATIONS.find((f) => f.id === this.state.formation) || FORMATIONS[1];
+    return FORMATIONS.find((f) => f.id === this.state.formation) || FORMATIONS.find((f) => f.id === '433') || FORMATIONS[0];
   },
 
   setFormation(id) {
@@ -169,28 +169,46 @@ const Engine = {
     this.save();
   },
 
+  // 'OFF' es la línea de enganches/mediapuntas/extremos entre el mediocampo
+  // y el ataque (4-3-1-2, 4-2-3-1, 3-2-5, etc.) — no es una posición real de
+  // ningún jugador (el plantel solo tiene POR/DEF/MED/DEL), es un casillero
+  // más en la cancha.
   slotOrderForFormation(formation) {
     return [
       'POR',
       ...Array(formation.def).fill('DEF'),
       ...Array(formation.med).fill('MED'),
+      ...Array(formation.off || 0).fill('OFF'),
       ...Array(formation.del).fill('DEL'),
     ];
   },
 
+  // Qué posiciones reales sirven para cubrir cada casillero, de mejor a peor
+  // candidato. El casillero OFF no es una posición real: se cubre primero
+  // con mediocampistas (mediapuntas) y si no hay, con delanteros.
+  preferredPositionsForSlot(slot) {
+    return slot === 'OFF' ? ['MED', 'DEL'] : [slot];
+  },
+
   // Arma el once automáticamente: para cada casillero busca el mejor jugador
-  // libre de esa posición exacta; si no alcanzan (plantel chico), completa
-  // los casilleros que queden vacíos con lo mejor que sobre. Se usa al
-  // arrancar la carrera y al cambiar de formación (ahí sí se resetean las
-  // elecciones manuales, porque cambiar de formación es una acción explícita
-  // del usuario).
+  // libre entre sus posiciones candidatas (ver preferredPositionsForSlot); si
+  // no alcanzan (plantel chico), completa los casilleros que queden vacíos
+  // con lo mejor que sobre. Se usa al arrancar la carrera y al cambiar de
+  // formación (ahí sí se resetean las elecciones manuales, porque cambiar de
+  // formación es una acción explícita del usuario).
   recomputeStartingSlots() {
     const s = this.state;
     const formation = this.currentFormation();
     const usedIds = new Set();
-    const bestOfPos = (pos) => [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === pos).sort((a, b) => b.rating - a.rating)[0];
+    const bestFor = (slot) => {
+      for (const pos of this.preferredPositionsForSlot(slot)) {
+        const p = [...s.squad].filter((pl) => !usedIds.has(pl.id) && pl.pos === pos).sort((a, b) => b.rating - a.rating)[0];
+        if (p) return p;
+      }
+      return null;
+    };
     let slots = this.slotOrderForFormation(formation).map((slot) => {
-      const p = bestOfPos(slot);
+      const p = bestFor(slot);
       if (!p) return { slot, playerId: null };
       usedIds.add(p.id);
       return { slot, playerId: p.id };
@@ -219,29 +237,39 @@ const Engine = {
     });
     s.startingSlots = s.startingSlots.map((entry) => {
       if (entry.playerId) return entry;
-      const natural = [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === entry.slot).sort((a, b) => b.rating - a.rating)[0];
-      const pick = natural || [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
+      let pick = null;
+      for (const pos of this.preferredPositionsForSlot(entry.slot)) {
+        pick = [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === pos).sort((a, b) => b.rating - a.rating)[0];
+        if (pick) break;
+      }
+      if (!pick) pick = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
       if (!pick) return entry;
       usedIds.add(pick.id);
       return { slot: entry.slot, playerId: pick.id };
     });
   },
 
-  // Orden de "cercanía" entre líneas: arquero-defensa-medio-ataque. Se usa
-  // para decidir qué tan mal le queda a alguien jugar en un casillero que no
-  // es su posición natural.
+  // Qué tan bien le queda a cada posición real jugar en cada casillero.
+  // Simétrica (POR-DEF vale lo mismo que DEF-POR). OFF (enganche/mediapunta)
+  // se cubre naturalmente con MED (así clasificamos a los mediapuntas en el
+  // plantel) y razonablemente con DEL; el arquero en cualquier lado que no
+  // sea el arco es siempre grave.
   positionFit(playerPos, slot) {
     if (playerPos === slot) return { color: 'green', mult: 1 };
-    const order = ['POR', 'DEF', 'MED', 'DEL'];
-    const dist = Math.abs(order.indexOf(playerPos) - order.indexOf(slot));
-    const involvesKeeper = playerPos === 'POR' || slot === 'POR';
-    if (involvesKeeper) {
-      // Un arquero jugando de otra cosa (o al revés) es siempre grave, y
-      // empeora cuanto más lejos del arco quede.
-      return { color: 'red', mult: dist === 1 ? 0.55 : dist === 2 ? 0.45 : 0.35 };
-    }
-    if (dist === 1) return { color: 'yellow', mult: 0.85 }; // línea vecina (def-med, med-del)
-    return { color: 'red', mult: 0.72 }; // def-del: lejos de su lugar
+    const table = {
+      'DEF-MED': { color: 'yellow', mult: 0.85 },
+      'DEL-MED': { color: 'yellow', mult: 0.85 },
+      'MED-OFF': { color: 'green', mult: 1 },
+      'DEL-OFF': { color: 'yellow', mult: 0.85 },
+      'DEF-DEL': { color: 'red', mult: 0.72 },
+      'DEF-OFF': { color: 'red', mult: 0.5 },
+      'DEF-POR': { color: 'red', mult: 0.55 },
+      'MED-POR': { color: 'red', mult: 0.45 },
+      'OFF-POR': { color: 'red', mult: 0.4 },
+      'DEL-POR': { color: 'red', mult: 0.35 },
+    };
+    const key = [playerPos, slot].sort().join('-');
+    return table[key] || { color: 'red', mult: 0.5 };
   },
 
   effectiveRating(player, slot) {
@@ -251,7 +279,7 @@ const Engine = {
   getStartingXI() {
     const s = this.state;
     if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
-    const rows = { POR: [], DEF: [], MED: [], DEL: [] };
+    const rows = { POR: [], DEF: [], MED: [], OFF: [], DEL: [] };
     const starters = [];
     s.startingSlots.forEach(({ slot, playerId }) => {
       const p = s.squad.find((pl) => pl.id === playerId);
@@ -266,6 +294,7 @@ const Engine = {
       gk: rows.POR,
       def: rows.DEF,
       med: rows.MED,
+      off: rows.OFF,
       del: rows.DEL,
       starters,
     };
@@ -438,7 +467,7 @@ const Engine = {
       budget: 0,
       morale: 0,
       squad: null,
-      formation: '442',
+      formation: '433',
       startingSlots: null,
       season: null,
       copaBracket: null,

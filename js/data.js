@@ -89,22 +89,31 @@ const CLUB_TEMPLATES = [
   { id: 'midland', name: 'Ferrocarril Midland', division: 'D2', zone: 'B', reputation: 1 },
 ];
 
-// Formaciones tácticas disponibles. def/med/del son la cantidad de jugadores
-// de cada línea (siempre suman 10 + el arquero = 11). `mod` es un pequeño
-// empujón a favor o en contra según qué tan ofensiva o defensiva es la
-// formación, que se suma a la fuerza del equipo en cada partido.
+// Formaciones tácticas disponibles. def/med/off/del son la cantidad de
+// jugadores de cada línea (siempre suman 10 + el arquero = 11). `off` es la
+// línea de enganches/mediapuntas/extremos entre el mediocampo y el ataque
+// (formaciones como 4-3-1-2 o 4-2-3-1); las formaciones que no la usan
+// simplemente no traen ese campo. `mod` es un pequeño empujón a favor o en
+// contra según qué tan ofensiva o defensiva es la formación, que se suma a
+// la fuerza del equipo en cada partido.
 const FORMATIONS = [
+  // Defensivas
   { id: '541', name: '5-4-1', def: 5, med: 4, del: 1, style: 'Defensiva', mod: -3 },
   { id: '532', name: '5-3-2', def: 5, med: 3, del: 2, style: 'Defensiva', mod: -2 },
+  { id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Defensiva', mod: -1 },
+  { id: '5212', name: '5-2-1-2', def: 5, med: 2, off: 1, del: 2, style: 'Defensiva', mod: -2 },
   { id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1 },
-  { id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0 },
-  { id: '361', name: '3-6-1', def: 3, med: 6, del: 1, style: 'Equilibrada', mod: 0 },
-  { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Equilibrada', mod: 1 },
-  { id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Ofensiva', mod: 2 },
-  { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 2 },
+  // Equilibradas
+  { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Equilibrada', mod: 1 },
+  { id: '4312', name: '4-3-1-2', def: 4, med: 3, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
+  { id: '3412', name: '3-4-1-2', def: 3, med: 4, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
+  // Ofensivas
   { id: '424', name: '4-2-4', def: 4, med: 2, del: 4, style: 'Ofensiva', mod: 4 },
+  { id: '433o', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 3 },
   { id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3 },
-  { id: '334', name: '3-3-4', def: 3, med: 3, del: 4, style: 'Ofensiva', mod: 5 },
+  { id: '4231', name: '4-2-3-1', def: 4, med: 2, off: 3, del: 1, style: 'Ofensiva', mod: 2 },
+  { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Ofensiva', mod: 2 },
+  { id: '325', name: '3-2-5', def: 3, med: 2, off: 4, del: 1, style: 'Ofensiva', mod: 5 },
 ];
 
 // Distribución de nacionalidades de los jugadores generados. La liga es

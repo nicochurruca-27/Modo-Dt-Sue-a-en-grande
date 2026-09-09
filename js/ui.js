@@ -193,6 +193,7 @@ function renderSquadPanel() {
       </div>
       <div class="pitch">
         <div class="pitch-row">${xi.del.map(chip).join('')}</div>
+        ${xi.off.length ? `<div class="pitch-row">${xi.off.map(chip).join('')}</div>` : ''}
         <div class="pitch-row">${xi.med.map(chip).join('')}</div>
         <div class="pitch-row">${xi.def.map(chip).join('')}</div>
         <div class="pitch-row">${xi.gk.map(chip).join('')}</div>

@@ -77,14 +77,20 @@ abrir seguís donde quedaste.
   pantalla, no solo al final de la temporada; a la derecha tu plantel sobre
   una cancha, con el arquero abajo y subiendo hacia los delanteros, más una
   lista de suplentes.
-- **Formaciones y estilo táctico**: 11 formaciones (5-4-1, 5-3-2, 4-5-1,
-  4-4-2, 3-6-1, 3-5-2, 5-2-3, 4-3-3, 4-2-4, 3-4-3, 3-3-4), agrupadas en 3
-  estilos elegibles con un click (Defensiva, Equilibrada, Ofensiva). Elegir
-  un estilo selecciona una formación de ese grupo y muestra el resto de las
-  formaciones de esa familia para elegir la exacta. La formación decide
-  cuántos jugadores de cada línea entran al once (los mejores de cada una
-  según su valoración) y da un pequeño empujón o resta a tu fuerza en el
-  partido según qué tan ofensiva sea.
+- **Formaciones y estilo táctico**: 14 formaciones agrupadas en 3 estilos
+  elegibles con un click (Defensiva, Equilibrada, Ofensiva). Elegir un
+  estilo selecciona una formación de ese grupo y muestra el resto de las
+  formaciones de esa familia para elegir la exacta.
+  - Defensivas: 5-4-1, 5-3-2, 5-2-3, 5-2-1-2, 4-5-1.
+  - Equilibradas: 4-3-3, 4-3-1-2, 3-4-1-2.
+  - Ofensivas: 4-2-4, 4-3-3, 3-4-3, 4-2-3-1, 3-5-2, 3-2-5.
+
+  Formaciones como 4-3-1-2 o 3-2-5 tienen una cuarta línea entre el
+  mediocampo y el ataque (el enganche/las mediapuntas) que se dibuja como
+  una fila propia en la cancha, entre los mediocampistas y los delanteros.
+  La formación decide cuántos jugadores entran a cada línea (los mejores de
+  cada una según su valoración) y da un pequeño empujón o resta a tu fuerza
+  en el partido según qué tan ofensiva sea.
 - **Cambios de titulares**: se tocan (o se arrastran) dos jugadores — uno de
   la cancha y uno del banco — para intercambiarlos, sin un botón intermedio.
   El casillero (cuántos hay en cada línea) siempre lo define la formación
