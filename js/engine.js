@@ -511,6 +511,7 @@ const Engine = {
       formation: '433',
       startingSlots: null,
       season: null,
+      calendar: null,
       copaBracket: null,
       bracket: null,
       matchContext: null,
@@ -568,10 +569,13 @@ const Engine = {
     const option = this.presentationResponses()[optionIndex];
     if (option) {
       s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
-      s.lastDecisionNote = option.note;
     }
-    s.screen = 'pre-match';
-    this.save();
+    // El primer partido de la carrera también pasa por el calendario día a
+    // día, igual que cualquier otra fecha (antes saltaba directo a
+    // 'pre-match' porque enterEditionRound ya lo había dejado armado desde
+    // newGame(), pero ahora esa función solo arranca la semana en
+    // calendario, así que hay que volver a llamarla acá).
+    this.enterEditionRound();
   },
 
   // Arranca un año nuevo completo: simula instantáneamente la división en la
@@ -665,7 +669,70 @@ const Engine = {
 
   // ---------- Progreso fecha a fecha dentro de una edición/etapa ----------
 
+  // Punto de entrada real de "pasar a la próxima fecha": en vez de saltar
+  // directo al próximo evento (partido, fecha FIFA, mercado, etc.) como
+  // antes, primero se recorre la semana día a día (ver startCalendarWeek).
+  // enterEditionRoundContent() de más abajo es la lógica de siempre —
+  // decide qué toca esta fecha — y se llama recién cuando la semana
+  // termina de recorrerse.
   enterEditionRound() {
+    this.startCalendarWeek('enterEditionRoundContent');
+  },
+
+  // ---------- Calendario día a día entre una fecha y la siguiente ----------
+  //
+  // Una semana dura 7 días: los días 1 a 6 son de rutina (a veces con un
+  // mensaje del club, ver INBOX_MESSAGES en data.js) y el día 7 revela lo
+  // que corresponda a la próxima fecha (nextAction, casi siempre
+  // 'enterEditionRoundContent'). Todo lo que se guarda en s.calendar es
+  // JSON-serializable (nada de objetos Date ni funciones) para que
+  // sobreviva bien al save/load: la fecha se calcula con un contador de
+  // días (dayCount) sobre un almanaque fijo, ver formatCalendarDate.
+  startCalendarWeek(nextAction) {
+    const s = this.state;
+    if (!s.calendar) s.calendar = { dayCount: 0 };
+    const hasMessage = Math.random() < 0.5;
+    s.calendar.dayInWeek = 0;
+    s.calendar.messageDay = hasMessage ? 2 + Math.floor(Math.random() * 4) : null; // día 2 a 5 de la semana
+    s.calendar.message = null;
+    s.calendar.nextAction = nextAction;
+    s.lastDecisionNote = null;
+    s.screen = 'calendar';
+    this.save();
+  },
+
+  advanceCalendarDay() {
+    const s = this.state;
+    const cal = s.calendar;
+    cal.dayInWeek++;
+    cal.dayCount++;
+
+    if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
+      cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
+      this.save();
+      return;
+    }
+
+    if (cal.dayInWeek >= 7) {
+      this[cal.nextAction]();
+      return;
+    }
+
+    this.save();
+  },
+
+  answerCalendarMessage(optionIndex) {
+    const s = this.state;
+    const cal = s.calendar;
+    const option = cal.message.options[optionIndex];
+    s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
+    s.lastDecisionNote = option.note;
+    cal.message = null;
+    cal.messageDay = null; // un solo mensaje por semana
+    this.save();
+  },
+
+  enterEditionRoundContent() {
     const s = this.state;
     const season = s.season;
 

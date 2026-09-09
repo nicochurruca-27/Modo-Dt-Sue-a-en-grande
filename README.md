@@ -28,6 +28,16 @@ abrir seguís donde quedaste.
   ascenso" en la Nacional — y elegís cómo responder (aceptar el desafío,
   pedir tiempo, o poner paños fríos), con un pequeño efecto en el ánimo. El
   objetivo queda visible en la cabecera durante toda la temporada.
+- **Calendario día a día**: entre una fecha y la siguiente ya no se salta
+  directo al próximo partido — aparece un calendario con la fecha real
+  (arranca el 1° de febrero) y un botón "Avanzar" que hace pasar los días
+  de a uno. La mayoría son días tranquilos, pero de vez en cuando (más o
+  menos la mitad de las semanas) un día se frena con un mensaje del club
+  —de la dirigencia, el cuerpo técnico, tu representante o algún
+  jugador— que respondés antes de poder seguir avanzando, con un pequeño
+  efecto en el ánimo según la opción. Al llegar al día del partido (o de
+  la fecha FIFA, la ventana de pases, etc.) el calendario se corta solo y
+  aparece la pantalla correspondiente.
 - **Primera División y Primera Nacional**: 30 clubes reales en Primera (2
   zonas de 15) y 36 en la Nacional (2 zonas de 18), con la composición
   actual verificada (incluye los últimos ascensos/descensos: Colón, Godoy

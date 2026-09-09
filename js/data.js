@@ -1,6 +1,14 @@
 // Contenido del juego: clubes (Primera División y Primera Nacional),
 // nombres de jugadores por país y decisiones posibles.
 
+const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+// El calendario de la carrera arranca el 1° de febrero, como el arranque
+// real de la temporada de AFA, y avanza de a un día por cada "Avanzar" del
+// jugador (ver Engine.startCalendarWeek/advanceCalendarDay).
+const CALENDAR_START_MONTH = 1; // 0 = enero
+const CALENDAR_START_DAY = 1;
+
 // division: 'D1' (Primera División) | 'D2' (Primera Nacional)
 // zone: 'A' | 'B' — D1 se juega en 2 zonas de 15 equipos, D2 en 2 zonas de 18.
 // Sin escudos por ahora: el juego muestra solo el nombre de cada club.
@@ -218,6 +226,76 @@ const DECISIONS = [
       { label: 'Foco físico', tacticMod: -1, moraleMod: 1, note: 'El equipo llega más fresco físicamente.' },
       { label: 'Foco táctico', tacticMod: 3, moraleMod: 0, note: 'Se trabajaron los movimientos para el partido.', growthBoost: true },
       { label: 'Día de descanso', tacticMod: -2, moraleMod: 3, note: 'El plantel agradece el descanso extra.' },
+    ],
+  },
+];
+
+// Mensajes que pueden aparecer un día cualquiera de la semana en el
+// calendario (ver Engine.startCalendarWeek en engine.js), fuera de los
+// días de partido: no afectan la táctica del próximo partido (por eso no
+// tienen tacticMod como las DECISIONS), solo dan sabor a la semana y un
+// empujoncito chico de ánimo según cómo los respondas.
+const INBOX_MESSAGES = [
+  {
+    from: 'Presidente del club',
+    subject: 'Un mensaje de la dirigencia',
+    body: 'Che, te escribo para decirte que la comisión está conforme con tu trabajo. Seguí así.',
+    options: [
+      { label: 'Agradecer el gesto', moraleMod: 3, note: 'El respaldo de arriba te da tranquilidad.' },
+      { label: 'Responder con formalidad', moraleMod: 0, note: 'Un intercambio breve y cordial, nada más.' },
+    ],
+  },
+  {
+    from: 'Cuerpo técnico',
+    subject: 'Charla con tu ayudante de campo',
+    body: 'Tu ayudante te comenta que notó a un par de jugadores algo bajoneados en los entrenamientos.',
+    options: [
+      { label: 'Hablar personalmente con el plantel', moraleMod: 4, note: 'El gesto se valora puertas adentro.' },
+      { label: 'Dejar que se acomode solo', moraleMod: -1, note: 'El clima del plantel no mejora ni empeora demasiado.' },
+    ],
+  },
+  {
+    from: 'Tu representante',
+    subject: 'Novedades de tu agente',
+    body: 'Tu representante te cuenta que hay rumores de otro club preguntando por vos, pero todavía nada formal.',
+    options: [
+      { label: 'Pedirle que no diga nada por ahora', moraleMod: 0, note: 'Preferís mantener el foco en el día a día.' },
+      { label: 'Que siga explorando la posibilidad', moraleMod: 1, note: 'Nunca está de más tener opciones sobre la mesa.' },
+    ],
+  },
+  {
+    from: 'Un jugador del plantel',
+    subject: 'Mensaje de un titular',
+    body: 'Uno de tus jugadores más importantes te escribe para agradecerte la confianza en las últimas fechas.',
+    options: [
+      { label: 'Responder con un mensaje cálido', moraleMod: 3, note: 'El vínculo con el plantel se fortalece.' },
+      { label: 'Un simple "de nada, a seguir así"', moraleMod: 1, note: 'Corto pero suficiente.' },
+    ],
+  },
+  {
+    from: 'Un suplente',
+    subject: 'Reclamo de un suplente',
+    body: 'Un jugador que no viene sumando minutos te escribe algo molesto, sintiendo que no lo tenés en cuenta.',
+    options: [
+      { label: 'Llamarlo para explicarle su situación', moraleMod: 2, note: 'El jugador se queda más tranquilo tras la charla.' },
+      { label: 'No responder por ahora', moraleMod: -2, note: 'El jugador queda con la bronca adentro.' },
+    ],
+  },
+  {
+    from: 'Cuerpo médico',
+    subject: 'Parte médico de rutina',
+    body: 'El cuerpo médico te manda el reporte semanal: por suerte no hay ninguna lesión para lamentar.',
+    options: [
+      { label: 'Tomar nota y seguir', moraleMod: 0, note: 'Buenas noticias, nada que resolver.' },
+    ],
+  },
+  {
+    from: 'Socios del club',
+    subject: 'Comentarios de la hinchada',
+    body: 'Circula en redes sociales un comentario de un hincha reconocido pidiendo un cambio de formación.',
+    options: [
+      { label: 'No darle importancia', moraleMod: 0, note: 'Las redes van a seguir hablando, hagas lo que hagas.' },
+      { label: 'Comentarlo con humor en la conferencia', moraleMod: 2, note: 'La hinchada valora que no te lo tomes tan en serio.' },
     ],
   },
 ];

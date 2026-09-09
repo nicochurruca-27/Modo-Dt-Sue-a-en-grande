@@ -20,12 +20,27 @@ function zoneLabel(id) {
   return z ? z.label : '';
 }
 
+// Convierte el contador de días (s.calendar.dayCount, un simple entero
+// que sobrevive bien al save/load) en una fecha legible, sumando días
+// sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
+// navegador, para no depender de nada más que aritmética simple.
+function formatCalendarDate(dayCount) {
+  let day = CALENDAR_START_DAY + dayCount;
+  let month = CALENDAR_START_MONTH;
+  while (day > DAYS_IN_MONTH[month]) {
+    day -= DAYS_IN_MONTH[month];
+    month = (month + 1) % 12;
+  }
+  return `${day} de ${MONTH_NAMES[month]}`;
+}
+
 function render() {
   const s = Engine.state;
   if (!s) return;
   if (s.screen === 'dt-create') renderDTCreate();
   else if (s.screen === 'club-select') renderClubSelect();
   else if (s.screen === 'presentation') renderPresentation();
+  else if (s.screen === 'calendar') renderCalendar();
   else if (s.screen === 'pre-match') renderPreMatch();
   else if (s.screen === 'penalty') renderPenalty();
   else if (s.screen === 'match-result') renderMatchResult();
@@ -465,6 +480,45 @@ function header() {
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
     </div>
   `;
+}
+
+function renderCalendar() {
+  const s = Engine.state;
+  const cal = s.calendar;
+  const dateLabel = formatCalendarDate(cal.dayCount);
+
+  if (cal.message) {
+    app.innerHTML = `
+      ${header()}
+      <div class="card">
+        <p class="muted">${dateLabel}</p>
+        <h2>${cal.message.subject}</h2>
+        <p class="muted">De: ${cal.message.from}</p>
+        <p>${cal.message.body}</p>
+        <div class="options" id="calendar-message-options">
+          ${cal.message.options.map((opt, i) => `<button class="option-btn" data-i="${i}">${opt.label}</button>`).join('')}
+        </div>
+      </div>
+    `;
+    app.querySelectorAll('#calendar-message-options .option-btn').forEach((btn) => {
+      btn.addEventListener('click', () => { Engine.answerCalendarMessage(Number(btn.dataset.i)); render(); });
+    });
+    return;
+  }
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card">
+      <h2>${dateLabel}</h2>
+      <p class="muted">${s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.'}</p>
+      <button class="option-btn" id="continue-btn">Avanzar</button>
+    </div>
+  `;
+  document.getElementById('continue-btn').addEventListener('click', () => {
+    s.lastDecisionNote = null;
+    Engine.advanceCalendarDay();
+    render();
+  });
 }
 
 function renderPreMatch() {
