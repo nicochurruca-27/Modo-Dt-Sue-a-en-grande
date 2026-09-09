@@ -203,14 +203,16 @@ function renderSquadPanel() {
       <div class="formation-select">
         ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
       </div>
-      <div class="pitch">
-        <div class="pitch-row">${xi.del.map(chip).join('')}</div>
-        ${xi.off.length ? `<div class="pitch-row">${xi.off.map(chip).join('')}</div>` : ''}
-        <div class="pitch-row">${xi.med.map(chip).join('')}</div>
-        <div class="pitch-row">${xi.def.map(chip).join('')}</div>
-        <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
+      <div class="pitch-scroll">
+        <div class="pitch">
+          <div class="pitch-row">${xi.del.map(chip).join('')}</div>
+          ${xi.off.length ? `<div class="pitch-row">${xi.off.map(chip).join('')}</div>` : ''}
+          <div class="pitch-row">${xi.med.map(chip).join('')}</div>
+          <div class="pitch-row">${xi.def.map(chip).join('')}</div>
+          <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
+        </div>
       </div>
-      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos${isTouchDevice ? '' : ' (o arrastrá uno sobre el otro)'}. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos.</p>
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos${isTouchDevice ? '' : ' (o arrastrá uno sobre el otro)'}. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       <h3>Suplentes</h3>
       <div class="bench-list">
