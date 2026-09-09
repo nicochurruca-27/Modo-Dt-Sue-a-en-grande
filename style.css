@@ -302,95 +302,32 @@ h1, h2, h3 {
   margin: 0 0 10px;
 }
 
-/* Envoltorio con scroll horizontal: si la formacion mas ancha (5 en una
-   linea) no entra en la pantalla, se desliza en vez de recortarse. La
-   cancha en si (.pitch) nunca achica a los jugadores para que "entren
-   igual" -- cada jugador tiene un tamano fijo comodo (ver .player-chip) y
-   es la cancha la que crece lo que haga falta. */
+/* Envoltorio con scroll horizontal: si la formación más ancha (5 en una
+   línea) no entra en la pantalla, se desliza en vez de recortarse. La
+   cancha (el <svg> de adentro) nunca achica a los jugadores para que
+   "entren igual" — mide en píxeles exactos lo que su fila más ancha
+   necesite (calculado a mano en JS, ver buildPitchSvg en ui.js) y es el
+   contenedor el que se desliza si hace falta. */
 .pitch-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 10px;
-}
-
-.pitch {
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTYwIj4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIHN0cm9rZS13aWR0aD0iMS4yIj4KICAgIDxyZWN0IHg9IjYiIHk9IjgiIHdpZHRoPSI4OCIgaGVpZ2h0PSIxNDQiIHJ4PSIyIiAvPgogICAgPGxpbmUgeDE9IjYiIHkxPSI4MCIgeDI9Ijk0IiB5Mj0iODAiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjgwIiByPSIxMiIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iODAiIHI9IjEuMiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxyZWN0IHg9IjIyIiB5PSI4IiB3aWR0aD0iNTYiIGhlaWdodD0iMjEiIC8+CiAgICA8cmVjdCB4PSIzOCIgeT0iOCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjkiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjIxIiByPSIxLjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIC8+CiAgICA8cGF0aCBkPSJNIDM4IDI5IEEgMTIgMTIgMCAwIDAgNjIgMjkiIC8+CiAgICA8cmVjdCB4PSIyMiIgeT0iMTMxIiB3aWR0aD0iNTYiIGhlaWdodD0iMjEiIC8+CiAgICA8cmVjdCB4PSIzOCIgeT0iMTQzIiB3aWR0aD0iMjQiIGhlaWdodD0iOSIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iMTM5IiByPSIxLjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIC8+CiAgICA8cGF0aCBkPSJNIDM4IDEzMSBBIDEyIDEyIDAgMCAxIDYyIDEzMSIgLz4KICAgIDxwYXRoIGQ9Ik0gNiAxNCBBIDYgNiAwIDAgMCAxMiA4IiAvPgogICAgPHBhdGggZD0iTSA4OCA4IEEgNiA2IDAgMCAwIDk0IDE0IiAvPgogICAgPHBhdGggZD0iTSA2IDE0NiBBIDYgNiAwIDAgMSAxMiAxNTIiIC8+CiAgICA8cGF0aCBkPSJNIDk0IDE0NiBBIDYgNiAwIDAgMSA4OCAxNTIiIC8+CiAgPC9nPgo8L3N2Zz4="),
-    linear-gradient(180deg, #1e7a3a, #15602e);
-  background-size: 100% 100%, 100% 100%;
-  background-repeat: no-repeat, no-repeat;
-  background-position: center, center;
-  border: 2px solid #0d3d1c;
-  border-radius: 10px;
-  /* Padding fijo en px: como los jugadores ya no se achican para entrar
-     (ver .player-chip), la cancha mide lo que su fila mas ancha necesite
-     y este padding le sobra de margen en cualquier caso -- no depende de a
-     cuantas columnas termine midiendo.
-     El ancho mínimo necesario para que la fila más ancha entre sin
-     achicarse se calcula en JS (ver renderSquadPanel en ui.js) y se pone
-     como min-width inline en el propio elemento — a propósito, en vez de
-     usar alguna propiedad de CSS "moderna" para que el contenedor mida su
-     contenido (se probaron un par y en algunos navegadores de celular no
-     terminaban de funcionar bien). Un min-width en px es lo más viejo y
-     compatible que hay.
-  */
-  padding: 30px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.pitch-row {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.player-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 auto;
-  width: 52px;
   text-align: center;
+}
+
+/* La cancha entera (líneas + jugadores) es un único SVG con las
+   coordenadas de cada jugador calculadas en JS — no hay flexbox de por
+   medio, así que ningún jugador puede terminar "afuera de la línea": su
+   posición se calculó a propósito para estar adentro. inline-block (y el
+   text-align:center del padre) la centran cuando el panel es más ancho de
+   lo que la cancha necesita, sin estirarla ni achicarla. */
+.pitch-svg {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.player-marker {
   cursor: pointer;
-  border-radius: 8px;
-  border: 2px solid transparent;
-  padding: 2px 0;
-}
-
-.player-chip svg {
-  display: block;
-  width: 34px;
-  height: 34px;
-}
-
-.player-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-/* Qué tan bien juega cada uno en el casillero donde está (ver
-   Engine.positionFit): verde = su posición, amarillo = línea vecina, rojo =
-   fuera de lugar. La selección (tocar para cambiar) usa un aro celeste
-   aparte para no confundirse con estos colores. */
-.player-chip.fit-green { border-color: var(--accent); }
-.player-chip.fit-yellow { border-color: #eab308; }
-.player-chip.fit-red { border-color: var(--danger); }
-
-.player-chip.selected {
-  background: rgba(56, 189, 248, 0.3);
-  box-shadow: 0 0 0 2px #38bdf8;
-}
-
-.player-chip span {
-  font-size: 0.68em;
-  line-height: 1.1;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .bench-list {

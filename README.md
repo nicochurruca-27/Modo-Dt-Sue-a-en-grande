@@ -91,16 +91,25 @@ abrir seguís donde quedaste.
   La formación decide cuántos jugadores entran a cada línea (los mejores de
   cada una según su valoración) y da un pequeño empujón o resta a tu fuerza
   en el partido según qué tan ofensiva sea.
-- **Cambios de titulares**: se tocan (o se arrastran) dos jugadores — uno de
-  la cancha y uno del banco — para intercambiarlos, sin un botón intermedio.
-  El casillero (cuántos hay en cada línea) siempre lo define la formación
-  elegida, no el cambio en sí. Se puede poner a cualquiera en cualquier
-  puesto, pero jugar fuera de su posición natural le baja el rendimiento: un
-  borde verde en la cancha indica que juega en lo suyo, amarillo una línea
-  vecina (por ejemplo un mediocampista de defensor) y rojo bien fuera de
-  lugar (por ejemplo un delantero de defensor, o cualquiera menos el
+- **Cambios de titulares**: se tocan dos jugadores — dos de la cancha, o uno
+  de la cancha y uno del banco — para intercambiarlos, sin un botón
+  intermedio. El casillero (cuántos hay en cada línea) siempre lo define la
+  formación elegida, no el cambio en sí. Se puede poner a cualquiera en
+  cualquier puesto, pero jugar fuera de su posición natural le baja el
+  rendimiento: un aro verde en la cancha indica que juega en lo suyo,
+  amarillo una línea vecina (por ejemplo un mediocampista de defensor) y
+  rojo bien fuera de lugar (por ejemplo un delantero de defensor, o
+  cualquiera menos el
   arquero en el arco) — la valoración efectiva que usa en el partido baja
-  según eso.
+  según eso. La cancha en sí es un único `<svg>` armado a mano en
+  `renderSquadPanel`/`buildPitchSvg` (`js/ui.js`): la posición de cada
+  jugador se calcula con aritmética simple, no con flexbox — hubo varias
+  vueltas con enfoques basados en CSS que fallaban en algunos navegadores
+  de celular (WebViews viejos que no soportan bien `width: max-content` u
+  otras propiedades modernas), así que se optó por lo más viejo y
+  compatible posible: coordenadas numéricas fijas, como una imagen. Si el
+  ancho que necesita la formación no entra en el panel, se desliza con el
+  dedo (`.pitch-scroll`) — los jugadores nunca se achican para "entrar".
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 

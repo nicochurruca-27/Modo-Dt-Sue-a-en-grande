@@ -114,49 +114,134 @@ function clubKit(club) {
   return c || { shirt: 'var(--accent)', band: null, trim: '#04220f' };
 }
 
-// Sin width/height fijos a propósito: el tamaño lo maneja 100% el CSS
-// (.player-chip svg), y el aspect-ratio sale solo del viewBox. Poner un
-// tamaño fijo en el propio SVG puede ganarle al CSS en algunos navegadores
-// de celular y hacer que la camiseta no se achique junto con el resto.
-function jerseySvg(kit, label) {
-  const bandPath = kit.band
-    ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
-    : '';
+// ---------- Cancha: un solo SVG con todo calculado a mano ----------
+//
+// Después de varias vueltas con flexbox (que dependía de que el navegador
+// calculara solo el ancho del contenido, y en algunos celulares reales no
+// funcionaba bien) se pasó todo el dibujo de la cancha a un único <svg>
+// donde la posición de cada jugador se calcula en JS con aritmética
+// simple y se pone directo en sus coordenadas (x, y). No hay ningún
+// flexbox de por medio en el camino crítico: el ancho/alto del <svg> son
+// atributos numéricos fijos (como los de una <img>), lo más viejo y
+// compatible que hay — así que un jugador JAMÁS puede terminar afuera de
+// la línea pintada, porque su posición se calculó para estar adentro.
+const PITCH_JERSEY_W = 40;
+const PITCH_JERSEY_H = 40;
+const PITCH_LABEL_H = 16; // alto de la placa con el nombre, debajo del dorsal
+const PITCH_ROW_H = 64; // separación vertical entre el arranque de una fila y la siguiente
+const PITCH_COL_GAP = 12;
+const PITCH_MARGIN_X = 26;
+const PITCH_MARGIN_Y = 22;
+
+function truncateLastName(name) {
+  const last = name.trim().split(' ').slice(-1)[0];
+  return last.length > 9 ? `${last.slice(0, 8)}…` : last;
+}
+
+// Líneas pintadas de la cancha, proporcionadas al tamaño real que termine
+// midiendo (que varía según la formación) en vez de una imagen fija.
+function pitchMarkingsSvg(w, h) {
+  const inset = 9;
+  const boxW = Math.min(w * 0.62, w - 36);
+  const boxH = Math.min(30, h * 0.17);
+  const goalW = boxW * 0.44;
+  const goalH = boxH * 0.42;
+  const arcR = Math.min(26, w * 0.16);
+  const circleR = Math.max(14, Math.min(30, w * 0.16, h * 0.09));
+  const corner = 9;
+  const cx = w / 2;
+  const stroke = 'rgba(255,255,255,0.55)';
   return `
-    <svg viewBox="0 0 44 44">
-      <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
-      ${bandPath}
-      <text x="22" y="29" text-anchor="middle" font-size="11" font-weight="700" fill="${kit.trim}">${label}</text>
-    </svg>
+    <rect x="${inset}" y="${inset}" width="${w - 2 * inset}" height="${h - 2 * inset}" rx="3" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <line x1="${inset}" y1="${h / 2}" x2="${w - inset}" y2="${h / 2}" stroke="${stroke}" stroke-width="1.5" />
+    <circle cx="${cx}" cy="${h / 2}" r="${circleR}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <circle cx="${cx}" cy="${h / 2}" r="2" fill="${stroke}" />
+    <rect x="${cx - boxW / 2}" y="${inset}" width="${boxW}" height="${boxH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <rect x="${cx - goalW / 2}" y="${inset}" width="${goalW}" height="${goalH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <path d="M ${cx - arcR} ${inset + boxH} A ${arcR} ${arcR} 0 0 0 ${cx + arcR} ${inset + boxH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <rect x="${cx - boxW / 2}" y="${h - inset - boxH}" width="${boxW}" height="${boxH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <rect x="${cx - goalW / 2}" y="${h - inset - goalH}" width="${goalW}" height="${goalH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <path d="M ${cx - arcR} ${h - inset - boxH} A ${arcR} ${arcR} 0 0 1 ${cx + arcR} ${h - inset - boxH}" fill="none" stroke="${stroke}" stroke-width="1.5" />
+    <path d="M ${inset} ${inset + corner} A ${corner} ${corner} 0 0 0 ${inset + corner} ${inset}" fill="none" stroke="${stroke}" stroke-width="1.2" />
+    <path d="M ${w - inset - corner} ${inset} A ${corner} ${corner} 0 0 0 ${w - inset} ${inset + corner}" fill="none" stroke="${stroke}" stroke-width="1.2" />
+    <path d="M ${inset} ${h - inset - corner} A ${corner} ${corner} 0 0 1 ${inset + corner} ${h - inset}" fill="none" stroke="${stroke}" stroke-width="1.2" />
+    <path d="M ${w - inset - corner} ${h - inset} A ${corner} ${corner} 0 0 1 ${w - inset} ${h - inset - corner}" fill="none" stroke="${stroke}" stroke-width="1.2" />
   `;
 }
 
-// Cada jugador es tocable/arrastrable: `data-player` identifica el id para
-// el intercambio (ver handlePlayerTap/los listeners de drag en
-// renderSquadPanel). El dorsal real se muestra si lo tenemos cargado; si no,
-// se sigue mostrando la valoración como antes. Los que están en la cancha
-// (`p.fit`, ver getStartingXI en engine.js) llevan un borde de color según
-// qué tan bien juegan en ese casillero: verde = su posición, amarillo =
-// línea vecina, rojo = fuera de lugar (rinde menos, ver effectiveRating).
-// El drag & drop de HTML5 (draggable="true") solo se activa en dispositivos
-// que no son táctiles: en el celular, esa marca puede confundir al
-// navegador (interpreta un toque como intento de arrastre, aparece el menú
-// de "guardar imagen", etc.) y termina comiéndose el tap. En touch, tocar
-// para elegir siempre funciona igual.
-const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-
-function playerChip(p, club, selected) {
-  const lastName = p.name.trim().split(' ').slice(-1)[0];
+// Un jugador puesto en (x, y): camiseta con mangas/cuello (como una
+// camiseta de verdad, no un rectángulo), dorsal, y una placa oscura con el
+// nombre debajo — el mismo estilo que las planillas de formación típicas.
+// El aro de color (verde/amarillo/rojo) indica qué tan bien juega ahí (ver
+// Engine.positionFit); el aro celeste es la selección para el cambio.
+function playerMarkerSvg(p, club, x, y, selected) {
   const kit = clubKit(club);
   const label = p.number != null ? p.number : p.rating;
-  const fitClass = p.fit ? `fit-${p.fit}` : '';
-  const title = p.fit && p.fit !== 'green' ? `title="Valoración natural ${p.rating}, jugando ahí rinde ${p.effectiveRating}"` : '';
-  const draggable = isTouchDevice ? '' : 'draggable="true"';
+  const bandPath = kit.band
+    ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
+    : '';
+  const fitStroke = p.fit === 'green' ? 'var(--accent)' : p.fit === 'yellow' ? '#eab308' : p.fit === 'red' ? 'var(--danger)' : null;
+  const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
+  const w = PITCH_JERSEY_W;
+  const h = PITCH_JERSEY_H;
+  const scale = w / 44;
   return `
-    <div class="player-chip ${fitClass} ${selected ? 'selected' : ''}" data-player="${p.id}" ${draggable} ${title}>
-      ${jerseySvg(kit, label)}
-      <span>${lastName}</span>
-    </div>
+    <g class="player-marker" data-player="${p.id}" transform="translate(${x}, ${y})">
+      ${title}
+      ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + 16}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
+      ${fitStroke ? `<rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="none" stroke="${fitStroke}" stroke-width="2.5" />` : ''}
+      <g transform="scale(${scale})">
+        <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
+        ${bandPath}
+        <text x="22" y="29" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.trim}">${label}</text>
+      </g>
+      <rect x="-3" y="${h + 3}" width="${w + 6}" height="${PITCH_LABEL_H}" rx="3" fill="rgba(0,0,0,0.6)" />
+      <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>
+    </g>
+  `;
+}
+
+// Arma el <svg> completo: calcula el ancho según la fila con más jugadores
+// (nunca se achica un jugador para que "entre" — es la cancha la que mide
+// lo que haga falta) y centra cada fila dentro de ese ancho.
+function buildPitchSvg(xi, club) {
+  const rows = [
+    { players: xi.del },
+    ...(xi.off.length ? [{ players: xi.off }] : []),
+    { players: xi.med },
+    { players: xi.def },
+    { players: xi.gk },
+  ];
+  const maxCols = Math.max(...rows.map((r) => r.players.length), 1);
+  const svgWidth = 2 * PITCH_MARGIN_X + maxCols * PITCH_JERSEY_W + Math.max(0, maxCols - 1) * PITCH_COL_GAP;
+  const rowContentH = PITCH_JERSEY_H + PITCH_LABEL_H + 6;
+  const svgHeight = 2 * PITCH_MARGIN_Y + Math.max(0, rows.length - 1) * PITCH_ROW_H + rowContentH;
+  const fieldInnerWidth = svgWidth - 2 * PITCH_MARGIN_X;
+
+  let playersMarkup = '';
+  rows.forEach((row, i) => {
+    const count = row.players.length;
+    const rowWidth = count * PITCH_JERSEY_W + Math.max(0, count - 1) * PITCH_COL_GAP;
+    const rowStartX = PITCH_MARGIN_X + (fieldInnerWidth - rowWidth) / 2;
+    const y = PITCH_MARGIN_Y + i * PITCH_ROW_H;
+    row.players.forEach((p, j) => {
+      const x = rowStartX + j * (PITCH_JERSEY_W + PITCH_COL_GAP);
+      playersMarkup += playerMarkerSvg(p, club, x, y, p.id === selectedPlayerId);
+    });
+  });
+
+  return `
+    <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="pitch-svg">
+      <defs>
+        <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1e7a3a" />
+          <stop offset="100%" stop-color="#15602e" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${svgWidth}" height="${svgHeight}" rx="10" fill="url(#pitchGrad)" />
+      ${pitchMarkingsSvg(svgWidth, svgHeight)}
+      ${playersMarkup}
+    </svg>
   `;
 }
 
@@ -191,20 +276,6 @@ function renderSquadPanel() {
   const activeStyle = xi.formation.style;
   const visibleFormations = FORMATIONS.filter((f) => f.style === activeStyle);
 
-  const chip = (p) => playerChip(p, club, p.id === selectedPlayerId);
-
-  // El ancho mínimo de la cancha se calcula a mano (en vez de dejar que el
-  // CSS lo infiera solo): la fila más ancha de la formación actual tiene
-  // que entrar siempre a su tamaño fijo (ver .player-chip), así que el
-  // mínimo es exactamente el que necesita esa fila más el padding de la
-  // cancha. Estas constantes tienen que coincidir con el CSS (.pitch,
-  // .pitch-row, .player-chip) — están comentadas ahí también.
-  const CHIP_WIDTH = 52;
-  const CHIP_GAP = 6;
-  const PITCH_PADDING_X = 32;
-  const maxCols = Math.max(xi.gk.length, xi.def.length, xi.med.length, xi.off.length, xi.del.length, 1);
-  const pitchMinWidth = maxCols * CHIP_WIDTH + (maxCols - 1) * CHIP_GAP + 2 * PITCH_PADDING_X;
-
   squadPanel.innerHTML = `
     <div class="card side-card">
       <h3>Estilo</h3>
@@ -216,20 +287,14 @@ function renderSquadPanel() {
         ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
       </div>
       <div class="pitch-scroll">
-        <div class="pitch" style="min-width: ${pitchMinWidth}px">
-          <div class="pitch-row">${xi.del.map(chip).join('')}</div>
-          ${xi.off.length ? `<div class="pitch-row">${xi.off.map(chip).join('')}</div>` : ''}
-          <div class="pitch-row">${xi.med.map(chip).join('')}</div>
-          <div class="pitch-row">${xi.def.map(chip).join('')}</div>
-          <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
-        </div>
+        ${buildPitchSvg(xi, club)}
       </div>
-      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos${isTouchDevice ? '' : ' (o arrastrá uno sobre el otro)'}. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
-          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}" ${isTouchDevice ? '' : 'draggable="true"'}>
+          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}">
             <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos} (${p.rating})</span>
           </div>
         `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
@@ -246,21 +311,8 @@ function renderSquadPanel() {
   squadPanel.querySelectorAll('[data-formation]').forEach((btn) => {
     btn.addEventListener('click', () => { Engine.setFormation(btn.dataset.formation); render(); });
   });
-
-  const playerEls = squadPanel.querySelectorAll('[data-player]');
-  playerEls.forEach((el) => {
-    el.addEventListener('click', () => handlePlayerTap(el.dataset.player));
-    el.addEventListener('dragstart', (ev) => { ev.dataTransfer.setData('text/plain', el.dataset.player); });
-    el.addEventListener('dragover', (ev) => ev.preventDefault());
-    el.addEventListener('drop', (ev) => {
-      ev.preventDefault();
-      const draggedId = ev.dataTransfer.getData('text/plain');
-      if (draggedId && draggedId !== el.dataset.player) {
-        Engine.swapPlayers(draggedId, el.dataset.player);
-        selectedPlayerId = null;
-        render();
-      }
-    });
+  squadPanel.querySelectorAll('.player-marker, .player-chip-row').forEach((el) => {
+    el.addEventListener('click', () => handlePlayerTap(el.getAttribute('data-player')));
   });
 }
 
