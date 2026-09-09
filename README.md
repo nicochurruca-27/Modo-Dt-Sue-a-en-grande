@@ -101,7 +101,14 @@ abrir seguís donde quedaste.
   rojo bien fuera de lugar (por ejemplo un delantero de defensor, o
   cualquiera menos el
   arquero en el arco) — la valoración efectiva que usa en el partido baja
-  según eso. La cancha en sí es un único `<svg>` armado a mano en
+  según eso. Dentro de los mediocampistas hay además un rol interno
+  (`contención` / `mixto` / `ofensivo`, ver `role` en `js/players.js`) que
+  solo entra en juego en formaciones con línea de enganche (4-3-1-2,
+  3-4-1-2, 4-2-3-1, 5-2-1-2, 3-2-5): ahí un mediocampista ofensivo puesto
+  de "5" es amarillo (no es su lugar natural) y uno de marca puesto de
+  enganche es directamente rojo — en formaciones sin esa línea, el
+  mediocampo es una sola banda y el rol no cambia nada. La cancha en sí es
+  un único `<svg>` armado a mano en
   `renderSquadPanel`/`buildPitchSvg` (`js/ui.js`): la posición de cada
   jugador se calcula con aritmética simple, no con flexbox — hubo varias
   vueltas con enfoques basados en CSS que fallaban en algunos navegadores

@@ -16,6 +16,14 @@
 // temporada 2026 (fuente: cariverplate.com.ar / Infobae, ver README). Los
 // jugadores para los que no encontramos una fuente oficial confiable se
 // dejan sin número (no se inventa) hasta poder confirmarlo con una captura.
+//
+// `role` (solo en mediocampistas): 'contención' | 'mixto' | 'ofensivo'.
+// Es nuestra lectura de cómo juega cada uno en la realidad (no hay una
+// fuente pública tipo "posición detallada" para esto, así que es una
+// estimación igual que el rating) — se usa para el aro de color de la
+// cancha en formaciones con línea de enganche, donde sí importa la
+// diferencia entre "el 5" y el enganche. Sin certeza sobre alguien joven
+// de reserva se le puso 'mixto' (no penaliza en ninguno de los dos casilleros).
 const REAL_ROSTERS = {
   river: [
     { name: 'Santiago Beltrán', pos: 'POR', age: 21, nation: 'ARG', contractYears: 2, rating: 68, number: 41 },
@@ -32,16 +40,16 @@ const REAL_ROSTERS = {
     { name: 'Gonzalo Montiel', pos: 'DEF', age: 29, nation: 'ARG', contractYears: 3, rating: 81, number: 29 },
     { name: 'Fabricio Bustos', pos: 'DEF', age: 30, nation: 'ARG', contractYears: 2, rating: 74, number: 16 },
     { name: 'Giovanni González', pos: 'DEF', age: 31, nation: 'URU', contractYears: 2, rating: 72 },
-    { name: 'Aníbal Moreno', pos: 'MED', age: 27, nation: 'ARG', contractYears: 2, rating: 76, number: 6 },
-    { name: 'Fausto Vera', pos: 'MED', age: 26, nation: 'ARG', contractYears: 1, rating: 74, number: 15 },
-    { name: 'Lucas Silva', pos: 'MED', age: 19, nation: 'ARG', contractYears: 3, rating: 65 },
-    { name: 'Tobías Andrada', pos: 'MED', age: 19, nation: 'ARG', contractYears: 5, rating: 64 },
-    { name: 'Mauro Arambarri', pos: 'MED', age: 30, nation: 'URU', contractYears: 3, rating: 77 },
-    { name: 'Lautaro Pereyra', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 62 },
-    { name: 'Thiago Almada', pos: 'MED', age: 25, nation: 'ARG', contractYears: 4, rating: 84 },
-    { name: 'Tomás Galván', pos: 'MED', age: 26, nation: 'ARG', contractYears: 3, rating: 73, number: 26 },
-    { name: 'Juan Cruz Meza', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 63 },
-    { name: 'Ángel Correa', pos: 'MED', age: 31, nation: 'ARG', contractYears: 4, rating: 80 },
+    { name: 'Aníbal Moreno', pos: 'MED', age: 27, nation: 'ARG', contractYears: 2, rating: 76, number: 6, role: 'contención' },
+    { name: 'Fausto Vera', pos: 'MED', age: 26, nation: 'ARG', contractYears: 1, rating: 74, number: 15, role: 'mixto' },
+    { name: 'Lucas Silva', pos: 'MED', age: 19, nation: 'ARG', contractYears: 3, rating: 65, role: 'mixto' },
+    { name: 'Tobías Andrada', pos: 'MED', age: 19, nation: 'ARG', contractYears: 5, rating: 64, role: 'mixto' },
+    { name: 'Mauro Arambarri', pos: 'MED', age: 30, nation: 'URU', contractYears: 3, rating: 77, role: 'contención' },
+    { name: 'Lautaro Pereyra', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 62, role: 'mixto' },
+    { name: 'Thiago Almada', pos: 'MED', age: 25, nation: 'ARG', contractYears: 4, rating: 84, role: 'ofensivo' },
+    { name: 'Tomás Galván', pos: 'MED', age: 26, nation: 'ARG', contractYears: 3, rating: 73, number: 26, role: 'mixto' },
+    { name: 'Juan Cruz Meza', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 63, role: 'mixto' },
+    { name: 'Ángel Correa', pos: 'MED', age: 31, nation: 'ARG', contractYears: 4, rating: 80, role: 'ofensivo' },
     { name: 'Lucas Beltrán', pos: 'DEL', age: 25, nation: 'ARG', contractYears: 2, rating: 78 },
     { name: 'Sebastián Driussi', pos: 'DEL', age: 30, nation: 'ARG', contractYears: 3, rating: 78, number: 9 },
     { name: 'Rafael Santos Borré', pos: 'DEL', age: 30, nation: 'COL', contractYears: 4, rating: 79 },

@@ -115,16 +115,18 @@ const Engine = {
     const real = REAL_ROSTERS[club.id];
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
-        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number,
+        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
       }));
     }
+    const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
     return SQUAD_POSITIONS.map((pos, i) => {
       const base = 44 + club.reputation * 6;
       const rating = Math.max(35, Math.min(90, Math.round(base + (Math.random() * 16 - 8))));
       const age = Math.round(17 + Math.random() * 18);
       const nation = this.rollNation();
       const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
-      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears };
+      const role = pos === 'MED' ? MED_ROLES[Math.floor(Math.random() * MED_ROLES.length)] : undefined;
+      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears, role };
     });
   },
 
@@ -254,7 +256,26 @@ const Engine = {
   // se cubre naturalmente con MED (así clasificamos a los mediapuntas en el
   // plantel) y razonablemente con DEL; el arquero en cualquier lado que no
   // sea el arco es siempre grave.
-  positionFit(playerPos, slot) {
+  //
+  // Dentro de MED hay además un rol (`player.role`: 'contención' | 'mixto'
+  // | 'ofensivo') que solo importa cuando la formación tiene línea de
+  // enganche (formation.off > 0): ahí sí hay una diferencia real entre "el
+  // 5" (el casillero MED, más de marca) y el enganche (el casillero OFF,
+  // más ofensivo), y no es lo mismo poner a cualquier mediocampista en
+  // cualquiera de los dos. En formaciones de 3 líneas (sin OFF) el mediocampo
+  // es una sola banda sin esa distinción, así que el rol no cambia nada ahí.
+  positionFit(player, slot, formation) {
+    const playerPos = player.pos;
+    if (playerPos === 'MED' && formation && formation.off && player.role) {
+      if (slot === 'OFF') {
+        if (player.role === 'contención') return { color: 'red', mult: 0.55 };
+        return { color: 'green', mult: 1 }; // ofensivo o mixto: es lo suyo
+      }
+      if (slot === 'MED') {
+        if (player.role === 'ofensivo') return { color: 'yellow', mult: 0.85 };
+        return { color: 'green', mult: 1 }; // contención o mixto: es lo suyo
+      }
+    }
     if (playerPos === slot) return { color: 'green', mult: 1 };
     const table = {
       'DEF-MED': { color: 'yellow', mult: 0.85 },
@@ -272,25 +293,26 @@ const Engine = {
     return table[key] || { color: 'red', mult: 0.5 };
   },
 
-  effectiveRating(player, slot) {
-    return Math.round(player.rating * this.positionFit(player.pos, slot).mult);
+  effectiveRating(player, slot, formation) {
+    return Math.round(player.rating * this.positionFit(player, slot, formation).mult);
   },
 
   getStartingXI() {
     const s = this.state;
     if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
+    const formation = this.currentFormation();
     const rows = { POR: [], DEF: [], MED: [], OFF: [], DEL: [] };
     const starters = [];
     s.startingSlots.forEach(({ slot, playerId }) => {
       const p = s.squad.find((pl) => pl.id === playerId);
       if (!p) return;
-      const fit = this.positionFit(p.pos, slot);
-      const entry = { ...p, slot, fit: fit.color, effectiveRating: this.effectiveRating(p, slot) };
+      const fit = this.positionFit(p, slot, formation);
+      const entry = { ...p, slot, fit: fit.color, effectiveRating: this.effectiveRating(p, slot, formation) };
       rows[slot].push(entry);
       starters.push(entry);
     });
     return {
-      formation: this.currentFormation(),
+      formation,
       gk: rows.POR,
       def: rows.DEF,
       med: rows.MED,

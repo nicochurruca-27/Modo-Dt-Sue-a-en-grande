@@ -181,7 +181,8 @@ function playerMarkerSvg(p, club, x, y, selected) {
     ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
     : '';
   const fitStroke = p.fit === 'green' ? 'var(--accent)' : p.fit === 'yellow' ? '#eab308' : p.fit === 'red' ? 'var(--danger)' : null;
-  const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
+  const roleNote = p.role ? ` (rol: ${p.role})` : '';
+  const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}${roleNote}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
   const w = PITCH_JERSEY_W;
   const h = PITCH_JERSEY_H;
   const scale = w / 44;
@@ -291,11 +292,12 @@ function renderSquadPanel() {
       </div>
       <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
+      ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
           <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}">
-            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos} (${p.rating})</span>
+            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${p.role ? ` (${p.role})` : ''} (${p.rating})</span>
           </div>
         `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
       </div>
