@@ -528,8 +528,9 @@ function keeperIconSvg(shirt, trim) {
 function goalWidgetHtml(keeperKit) {
   return `
     <div class="goal-wrap" id="goal-wrap">
+      <div class="goal-net"></div>
       <svg class="goal-frame" viewBox="0 0 100 60" preserveAspectRatio="none">
-        <rect x="4" y="4" width="92" height="52" fill="none" stroke="#e2e8f0" stroke-width="3" />
+        <polyline points="4,56 4,4 96,4 96,56" fill="none" stroke="#e2e8f0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
       </svg>
       ${PENALTY_ZONES.map((z) => `<div class="goal-zone" data-zone="${z.id}" style="left:${z.col * 33.33}%;top:${z.row * 50}%;"></div>`).join('')}
       <div class="goal-keeper" id="goal-keeper" style="left:50%;top:48%;">${keeperIconSvg(keeperKit.shirt, keeperKit.trim)}</div>

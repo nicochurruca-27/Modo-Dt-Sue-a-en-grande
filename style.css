@@ -403,15 +403,24 @@ h1, h2, h3 {
   max-width: 360px;
   margin: 14px auto 0;
   padding-bottom: 60%;
-  /* Red del arco: cuadrícula de líneas horizontales y verticales, como la
-     red de una portería real (antes eran líneas en diagonal, que parecían
-     más una trama decorativa que una red de fútbol). */
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
-    linear-gradient(#173a63, #0e2647);
+  background: linear-gradient(#173a63, #0e2647);
   border-radius: 8px;
   overflow: hidden;
+}
+
+/* La red va SOLO adentro de los palos (mismo recorte que el hueco del
+   arco en el <svg> de abajo: x 4%-96%, y 6.7%-93.3%). Antes la cuadrícula
+   era el fondo de todo .goal-wrap, así que "seguía" por fuera de los
+   palos en vez de cortarse justo ahí, como pasa en un arco de verdad. */
+.goal-net {
+  position: absolute;
+  left: 4%;
+  top: 6.7%;
+  width: 92%;
+  height: 86.6%;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px);
 }
 
 .goal-frame {
