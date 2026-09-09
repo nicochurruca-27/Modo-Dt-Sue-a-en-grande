@@ -161,6 +161,22 @@ h1, h2, h3 {
 
 .club-btn:hover { border-color: var(--accent); }
 
+.club-btn.active {
+  border-color: var(--accent);
+  background: #16321f;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: var(--text);
+  font-size: 1em;
+  margin: 6px 0 14px;
+}
+
 .options {
   display: flex;
   flex-direction: column;

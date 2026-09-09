@@ -18,7 +18,8 @@ function money(n) {
 function render() {
   const s = Engine.state;
   if (!s) return;
-  if (s.screen === 'club-select') renderClubSelect();
+  if (s.screen === 'dt-create') renderDTCreate();
+  else if (s.screen === 'club-select') renderClubSelect();
   else if (s.screen === 'pre-match') renderPreMatch();
   else if (s.screen === 'penalty') renderPenalty();
   else if (s.screen === 'match-result') renderMatchResult();
@@ -318,6 +319,56 @@ function renderSquadPanel() {
   });
 }
 
+let dtNameDraft = '';
+let dtNationDraft = 'ARG';
+let dtStyleDraft = 'equilibrado';
+
+const DT_STYLES = [
+  { id: 'ofensivo', name: 'Ofensivo', desc: 'Te gusta que el equipo siempre vaya al frente. Arrancás la carrera con más confianza (+10 de ánimo).' },
+  { id: 'equilibrado', name: 'Equilibrado', desc: 'Adaptás el plan según el rival, sin bonus ni penalidad — el club habla por sí solo.' },
+  { id: 'conservador', name: 'Conservador', desc: 'Cuidás cada peso y jugás con las cuentas claras. Arrancás con +10% de presupuesto inicial.' },
+];
+
+function renderDTCreate() {
+  app.innerHTML = `
+    <div class="card">
+      <h1>Creá tu Director Técnico</h1>
+      <p class="muted">Antes de elegir club, contanos quién sos como DT. Esto no cambia después — es tu identidad para toda la carrera.</p>
+      <label class="muted" for="dt-name-input">Nombre</label>
+      <input id="dt-name-input" type="text" maxlength="30" placeholder="Tu nombre" value="${dtNameDraft.replace(/"/g, '&quot;')}" class="text-input" />
+      <h3>Nacionalidad</h3>
+      <div class="club-grid">
+        ${NATIONS.map((n) => `
+          <button class="club-btn ${n.code === dtNationDraft ? 'active' : ''}" data-nation="${n.code}">
+            <strong>${n.flag} ${n.name}</strong>
+          </button>
+        `).join('')}
+      </div>
+      <h3>Estilo personal</h3>
+      <div class="options">
+        ${DT_STYLES.map((st) => `
+          <button class="club-btn ${st.id === dtStyleDraft ? 'active' : ''}" data-dtstyle="${st.id}">
+            <strong>${st.name}</strong>
+            <span class="muted">${st.desc}</span>
+          </button>
+        `).join('')}
+      </div>
+      <button class="option-btn" id="dt-create-btn">Empezar carrera</button>
+    </div>
+  `;
+  document.getElementById('dt-name-input').addEventListener('input', (ev) => { dtNameDraft = ev.target.value; });
+  app.querySelectorAll('[data-nation]').forEach((btn) => {
+    btn.addEventListener('click', () => { dtNationDraft = btn.dataset.nation; render(); });
+  });
+  app.querySelectorAll('[data-dtstyle]').forEach((btn) => {
+    btn.addEventListener('click', () => { dtStyleDraft = btn.dataset.dtstyle; render(); });
+  });
+  document.getElementById('dt-create-btn').addEventListener('click', () => {
+    Engine.createDT(dtNameDraft, dtNationDraft, dtStyleDraft);
+    render();
+  });
+}
+
 function renderClubSelect() {
   const clubs = CLUB_TEMPLATES.filter((c) => c.division === selectDivision && c.zone === selectZone);
   app.innerHTML = `
@@ -373,9 +424,13 @@ function header() {
   const table = Engine.sortTable(s.season.zones[zoneKey].table);
   const pos = table.findIndex((r) => r.id === s.clubId) + 1;
   const divisionName = club.division === 'D1' ? 'Primera División' : 'Primera Nacional';
+  const dt = s.dt;
+  const dtNation = dt && NATIONS.find((n) => n.code === dt.nation);
+  const dtLine = dt ? `<div class="muted">DT: ${dtNation ? dtNation.flag : ''} ${dt.name}</div>` : '';
   return `
     <div class="topbar">
       <div><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></div>
+      ${dtLine}
       <div class="muted">${competitionLabel()}</div>
       <div class="muted">Presupuesto: ${money(s.budget)} · Posición en zona: ${pos}°/${table.length} · Ánimo: ${s.morale}</div>
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
@@ -400,7 +455,7 @@ function renderPreMatch() {
       </div>
     </div>
   `;
-  app.querySelectorAll('.option-btn').forEach((btn) => {
+  app.querySelectorAll('.options .option-btn').forEach((btn) => {
     btn.addEventListener('click', () => { Engine.chooseDecision(Number(btn.dataset.i)); render(); });
   });
 }
@@ -448,7 +503,7 @@ function renderPenalty() {
         </div>
       </div>
     `;
-    app.querySelectorAll('.option-btn').forEach((btn) => {
+    app.querySelectorAll('.options .option-btn').forEach((btn) => {
       btn.addEventListener('click', () => { Engine.resolvePenalty(btn.dataset.dir, keeper); render(); });
     });
   }
@@ -725,7 +780,7 @@ function init() {
   if (Engine.hasSave()) {
     Engine.load();
   } else {
-    Engine.state = { screen: 'club-select' };
+    Engine.state = { screen: 'dt-create' };
   }
   setupMobileTabs();
   render();

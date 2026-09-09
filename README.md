@@ -14,6 +14,13 @@ abrir seguís donde quedaste.
 
 ## Qué incluye esta versión
 
+- **Creá tu Director Técnico**: antes de elegir club, ponés nombre,
+  nacionalidad y un estilo personal (Ofensivo, Equilibrado o Conservador).
+  El estilo da un empujoncito de sabor al arrancar la carrera — Ofensivo
+  suma +10 de ánimo inicial, Conservador da +10% de presupuesto inicial,
+  Equilibrado no cambia nada — y tu nombre queda mostrado en la cabecera
+  durante toda la carrera. Es identidad, no dificultad: no vuelve a
+  preguntarse hasta que termines la carrera y empieces una nueva.
 - **Primera División y Primera Nacional**: 30 clubes reales en Primera (2
   zonas de 15) y 36 en la Nacional (2 zonas de 18), con la composición
   actual verificada (incluye los últimos ascensos/descensos: Colón, Godoy

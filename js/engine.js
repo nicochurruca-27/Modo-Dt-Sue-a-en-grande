@@ -71,7 +71,19 @@ const Engine = {
 
   resetGame() {
     localStorage.removeItem(SAVE_KEY);
-    this.state = { screen: 'club-select' };
+    this.state = { screen: 'dt-create' };
+  },
+
+  // Primer paso de toda carrera nueva: nombre, nacionalidad y estilo
+  // personal del DT (no del equipo — eso lo sigue definiendo la
+  // formación). El estilo da un empujoncito de sabor al arrancar la
+  // carrera, nada que rompa el balance del juego:
+  // - Ofensivo: arranca con más confianza (+10 de ánimo).
+  // - Conservador: administra mejor la caja (+10% de presupuesto inicial).
+  // - Equilibrado: sin bonus, deja que el club hable por sí solo.
+  createDT(name, nation, style) {
+    const cleanName = (name || '').trim().slice(0, 30) || 'DT';
+    this.state = { screen: 'club-select', dt: { name: cleanName, nation, style } };
   },
 
   getClub(id) {
@@ -487,12 +499,14 @@ const Engine = {
   // ---------- Ciclo de vida de la partida ----------
 
   newGame(clubId) {
+    const dt = this.state && this.state.dt;
     this.state = {
       screen: 'pre-match',
+      dt,
       clubId,
       clubs: CLUB_TEMPLATES.map((c) => ({ ...c, history: [] })),
       budget: 0,
-      morale: 0,
+      morale: dt && dt.style === 'ofensivo' ? 10 : 0,
       squad: null,
       formation: '433',
       startingSlots: null,
@@ -509,7 +523,9 @@ const Engine = {
       log: [],
     };
     const club = this.getClub(clubId);
-    this.state.budget = this.startingBudget(club);
+    let budget = this.startingBudget(club);
+    if (dt && dt.style === 'conservador') budget = Math.round(budget * 1.1);
+    this.state.budget = budget;
     this.state.squad = this.generateSquad(club);
     this.recomputeStartingSlots();
     this.startNewSeason();
