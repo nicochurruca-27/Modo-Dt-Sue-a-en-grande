@@ -134,14 +134,22 @@ function jerseySvg(kit, label) {
 // (`p.fit`, ver getStartingXI en engine.js) llevan un borde de color según
 // qué tan bien juegan en ese casillero: verde = su posición, amarillo =
 // línea vecina, rojo = fuera de lugar (rinde menos, ver effectiveRating).
+// El drag & drop de HTML5 (draggable="true") solo se activa en dispositivos
+// que no son táctiles: en el celular, esa marca puede confundir al
+// navegador (interpreta un toque como intento de arrastre, aparece el menú
+// de "guardar imagen", etc.) y termina comiéndose el tap. En touch, tocar
+// para elegir siempre funciona igual.
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
 function playerChip(p, club, selected) {
   const lastName = p.name.trim().split(' ').slice(-1)[0];
   const kit = clubKit(club);
   const label = p.number != null ? p.number : p.rating;
   const fitClass = p.fit ? `fit-${p.fit}` : '';
   const title = p.fit && p.fit !== 'green' ? `title="Valoración natural ${p.rating}, jugando ahí rinde ${p.effectiveRating}"` : '';
+  const draggable = isTouchDevice ? '' : 'draggable="true"';
   return `
-    <div class="player-chip ${fitClass} ${selected ? 'selected' : ''}" data-player="${p.id}" draggable="true" ${title}>
+    <div class="player-chip ${fitClass} ${selected ? 'selected' : ''}" data-player="${p.id}" ${draggable} ${title}>
       ${jerseySvg(kit, label)}
       <span>${lastName}</span>
     </div>
@@ -198,12 +206,12 @@ function renderSquadPanel() {
         <div class="pitch-row">${xi.def.map(chip).join('')}</div>
         <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
       </div>
-      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos (o arrastrá uno sobre el otro). Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos.</p>
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos${isTouchDevice ? '' : ' (o arrastrá uno sobre el otro)'}. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos.</p>
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
-          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}" draggable="true">
+          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}" ${isTouchDevice ? '' : 'draggable="true"'}>
             <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos} (${p.rating})</span>
           </div>
         `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
