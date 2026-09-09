@@ -403,12 +403,13 @@ h1, h2, h3 {
   max-width: 360px;
   margin: 14px auto 0;
   padding-bottom: 60%;
-  /* Red del arco: dos tramas diagonales de líneas finas (rombos), como una
-     red de verdad, sobre el fondo verde oscuro de siempre. */
+  /* Red del arco: cuadrícula de líneas horizontales y verticales, como la
+     red de una portería real (antes eran líneas en diagonal, que parecían
+     más una trama decorativa que una red de fútbol). */
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0, rgba(255, 255, 255, 0.16) 1px, transparent 1px, transparent 11px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0, rgba(255, 255, 255, 0.16) 1px, transparent 1px, transparent 11px),
-    linear-gradient(#1a2e1a, #16281b);
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
+    linear-gradient(#173a63, #0e2647);
   border-radius: 8px;
   overflow: hidden;
 }

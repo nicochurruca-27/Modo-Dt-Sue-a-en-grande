@@ -503,13 +503,24 @@ function goalZoneCenter(zoneId) {
   return { leftPct, topPct };
 }
 
+// Arquero parado en pose de espera: brazos bien abiertos hacia arriba con
+// guantes, piernas separadas, como en la pose clásica de "listo para
+// atajar" (a diferencia de la versión anterior, que no se distinguía de
+// un muñeco cualquiera).
 function keeperIconSvg(shirt, trim) {
+  const t = trim || '#0a0a0a';
+  const shorts = trim || '#1e293b';
   return `
-    <svg viewBox="0 0 24 30" width="30" height="38">
-      <circle cx="12" cy="5" r="4" fill="#e8b48c" />
-      <path d="M12 9 L4 6 M12 9 L20 6" stroke="${trim || '#0a0a0a'}" stroke-width="2" fill="none" stroke-linecap="round" />
-      <rect x="6" y="9" width="12" height="14" rx="3" fill="${shirt}" stroke="${trim || '#0a0a0a'}" stroke-width="1" />
-      <path d="M12 23 L8 30 M12 23 L16 30" stroke="${trim || '#0a0a0a'}" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    <svg viewBox="0 0 40 46" width="34" height="40">
+      <path d="M20 16 L7 5 M20 16 L33 5" stroke="${shirt}" stroke-width="5" fill="none" stroke-linecap="round" />
+      <circle cx="7" cy="5" r="4" fill="#e8b48c" stroke="${t}" stroke-width="1" />
+      <circle cx="33" cy="5" r="4" fill="#e8b48c" stroke="${t}" stroke-width="1" />
+      <circle cx="20" cy="8" r="6" fill="#e8b48c" />
+      <path d="M15 6 Q20 2 25 6" stroke="${t}" stroke-width="1.5" fill="none" stroke-linecap="round" />
+      <rect x="11" y="13" width="18" height="19" rx="4" fill="${shirt}" stroke="${t}" stroke-width="1.5" />
+      <path d="M17 32 L11 45 M23 32 L29 45" stroke="${shorts}" stroke-width="6" fill="none" stroke-linecap="round" />
+      <ellipse cx="11" cy="45" rx="4" ry="2.4" fill="${t}" />
+      <ellipse cx="29" cy="45" rx="4" ry="2.4" fill="${t}" />
     </svg>
   `;
 }
@@ -519,10 +530,6 @@ function goalWidgetHtml(keeperKit) {
     <div class="goal-wrap" id="goal-wrap">
       <svg class="goal-frame" viewBox="0 0 100 60" preserveAspectRatio="none">
         <rect x="4" y="4" width="92" height="52" fill="none" stroke="#e2e8f0" stroke-width="3" />
-        <line x1="27.3" y1="4" x2="27.3" y2="56" stroke="#94a3b8" stroke-width="0.6" />
-        <line x1="50.7" y1="4" x2="50.7" y2="56" stroke="#94a3b8" stroke-width="0.6" />
-        <line x1="74" y1="4" x2="74" y2="56" stroke="#94a3b8" stroke-width="0.6" />
-        <line x1="4" y1="30" x2="96" y2="30" stroke="#94a3b8" stroke-width="0.6" />
       </svg>
       ${PENALTY_ZONES.map((z) => `<div class="goal-zone" data-zone="${z.id}" style="left:${z.col * 33.33}%;top:${z.row * 50}%;"></div>`).join('')}
       <div class="goal-keeper" id="goal-keeper" style="left:50%;top:48%;">${keeperIconSvg(keeperKit.shirt, keeperKit.trim)}</div>
