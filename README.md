@@ -69,6 +69,16 @@ abrir seguís donde quedaste.
   penal es en contra). En instancias de eliminación directa que terminan
   empatadas (Copa Argentina, playoffs, Final por el ascenso, Reducido), se
   resuelve por penales.
+- **Pantalla con 3 paneles**: a la izquierda la tabla de posiciones de tu
+  zona, actualizada fecha a fecha; en el medio el juego en sí (decisiones,
+  partidos, mercado, etc.); a la derecha tu plantel sobre una cancha, con el
+  arquero abajo y subiendo hacia los delanteros, más una lista de
+  suplentes con un botón para poner a cualquiera de titular.
+- **Formaciones**: 5-3-2, 4-4-2, 4-5-1, 3-5-2, 4-3-3 y 3-4-3, cada una
+  etiquetada como defensiva, equilibrada u ofensiva. La formación decide
+  cuántos jugadores de cada línea entran al once (los mejores de cada una
+  según su valoración) y da un pequeño empujón o resta a tu fuerza en el
+  partido según qué tan ofensiva sea.
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 

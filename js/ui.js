@@ -3,6 +3,8 @@
 // a render() para reflejar el nuevo estado del juego.
 
 const app = document.getElementById('app');
+const tablePanel = document.getElementById('table-panel');
+const squadPanel = document.getElementById('squad-panel');
 
 let selectDivision = 'D1';
 let selectZone = 'A';
@@ -14,14 +16,95 @@ function money(n) {
 function render() {
   const s = Engine.state;
   if (!s) return;
-  if (s.screen === 'club-select') return renderClubSelect();
-  if (s.screen === 'pre-match') return renderPreMatch();
-  if (s.screen === 'penalty') return renderPenalty();
-  if (s.screen === 'match-result') return renderMatchResult();
-  if (s.screen === 'contract-renewal') return renderContractRenewal();
-  if (s.screen === 'transfer') return renderTransfer();
-  if (s.screen === 'fifa-break') return renderFifaBreak();
-  if (s.screen === 'season-end') return renderSeasonEnd();
+  if (s.screen === 'club-select') renderClubSelect();
+  else if (s.screen === 'pre-match') renderPreMatch();
+  else if (s.screen === 'penalty') renderPenalty();
+  else if (s.screen === 'match-result') renderMatchResult();
+  else if (s.screen === 'contract-renewal') renderContractRenewal();
+  else if (s.screen === 'transfer') renderTransfer();
+  else if (s.screen === 'fifa-break') renderFifaBreak();
+  else if (s.screen === 'season-end') renderSeasonEnd();
+  renderTablePanel();
+  renderSquadPanel();
+}
+
+// Los paneles laterales no existen todavía en la pantalla de elegir club
+// (no hay temporada armada). Se limpian ahí y se dibujan en cualquier otra.
+function renderTablePanel() {
+  const s = Engine.state;
+  if (!s || !s.season) { tablePanel.innerHTML = ''; return; }
+  const club = Engine.getClub(s.clubId);
+  const zoneKey = Engine.myZoneKey();
+  const table = Engine.sortTable(s.season.zones[zoneKey].table);
+  tablePanel.innerHTML = `
+    <div class="card side-card">
+      <h3>Tabla — Zona ${club.zone}</h3>
+      <div class="table-wrap">
+        <table class="table compact">
+          <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+          <tbody>
+            ${table.map((r, i) => `<tr class="${r.id === s.clubId ? 'me' : ''}"><td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.pts}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function jerseySvg(label) {
+  return `
+    <svg width="40" height="40" viewBox="0 0 44 44">
+      <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="var(--accent)" stroke="#04220f" stroke-width="1.5" />
+      <text x="22" y="27" text-anchor="middle" font-size="11" font-weight="700" fill="#04220f">${label}</text>
+    </svg>
+  `;
+}
+
+function playerChip(p) {
+  const lastName = p.name.trim().split(' ').slice(-1)[0];
+  return `
+    <div class="player-chip">
+      ${jerseySvg(p.rating)}
+      <span>${lastName}</span>
+    </div>
+  `;
+}
+
+function renderSquadPanel() {
+  const s = Engine.state;
+  if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
+  const xi = Engine.getStartingXI();
+  const bench = Engine.getBench();
+  squadPanel.innerHTML = `
+    <div class="card side-card">
+      <h3>Formación</h3>
+      <div class="formation-select">
+        ${FORMATIONS.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
+      </div>
+      <p class="muted formation-style">Estilo: ${xi.formation.style}</p>
+      <div class="pitch">
+        <div class="pitch-row">${xi.del.map(playerChip).join('')}</div>
+        <div class="pitch-row">${xi.med.map(playerChip).join('')}</div>
+        <div class="pitch-row">${xi.def.map(playerChip).join('')}</div>
+        <div class="pitch-row">${xi.gk.map(playerChip).join('')}</div>
+      </div>
+      <h3>Suplentes</h3>
+      <div class="bench-list">
+        ${bench.map((p) => `
+          <div class="pick-row">
+            <span>${p.name} — ${p.pos} (${p.rating})</span>
+            <button class="option-btn small" data-bench="${p.id}">Poner de titular</button>
+          </div>
+        `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
+      </div>
+    </div>
+  `;
+  squadPanel.querySelectorAll('[data-formation]').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.setFormation(btn.dataset.formation); render(); });
+  });
+  squadPanel.querySelectorAll('[data-bench]').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.swapToStarting(btn.dataset.bench); render(); });
+  });
 }
 
 function renderClubSelect() {

@@ -19,14 +19,36 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  display: flex;
-  justify-content: center;
   padding: 16px;
 }
 
+.layout {
+  display: flex;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
 #app {
-  width: 100%;
+  flex: 1 1 480px;
+  min-width: 0;
   max-width: 640px;
+  margin: 0 auto;
+}
+
+.side-panel {
+  flex: 0 0 250px;
+  position: sticky;
+  top: 16px;
+}
+
+@media (max-width: 960px) {
+  .layout { flex-direction: column; }
+  #app { max-width: 100%; margin: 0; order: 1; }
+  #table-panel { order: 2; }
+  #squad-panel { order: 3; }
+  .side-panel { flex: 1 1 auto; width: 100%; position: static; }
 }
 
 h1, h2, h3 {
@@ -198,4 +220,67 @@ h1, h2, h3 {
 .me-line {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* ---- Paneles laterales: tabla de posiciones y plantel/formación ---- */
+
+.side-card {
+  font-size: 0.9em;
+}
+
+.side-card h3 {
+  font-size: 1em;
+  margin-bottom: 8px;
+}
+
+.table.compact th, .table.compact td {
+  padding: 4px 6px;
+  font-size: 0.85em;
+}
+
+.formation-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.formation-style {
+  margin: 0 0 10px;
+}
+
+.pitch {
+  background: linear-gradient(180deg, #1e7a3a, #15602e);
+  border: 2px solid #0d3d1c;
+  border-radius: 10px;
+  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pitch-row {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.player-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  text-align: center;
+}
+
+.player-chip span {
+  font-size: 0.68em;
+  line-height: 1.1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.bench-list {
+  margin-top: 6px;
 }

@@ -128,15 +128,98 @@ const Engine = {
     });
   },
 
-  squadStrength(squad) {
-    const top11 = [...squad].sort((a, b) => b.rating - a.rating).slice(0, 11);
-    return top11.reduce((sum, p) => sum + p.rating, 0) / top11.length;
+  // La fuerza de TU equipo sale del once que realmente vas a poner en cancha
+  // (según la formación elegida), no de los 11 mejores del plantel sin más:
+  // una formación con 5 defensores igual tiene que poner 5, aunque el 5º no
+  // sea tan bueno como un delantero suplente.
+  squadStrength() {
+    const xi = this.getStartingXI().starters;
+    return xi.reduce((sum, p) => sum + p.rating, 0) / xi.length;
   },
 
   clubStrength(clubId) {
-    if (clubId === this.state.clubId) return this.squadStrength(this.state.squad);
+    if (clubId === this.state.clubId) return this.squadStrength();
     const club = this.getClub(clubId);
     return 44 + club.reputation * 6 + (Math.random() * 10 - 5);
+  },
+
+  // ---------- Formación y once titular ----------
+
+  currentFormation() {
+    return FORMATIONS.find((f) => f.id === this.state.formation) || FORMATIONS[1];
+  },
+
+  setFormation(id) {
+    if (!FORMATIONS.some((f) => f.id === id)) return;
+    this.state.formation = id;
+    this.recomputeStartingIds();
+    this.save();
+  },
+
+  // Arma el once automáticamente: los mejores de cada línea según la
+  // formación actual. Se usa al arrancar la carrera, al cambiar de
+  // formación, o para completar huecos si el plantel es chico.
+  recomputeStartingIds() {
+    const s = this.state;
+    const formation = this.currentFormation();
+    const byPos = (pos) => [...s.squad].filter((p) => p.pos === pos).sort((a, b) => b.rating - a.rating);
+    let starters = [...byPos('POR').slice(0, 1), ...byPos('DEF').slice(0, formation.def), ...byPos('MED').slice(0, formation.med), ...byPos('DEL').slice(0, formation.del)];
+    if (starters.length < 11) {
+      const usedIds = new Set(starters.map((p) => p.id));
+      const rest = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
+      while (starters.length < 11 && rest.length) starters.push(rest.shift());
+    }
+    s.startingIds = starters.map((p) => p.id);
+  },
+
+  // Saca de la lista de titulares a cualquiera que ya no esté en el plantel
+  // (se vendió, se dejó ir, etc.) y completa lo que falte. Mantiene el resto
+  // de las elecciones manuales del usuario tal cual estaban.
+  repairStartingIds() {
+    const s = this.state;
+    if (!s.startingIds) { this.recomputeStartingIds(); return; }
+    const squadIds = new Set(s.squad.map((p) => p.id));
+    s.startingIds = s.startingIds.filter((id) => squadIds.has(id));
+    if (s.startingIds.length < 11) {
+      const usedIds = new Set(s.startingIds);
+      const rest = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
+      while (s.startingIds.length < 11 && rest.length) s.startingIds.push(rest.shift().id);
+    }
+  },
+
+  getStartingXI() {
+    const s = this.state;
+    if (!s.startingIds || !s.startingIds.length) this.recomputeStartingIds();
+    const starters = s.startingIds.map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
+    return {
+      formation: this.currentFormation(),
+      gk: starters.filter((p) => p.pos === 'POR'),
+      def: starters.filter((p) => p.pos === 'DEF'),
+      med: starters.filter((p) => p.pos === 'MED'),
+      del: starters.filter((p) => p.pos === 'DEL'),
+      starters,
+    };
+  },
+
+  getBench() {
+    const s = this.state;
+    if (!s.startingIds || !s.startingIds.length) this.recomputeStartingIds();
+    const startingSet = new Set(s.startingIds);
+    return [...s.squad].filter((p) => !startingSet.has(p.id)).sort((a, b) => b.rating - a.rating);
+  },
+
+  // Pone a un suplente de titular, sacando al peor de su misma línea (así el
+  // usuario elige QUIÉN entra sin tener que armar el once entero a mano).
+  swapToStarting(benchPlayerId) {
+    const s = this.state;
+    const benchPlayer = s.squad.find((p) => p.id === benchPlayerId);
+    if (!benchPlayer || !s.startingIds) return false;
+    const startersOfSamePos = s.startingIds.map((id) => s.squad.find((p) => p.id === id)).filter((p) => p && p.pos === benchPlayer.pos);
+    if (!startersOfSamePos.length) return false;
+    const weakest = startersOfSamePos.sort((a, b) => a.rating - b.rating)[0];
+    s.startingIds = s.startingIds.map((id) => (id === weakest.id ? benchPlayer.id : id));
+    this.save();
+    return true;
   },
 
   // Genera un todos-contra-todos a una rueda. Si la cantidad de equipos es
@@ -277,6 +360,8 @@ const Engine = {
       budget: 0,
       morale: 0,
       squad: null,
+      formation: '442',
+      startingIds: null,
       season: null,
       copaBracket: null,
       bracket: null,
@@ -292,6 +377,7 @@ const Engine = {
     const club = this.getClub(clubId);
     this.state.budget = this.startingBudget(club);
     this.state.squad = this.generateSquad(club);
+    this.recomputeStartingIds();
     this.startNewSeason();
   },
 
@@ -502,7 +588,7 @@ const Engine = {
     }
 
     const ctx = s.matchContext;
-    const myStrength = this.squadStrength(s.squad) + option.tacticMod + s.morale / 3;
+    const myStrength = this.squadStrength() + option.tacticMod + this.currentFormation().mod + s.morale / 3;
     const oppStrength = this.clubStrength(ctx.opponentId);
     const homeAdvantage = 4;
     const homeStrength = ctx.isHome ? myStrength : oppStrength;
@@ -577,7 +663,7 @@ const Engine = {
     // Argentina, playoffs, Final por el ascenso, Reducido) es eliminación
     // directa: un empate se define por penales.
     if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
-      const myStrength = this.squadStrength(s.squad);
+      const myStrength = this.squadStrength();
       const oppStrength = this.clubStrength(m.opponentId);
       const userIsHomeSide = m.isHome;
       const prob = Math.max(0.15, Math.min(0.85, 0.5 + (myStrength - oppStrength) / 100));
@@ -896,6 +982,7 @@ const Engine = {
       player.contractYears = 2 + Math.floor(Math.random() * 2);
     } else if (player) {
       s.squad = s.squad.filter((p) => p.id !== playerId);
+      this.repairStartingIds();
     }
     this.showNextContractDecision();
   },
@@ -929,6 +1016,7 @@ const Engine = {
     const idx = s.squad.findIndex((p) => p.id === target.id);
     s.squad[idx] = { id: offer.id, name: offer.name, pos: offer.pos, rating: offer.rating, age: offer.age, nation: offer.nation, contractYears: 3 };
     s.market.splice(marketIndex, 1);
+    this.repairStartingIds();
     this.save();
     return true;
   },
@@ -939,6 +1027,7 @@ const Engine = {
     const player = s.squad[squadIndex];
     s.budget += Math.round(player.rating * 15000 * 0.7);
     s.squad.splice(squadIndex, 1);
+    this.repairStartingIds();
     this.save();
     return true;
   },
