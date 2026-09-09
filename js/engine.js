@@ -307,22 +307,27 @@ const Engine = {
     return [...s.squad].filter((p) => !startingSet.has(p.id)).sort((a, b) => b.rating - a.rating);
   },
 
-  // Pone a cualquier jugador (titular o suplente) en el casillero de otro
-  // (uno de los dos ids tiene que estar en cancha y el otro en el banco). Es
-  // lo que dispara tocar/arrastrar un jugador de la cancha y después uno del
-  // banco (o al revés) en la UI. Se puede cambiar por alguien de OTRA
-  // posición a propósito — el que entra rinde según positionFit, pero la
-  // formación (los casilleros en sí) nunca cambia por hacer un cambio.
+  // Intercambia dos jugadores cualesquiera: dos titulares (se cambian de
+  // casillero entre sí), un titular y un suplente (el suplente entra a ese
+  // casillero), o nada si los dos son suplentes (ninguno ocupa un casillero
+  // para intercambiar). Es lo que dispara tocar/arrastrar dos jugadores en
+  // la UI. Se puede cambiar por alguien de OTRA posición a propósito — el
+  // que entra rinde según positionFit, pero la formación (los casilleros en
+  // sí) nunca cambia por hacer un cambio.
   swapPlayers(idA, idB) {
     const s = this.state;
     if (!s.startingSlots || idA === idB) return false;
     const slotA = s.startingSlots.find((e) => e.playerId === idA);
     const slotB = s.startingSlots.find((e) => e.playerId === idB);
-    const aStarts = !!slotA;
-    const bStarts = !!slotB;
-    if (aStarts === bStarts) return false;
-    const starterEntry = aStarts ? slotA : slotB;
-    const benchId = aStarts ? idB : idA;
+    if (slotA && slotB) {
+      slotA.playerId = idB;
+      slotB.playerId = idA;
+      this.save();
+      return true;
+    }
+    if (!slotA && !slotB) return false;
+    const starterEntry = slotA || slotB;
+    const benchId = slotA ? idB : idA;
     if (!s.squad.some((p) => p.id === benchId)) return false;
     starterEntry.playerId = benchId;
     this.save();

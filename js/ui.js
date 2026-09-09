@@ -164,9 +164,9 @@ function handlePlayerTap(id) {
     return;
   }
   const isStarter = (pid) => s.startingSlots.some((e) => e.playerId === pid);
-  const bothSameGroup = isStarter(selectedPlayerId) === isStarter(id);
-  if (bothSameGroup) {
-    // Tocar dos titulares o dos suplentes entre sí no cambia nada: solo se mueve la selección.
+  if (!isStarter(selectedPlayerId) && !isStarter(id)) {
+    // Dos suplentes entre sí: ninguno ocupa un casillero de la cancha, así
+    // que no hay nada que intercambiar. Solo se mueve la selección.
     selectedPlayerId = id;
     render();
     return;

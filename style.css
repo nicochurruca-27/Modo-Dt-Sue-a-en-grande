@@ -304,7 +304,7 @@ h1, h2, h3 {
 }
 
 .pitch {
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTYwIj4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIHN0cm9rZS13aWR0aD0iMS4yIj4KICAgIDxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjgwIiBoZWlnaHQ9IjE0MCIgcng9IjIiIC8+CiAgICA8bGluZSB4MT0iMTAiIHkxPSI4MCIgeDI9IjkwIiB5Mj0iODAiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjgwIiByPSIxMyIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iODAiIHI9IjEuMyIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxyZWN0IHg9IjIyIiB5PSIxMCIgd2lkdGg9IjU2IiBoZWlnaHQ9IjI0IiAvPgogICAgPHJlY3QgeD0iMzciIHk9IjEwIiB3aWR0aD0iMjYiIGhlaWdodD0iMTAiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjI0IiByPSIxLjMiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIC8+CiAgICA8cGF0aCBkPSJNIDM3IDM0IEEgMTMgMTMgMCAwIDAgNjMgMzQiIC8+CiAgICA8cmVjdCB4PSIyMiIgeT0iMTI2IiB3aWR0aD0iNTYiIGhlaWdodD0iMjQiIC8+CiAgICA8cmVjdCB4PSIzNyIgeT0iMTQwIiB3aWR0aD0iMjYiIGhlaWdodD0iMTAiIC8+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjEzNiIgcj0iMS4zIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNTUpIiAvPgogICAgPHBhdGggZD0iTSAzNyAxMjYgQSAxMyAxMyAwIDAgMSA2MyAxMjYiIC8+CiAgICA8cGF0aCBkPSJNIDEwIDE2IEEgNiA2IDAgMCAwIDE2IDEwIiAvPgogICAgPHBhdGggZD0iTSA4NCAxMCBBIDYgNiAwIDAgMCA5MCAxNiIgLz4KICAgIDxwYXRoIGQ9Ik0gMTAgMTQ0IEEgNiA2IDAgMCAxIDE2IDE1MCIgLz4KICAgIDxwYXRoIGQ9Ik0gOTAgMTQ0IEEgNiA2IDAgMCAxIDg0IDE1MCIgLz4KICA8L2c+Cjwvc3ZnPg=="),
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTYwIj4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC41NSkiIHN0cm9rZS13aWR0aD0iMS4yIj4KICAgIDxyZWN0IHg9IjE0IiB5PSI4IiB3aWR0aD0iNzIiIGhlaWdodD0iMTQ0IiByeD0iMiIgLz4KICAgIDxsaW5lIHgxPSIxNCIgeTE9IjgwIiB4Mj0iODYiIHkyPSI4MCIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iODAiIHI9IjEyIiAvPgogICAgPGNpcmNsZSBjeD0iNTAiIGN5PSI4MCIgcj0iMS4yIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNTUpIiAvPgogICAgPHJlY3QgeD0iMjQiIHk9IjgiIHdpZHRoPSI1MiIgaGVpZ2h0PSIyMSIgLz4KICAgIDxyZWN0IHg9IjM4IiB5PSI4IiB3aWR0aD0iMjQiIGhlaWdodD0iOSIgLz4KICAgIDxjaXJjbGUgY3g9IjUwIiBjeT0iMjEiIHI9IjEuMiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzggMjkgQSAxMiAxMiAwIDAgMCA2MiAyOSIgLz4KICAgIDxyZWN0IHg9IjI0IiB5PSIxMzEiIHdpZHRoPSI1MiIgaGVpZ2h0PSIyMSIgLz4KICAgIDxyZWN0IHg9IjM4IiB5PSIxNDMiIHdpZHRoPSIyNCIgaGVpZ2h0PSI5IiAvPgogICAgPGNpcmNsZSBjeD0iNTAiIGN5PSIxMzkiIHI9IjEuMiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjU1KSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzggMTMxIEEgMTIgMTIgMCAwIDEgNjIgMTMxIiAvPgogICAgPHBhdGggZD0iTSAxNCAxNCBBIDYgNiAwIDAgMCAyMCA4IiAvPgogICAgPHBhdGggZD0iTSA4MCA4IEEgNiA2IDAgMCAwIDg2IDE0IiAvPgogICAgPHBhdGggZD0iTSAxNCAxNDYgQSA2IDYgMCAwIDEgMjAgMTUyIiAvPgogICAgPHBhdGggZD0iTSA4NiAxNDYgQSA2IDYgMCAwIDEgODAgMTUyIiAvPgogIDwvZz4KPC9zdmc+"),
     linear-gradient(180deg, #1e7a3a, #15602e);
   background-size: 100% 100%, 100% 100%;
   background-repeat: no-repeat, no-repeat;
@@ -314,8 +314,13 @@ h1, h2, h3 {
   /* El padding horizontal va en % (no en px fijos) para que, sea cual sea el
      ancho real de la cancha (celular angosto o panel de PC), los jugadores
      siempre queden encerrados bien adentro de la línea blanca pintada (que
-     está al 10%/90% del ancho total, ver el SVG de arriba). */
-  padding: 26px 12%;
+     está al 14%/86% del ancho total, ver el SVG de arriba). El padding
+     vertical es en px fijos a propósito (los % verticales de CSS se
+     calculan sobre el ANCHO, no sirven acá); el margen vertical de la
+     línea en el SVG se dejó chico (5% de la altura) para que ese padding
+     fijo alcance incluso en la formación con más filas (la que usa la
+     línea de enganche, 5 filas en vez de 4). */
+  padding: 30px 18%;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -334,7 +339,7 @@ h1, h2, h3 {
   align-items: center;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 56px;
+  max-width: 48px;
   text-align: center;
   cursor: pointer;
   border-radius: 8px;
@@ -344,7 +349,7 @@ h1, h2, h3 {
 
 .player-chip svg {
   width: 100%;
-  max-width: 40px;
+  max-width: 34px;
   height: auto;
 }
 
