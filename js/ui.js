@@ -20,6 +20,7 @@ function render() {
   if (!s) return;
   if (s.screen === 'dt-create') renderDTCreate();
   else if (s.screen === 'club-select') renderClubSelect();
+  else if (s.screen === 'presentation') renderPresentation();
   else if (s.screen === 'pre-match') renderPreMatch();
   else if (s.screen === 'penalty') renderPenalty();
   else if (s.screen === 'match-result') renderMatchResult();
@@ -405,6 +406,27 @@ function renderClubSelect() {
   });
 }
 
+function renderPresentation() {
+  const s = Engine.state;
+  const club = Engine.getClub(s.clubId);
+  const dt = s.dt;
+  const responses = Engine.presentationResponses();
+  app.innerHTML = `
+    <div class="card">
+      <h1>Presentación en sociedad</h1>
+      <p class="muted">La dirigencia de <strong>${club.name}</strong> te da la bienvenida${dt ? `, ${dt.name}` : ''}.</p>
+      <p>"Este año el objetivo es claro: <strong>${s.objective.text}</strong>"</p>
+      <h3>¿Cómo respondés?</h3>
+      <div class="options">
+        ${responses.map((opt, i) => `<button class="option-btn" data-i="${i}">${opt.label}</button>`).join('')}
+      </div>
+    </div>
+  `;
+  app.querySelectorAll('.options .option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.continueFromPresentation(Number(btn.dataset.i)); render(); });
+  });
+}
+
 function competitionLabel() {
   const s = Engine.state;
   const ctx = s.matchContext;
@@ -427,10 +449,12 @@ function header() {
   const dt = s.dt;
   const dtNation = dt && NATIONS.find((n) => n.code === dt.nation);
   const dtLine = dt ? `<div class="muted">DT: ${dtNation ? dtNation.flag : ''} ${dt.name}</div>` : '';
+  const objectiveLine = s.objective ? `<div class="muted">Objetivo de la dirigencia: ${s.objective.text}</div>` : '';
   return `
     <div class="topbar">
       <div><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></div>
       ${dtLine}
+      ${objectiveLine}
       <div class="muted">${competitionLabel()}</div>
       <div class="muted">Presupuesto: ${money(s.budget)} · Posición en zona: ${pos}°/${table.length} · Ánimo: ${s.morale}</div>
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>

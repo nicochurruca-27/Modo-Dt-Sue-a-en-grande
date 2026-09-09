@@ -529,6 +529,49 @@ const Engine = {
     this.state.squad = this.generateSquad(club);
     this.recomputeStartingSlots();
     this.startNewSeason();
+    // La presentación en sociedad solo aparece al arrancar la carrera (acá,
+    // después de armar la primera temporada): las temporadas siguientes
+    // arrancan directo por startNewSeason() sin pasar por acá.
+    this.state.objective = this.seasonObjective(club);
+    this.state.screen = 'presentation';
+  },
+
+  // Qué le pide la dirigencia para esta temporada, según el nivel del club.
+  // Es solo sabor/contexto (no afecta el cálculo del juego): le da un
+  // objetivo a la carrera en vez de arrancar en el vacío.
+  seasonObjective(club) {
+    if (club.division === 'D1') {
+      if (club.reputation >= 5) return { key: 'campeonato', text: 'Pelear el campeonato y meterse en la Copa Libertadores.' };
+      if (club.reputation === 4) return { key: 'copas', text: 'Terminar entre los primeros puestos y clasificar a una copa internacional.' };
+      if (club.reputation === 3) return { key: 'mitad-tabla', text: 'Consolidarse en la mitad de la tabla, sin sobresaltos.' };
+      if (club.reputation === 2) return { key: 'no-descender', text: 'Terminar la temporada lejos de la zona de descenso.' };
+      return { key: 'salvarse', text: 'Sobrevivir la temporada: cualquier cosa que no sea bajar de categoría ya es un buen año.' };
+    }
+    if (club.reputation >= 3) return { key: 'ascenso', text: 'Pelear el ascenso directo a Primera División.' };
+    if (club.reputation === 2) return { key: 'reducido', text: 'Meterse en el Torneo Reducido y pelear el ascenso por ahí.' };
+    return { key: 'consolidarse', text: 'Consolidar a la institución en la categoría, con los pies en la tierra.' };
+  },
+
+  // Las 3 respuestas posibles en la presentación en sociedad. Son genéricas
+  // (no cambian según el objetivo) para arrancar simple; el efecto es un
+  // empujón chico de ánimo, como cualquier otra decisión del juego.
+  presentationResponses() {
+    return [
+      { label: 'Aceptar el desafío con confianza', moraleMod: 5, note: 'El plantel se entusiasma con el objetivo planteado.' },
+      { label: 'Pedir tiempo, esto es un proceso', moraleMod: 0, note: 'La dirigencia entiende que hay que ir paso a paso.' },
+      { label: 'Poner paños fríos, no prometer nada', moraleMod: -3, note: 'La cautela deja algo fría a la hinchada.' },
+    ];
+  },
+
+  continueFromPresentation(optionIndex) {
+    const s = this.state;
+    const option = this.presentationResponses()[optionIndex];
+    if (option) {
+      s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
+      s.lastDecisionNote = option.note;
+    }
+    s.screen = 'pre-match';
+    this.save();
   },
 
   // Arranca un año nuevo completo: simula instantáneamente la división en la
