@@ -10,7 +10,6 @@ let selectDivision = 'D1';
 let selectZone = 'A';
 let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
 let selectedPlayerId = null; // jugador tocado en la cancha/banco, esperando el segundo toque para cambiarlo
-let swapNotice = null; // aviso corto si el último intento de cambio no se pudo hacer
 
 function money(n) {
   return '$' + Math.round(n).toLocaleString('es-AR');
@@ -131,13 +130,18 @@ function jerseySvg(kit, label) {
 // Cada jugador es tocable/arrastrable: `data-player` identifica el id para
 // el intercambio (ver handlePlayerTap/los listeners de drag en
 // renderSquadPanel). El dorsal real se muestra si lo tenemos cargado; si no,
-// se sigue mostrando la valoración como antes.
+// se sigue mostrando la valoración como antes. Los que están en la cancha
+// (`p.fit`, ver getStartingXI en engine.js) llevan un borde de color según
+// qué tan bien juegan en ese casillero: verde = su posición, amarillo =
+// línea vecina, rojo = fuera de lugar (rinde menos, ver effectiveRating).
 function playerChip(p, club, selected) {
   const lastName = p.name.trim().split(' ').slice(-1)[0];
   const kit = clubKit(club);
   const label = p.number != null ? p.number : p.rating;
+  const fitClass = p.fit ? `fit-${p.fit}` : '';
+  const title = p.fit && p.fit !== 'green' ? `title="Valoración natural ${p.rating}, jugando ahí rinde ${p.effectiveRating}"` : '';
   return `
-    <div class="player-chip ${selected ? 'selected' : ''}" data-player="${p.id}" draggable="true">
+    <div class="player-chip ${fitClass} ${selected ? 'selected' : ''}" data-player="${p.id}" draggable="true" ${title}>
       ${jerseySvg(kit, label)}
       <span>${lastName}</span>
     </div>
@@ -148,21 +152,19 @@ function handlePlayerTap(id) {
   const s = Engine.state;
   if (selectedPlayerId === null || selectedPlayerId === id) {
     selectedPlayerId = selectedPlayerId === id ? null : id;
-    swapNotice = null;
     render();
     return;
   }
-  const bothSameGroup = s.startingIds.includes(selectedPlayerId) === s.startingIds.includes(id);
+  const isStarter = (pid) => s.startingSlots.some((e) => e.playerId === pid);
+  const bothSameGroup = isStarter(selectedPlayerId) === isStarter(id);
   if (bothSameGroup) {
     // Tocar dos titulares o dos suplentes entre sí no cambia nada: solo se mueve la selección.
     selectedPlayerId = id;
-    swapNotice = null;
     render();
     return;
   }
-  const ok = Engine.swapPlayers(selectedPlayerId, id);
-  selectedPlayerId = ok ? null : id;
-  swapNotice = ok ? null : 'Tienen que ser de la misma posición para cambiarse (así no se te altera la formación).';
+  Engine.swapPlayers(selectedPlayerId, id);
+  selectedPlayerId = null;
   render();
 }
 
@@ -195,8 +197,8 @@ function renderSquadPanel() {
         <div class="pitch-row">${xi.def.map(chip).join('')}</div>
         <div class="pitch-row">${xi.gk.map(chip).join('')}</div>
       </div>
-      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. También podés arrastrar uno encima del otro.</p>
-      ${swapNotice ? `<p class="swap-notice">${swapNotice}</p>` : ''}
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos (o arrastrá uno sobre el otro). Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos.</p>
+      <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => `
@@ -227,9 +229,8 @@ function renderSquadPanel() {
       ev.preventDefault();
       const draggedId = ev.dataTransfer.getData('text/plain');
       if (draggedId && draggedId !== el.dataset.player) {
-        const ok = Engine.swapPlayers(draggedId, el.dataset.player);
+        Engine.swapPlayers(draggedId, el.dataset.player);
         selectedPlayerId = null;
-        swapNotice = ok ? null : 'Tienen que ser de la misma posición para cambiarse (así no se te altera la formación).';
         render();
       }
     });

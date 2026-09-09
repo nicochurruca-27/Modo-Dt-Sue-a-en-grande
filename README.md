@@ -87,6 +87,14 @@ abrir seguís donde quedaste.
   partido según qué tan ofensiva sea.
 - **Cambios de titulares**: se tocan (o se arrastran) dos jugadores — uno de
   la cancha y uno del banco — para intercambiarlos, sin un botón intermedio.
+  El casillero (cuántos hay en cada línea) siempre lo define la formación
+  elegida, no el cambio en sí. Se puede poner a cualquiera en cualquier
+  puesto, pero jugar fuera de su posición natural le baja el rendimiento: un
+  borde verde en la cancha indica que juega en lo suyo, amarillo una línea
+  vecina (por ejemplo un mediocampista de defensor) y rojo bien fuera de
+  lugar (por ejemplo un delantero de defensor, o cualquiera menos el
+  arquero en el arco) — la valoración efectiva que usa en el partido baja
+  según eso.
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 

@@ -131,10 +131,12 @@ const Engine = {
   // La fuerza de TU equipo sale del once que realmente vas a poner en cancha
   // (según la formación elegida), no de los 11 mejores del plantel sin más:
   // una formación con 5 defensores igual tiene que poner 5, aunque el 5º no
-  // sea tan bueno como un delantero suplente.
+  // sea tan bueno como un delantero suplente. Además cuenta la valoración
+  // EFECTIVA de cada uno (ver effectiveRating): jugar fuera de puesto rinde
+  // menos que en su posición natural.
   squadStrength() {
     const xi = this.getStartingXI().starters;
-    return xi.reduce((sum, p) => sum + p.rating, 0) / xi.length;
+    return xi.reduce((sum, p) => sum + p.effectiveRating, 0) / xi.length;
   },
 
   clubStrength(clubId) {
@@ -144,6 +146,17 @@ const Engine = {
   },
 
   // ---------- Formación y once titular ----------
+  //
+  // El once se guarda como "slots" (s.startingSlots): 11 casilleros fijos
+  // según la formación elegida (1 POR + los DEF/MED/DEL que toquen), cada
+  // uno con el id del jugador que lo ocupa. Así la forma de la cancha
+  // (cuántos hay en cada línea) la define SIEMPRE la formación elegida, sin
+  // importar a quién pongas en cada casillero — cambiar un jugador de lugar
+  // nunca cambia la formación por sí solo.
+  //
+  // Se puede poner a cualquiera en cualquier casillero (el usuario decide),
+  // pero jugar fuera de su posición natural le baja el rendimiento: ver
+  // positionFit/effectiveRating más abajo.
 
   currentFormation() {
     return FORMATIONS.find((f) => f.id === this.state.formation) || FORMATIONS[1];
@@ -152,81 +165,137 @@ const Engine = {
   setFormation(id) {
     if (!FORMATIONS.some((f) => f.id === id)) return;
     this.state.formation = id;
-    this.recomputeStartingIds();
+    this.recomputeStartingSlots();
     this.save();
   },
 
-  // Arma el once automáticamente: los mejores de cada línea según la
-  // formación actual. Se usa al arrancar la carrera, al cambiar de
-  // formación, o para completar huecos si el plantel es chico.
-  recomputeStartingIds() {
-    const s = this.state;
-    const formation = this.currentFormation();
-    const byPos = (pos) => [...s.squad].filter((p) => p.pos === pos).sort((a, b) => b.rating - a.rating);
-    let starters = [...byPos('POR').slice(0, 1), ...byPos('DEF').slice(0, formation.def), ...byPos('MED').slice(0, formation.med), ...byPos('DEL').slice(0, formation.del)];
-    if (starters.length < 11) {
-      const usedIds = new Set(starters.map((p) => p.id));
-      const rest = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
-      while (starters.length < 11 && rest.length) starters.push(rest.shift());
-    }
-    s.startingIds = starters.map((p) => p.id);
+  slotOrderForFormation(formation) {
+    return [
+      'POR',
+      ...Array(formation.def).fill('DEF'),
+      ...Array(formation.med).fill('MED'),
+      ...Array(formation.del).fill('DEL'),
+    ];
   },
 
-  // Saca de la lista de titulares a cualquiera que ya no esté en el plantel
-  // (se vendió, se dejó ir, etc.) y completa lo que falte. Mantiene el resto
-  // de las elecciones manuales del usuario tal cual estaban.
-  repairStartingIds() {
+  // Arma el once automáticamente: para cada casillero busca el mejor jugador
+  // libre de esa posición exacta; si no alcanzan (plantel chico), completa
+  // los casilleros que queden vacíos con lo mejor que sobre. Se usa al
+  // arrancar la carrera y al cambiar de formación (ahí sí se resetean las
+  // elecciones manuales, porque cambiar de formación es una acción explícita
+  // del usuario).
+  recomputeStartingSlots() {
     const s = this.state;
-    if (!s.startingIds) { this.recomputeStartingIds(); return; }
+    const formation = this.currentFormation();
+    const usedIds = new Set();
+    const bestOfPos = (pos) => [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === pos).sort((a, b) => b.rating - a.rating)[0];
+    let slots = this.slotOrderForFormation(formation).map((slot) => {
+      const p = bestOfPos(slot);
+      if (!p) return { slot, playerId: null };
+      usedIds.add(p.id);
+      return { slot, playerId: p.id };
+    });
+    const leftover = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
+    slots = slots.map((entry) => {
+      if (entry.playerId) return entry;
+      const p = leftover.shift();
+      return p ? { slot: entry.slot, playerId: p.id } : entry;
+    });
+    s.startingSlots = slots;
+  },
+
+  // Saca de los casilleros a cualquiera que ya no esté en el plantel (se
+  // vendió, se dejó ir, etc.) y completa lo que falte, priorizando su
+  // posición natural. Mantiene el resto de las elecciones manuales tal cual
+  // estaban.
+  repairStartingSlots() {
+    const s = this.state;
+    if (!s.startingSlots) { this.recomputeStartingSlots(); return; }
     const squadIds = new Set(s.squad.map((p) => p.id));
-    s.startingIds = s.startingIds.filter((id) => squadIds.has(id));
-    if (s.startingIds.length < 11) {
-      const usedIds = new Set(s.startingIds);
-      const rest = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
-      while (s.startingIds.length < 11 && rest.length) s.startingIds.push(rest.shift().id);
+    const usedIds = new Set();
+    s.startingSlots = s.startingSlots.map((entry) => {
+      if (entry.playerId && squadIds.has(entry.playerId)) { usedIds.add(entry.playerId); return entry; }
+      return { slot: entry.slot, playerId: null };
+    });
+    s.startingSlots = s.startingSlots.map((entry) => {
+      if (entry.playerId) return entry;
+      const natural = [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === entry.slot).sort((a, b) => b.rating - a.rating)[0];
+      const pick = natural || [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
+      if (!pick) return entry;
+      usedIds.add(pick.id);
+      return { slot: entry.slot, playerId: pick.id };
+    });
+  },
+
+  // Orden de "cercanía" entre líneas: arquero-defensa-medio-ataque. Se usa
+  // para decidir qué tan mal le queda a alguien jugar en un casillero que no
+  // es su posición natural.
+  positionFit(playerPos, slot) {
+    if (playerPos === slot) return { color: 'green', mult: 1 };
+    const order = ['POR', 'DEF', 'MED', 'DEL'];
+    const dist = Math.abs(order.indexOf(playerPos) - order.indexOf(slot));
+    const involvesKeeper = playerPos === 'POR' || slot === 'POR';
+    if (involvesKeeper) {
+      // Un arquero jugando de otra cosa (o al revés) es siempre grave, y
+      // empeora cuanto más lejos del arco quede.
+      return { color: 'red', mult: dist === 1 ? 0.55 : dist === 2 ? 0.45 : 0.35 };
     }
+    if (dist === 1) return { color: 'yellow', mult: 0.85 }; // línea vecina (def-med, med-del)
+    return { color: 'red', mult: 0.72 }; // def-del: lejos de su lugar
+  },
+
+  effectiveRating(player, slot) {
+    return Math.round(player.rating * this.positionFit(player.pos, slot).mult);
   },
 
   getStartingXI() {
     const s = this.state;
-    if (!s.startingIds || !s.startingIds.length) this.recomputeStartingIds();
-    const starters = s.startingIds.map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
+    if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
+    const rows = { POR: [], DEF: [], MED: [], DEL: [] };
+    const starters = [];
+    s.startingSlots.forEach(({ slot, playerId }) => {
+      const p = s.squad.find((pl) => pl.id === playerId);
+      if (!p) return;
+      const fit = this.positionFit(p.pos, slot);
+      const entry = { ...p, slot, fit: fit.color, effectiveRating: this.effectiveRating(p, slot) };
+      rows[slot].push(entry);
+      starters.push(entry);
+    });
     return {
       formation: this.currentFormation(),
-      gk: starters.filter((p) => p.pos === 'POR'),
-      def: starters.filter((p) => p.pos === 'DEF'),
-      med: starters.filter((p) => p.pos === 'MED'),
-      del: starters.filter((p) => p.pos === 'DEL'),
+      gk: rows.POR,
+      def: rows.DEF,
+      med: rows.MED,
+      del: rows.DEL,
       starters,
     };
   },
 
   getBench() {
     const s = this.state;
-    if (!s.startingIds || !s.startingIds.length) this.recomputeStartingIds();
-    const startingSet = new Set(s.startingIds);
+    if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
+    const startingSet = new Set(s.startingSlots.map((e) => e.playerId).filter(Boolean));
     return [...s.squad].filter((p) => !startingSet.has(p.id)).sort((a, b) => b.rating - a.rating);
   },
 
-  // Intercambia un titular por un suplente (uno de los dos ids tiene que
-  // estar en cancha y el otro en el banco). Es lo que dispara tocar/arrastrar
-  // un jugador de la cancha y después uno del banco (o al revés) en la UI.
-  // Se exige la misma posición a propósito: la formación (cuántos defensores,
-  // mediocampistas y delanteros hay) la elige el usuario a mano con el
-  // selector de formación, y un simple cambio de titular no la tiene que
-  // alterar sin que se lo pidan.
+  // Pone a cualquier jugador (titular o suplente) en el casillero de otro
+  // (uno de los dos ids tiene que estar en cancha y el otro en el banco). Es
+  // lo que dispara tocar/arrastrar un jugador de la cancha y después uno del
+  // banco (o al revés) en la UI. Se puede cambiar por alguien de OTRA
+  // posición a propósito — el que entra rinde según positionFit, pero la
+  // formación (los casilleros en sí) nunca cambia por hacer un cambio.
   swapPlayers(idA, idB) {
     const s = this.state;
-    if (!s.startingIds || idA === idB) return false;
-    const aStarts = s.startingIds.includes(idA);
-    const bStarts = s.startingIds.includes(idB);
+    if (!s.startingSlots || idA === idB) return false;
+    const slotA = s.startingSlots.find((e) => e.playerId === idA);
+    const slotB = s.startingSlots.find((e) => e.playerId === idB);
+    const aStarts = !!slotA;
+    const bStarts = !!slotB;
     if (aStarts === bStarts) return false;
-    const starterId = aStarts ? idA : idB;
+    const starterEntry = aStarts ? slotA : slotB;
     const benchId = aStarts ? idB : idA;
-    const starterPlayer = s.squad.find((p) => p.id === starterId);
-    const benchPlayer = s.squad.find((p) => p.id === benchId);
-    if (!starterPlayer || !benchPlayer || starterPlayer.pos !== benchPlayer.pos) return false;
-    s.startingIds = s.startingIds.map((id) => (id === starterId ? benchId : id));
+    if (!s.squad.some((p) => p.id === benchId)) return false;
+    starterEntry.playerId = benchId;
     this.save();
     return true;
   },
@@ -370,7 +439,7 @@ const Engine = {
       morale: 0,
       squad: null,
       formation: '442',
-      startingIds: null,
+      startingSlots: null,
       season: null,
       copaBracket: null,
       bracket: null,
@@ -386,7 +455,7 @@ const Engine = {
     const club = this.getClub(clubId);
     this.state.budget = this.startingBudget(club);
     this.state.squad = this.generateSquad(club);
-    this.recomputeStartingIds();
+    this.recomputeStartingSlots();
     this.startNewSeason();
   },
 
@@ -995,7 +1064,7 @@ const Engine = {
       player.contractYears = 2 + Math.floor(Math.random() * 2);
     } else if (player) {
       s.squad = s.squad.filter((p) => p.id !== playerId);
-      this.repairStartingIds();
+      this.repairStartingSlots();
     }
     this.showNextContractDecision();
   },
@@ -1029,7 +1098,7 @@ const Engine = {
     const idx = s.squad.findIndex((p) => p.id === target.id);
     s.squad[idx] = { id: offer.id, name: offer.name, pos: offer.pos, rating: offer.rating, age: offer.age, nation: offer.nation, contractYears: 3 };
     s.market.splice(marketIndex, 1);
-    this.repairStartingIds();
+    this.repairStartingSlots();
     this.save();
     return true;
   },
@@ -1040,7 +1109,7 @@ const Engine = {
     const player = s.squad[squadIndex];
     s.budget += Math.round(player.rating * 15000 * 0.7);
     s.squad.splice(squadIndex, 1);
-    this.repairStartingIds();
+    this.repairStartingSlots();
     this.save();
     return true;
   },
