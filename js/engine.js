@@ -21,16 +21,16 @@
 //   simulación (no queda "vacante").
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
-// - Descienden 2 de Primera por año: el último de la Tabla Anual (suma de
-//   Apertura + Clausura) y el peor promedio de puntos por partido de las
-//   últimas 3 temporadas en Primera (si coinciden, el segundo descenso pasa
-//   al siguiente peor promedio).
+// - Descienden 2 de Primera por año: los dos últimos de la Tabla Anual (suma
+//   de las fases regulares del Apertura y el Clausura). En la realidad baja
+//   el último de esa tabla y, aparte, el peor promedio de las últimas 3
+//   temporadas; acá se usan los dos últimos de la Anual para no arrastrar
+//   una segunda tabla con el historial de cada club.
 // - Cupos a copas internacionales: 6 a Libertadores (campeón Apertura,
-//   campeón Clausura, campeón Copa Argentina, 1º y 2º de la Tabla Anual, y
-//   un repechaje anclado en el 9º), y 6 a Sudamericana (del 3º al 8º de la
-//   Tabla Anual), salteando siempre clubes ya clasificados por otra vía. Si
-//   un campeón desciende esa misma temporada, pierde el cupo directo y este
-//   se reparte igual por tabla.
+//   campeón Clausura, campeón Copa Argentina, y los 3 mejores de la Tabla
+//   Anual que no hayan clasificado ya, el tercero de ellos a fase previa) y
+//   6 a Sudamericana (los 6 siguientes de la Tabla Anual). Un campeón que
+//   además desciende conserva igual su cupo, como en la realidad.
 // - La división en la que NO juega el usuario se simula completa e
 //   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
 //   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
@@ -627,15 +627,44 @@ const Engine = {
     return this.mergeTableRows(tables);
   },
 
-  // Siembra de los playoffs de Primera: los 8 primeros de cada zona, cruzados
-  // A contra B (1ºA-8ºB, 2ºA-7ºB, ...). El orden del array es el que después
-  // usa pairStage (que enfrenta al primero con el último), así que esta
-  // intercalación es la que arma esos cruces.
+  // Cuadro de los playoffs de Primera: los 8 primeros de cada zona en la
+  // llave FIJA del reglamento de la LPF. El array está en orden de cuadro
+  // (ver pairStage: se enfrentan de a dos, los vecinos), así que el cruce de
+  // cada ronda queda determinado desde el arranque — ganar los octavos ya te
+  // dice contra quién jugás en cuartos.
+  //
+  //   Octavos              Cuartos                Semi
+  //   1ºA - 8ºB  ┐
+  //   4ºB - 5ºA  ┘─ C1  ┐
+  //   2ºB - 7ºA  ┐      ├─ S1  ┐
+  //   3ºA - 6ºB  ┘─ C4  ┘      │
+  //   1ºB - 8ºA  ┐             ├─ FINAL
+  //   4ºA - 5ºB  ┘─ C2  ┐      │
+  //   2ºA - 7ºB  ┐      ├─ S2  ┘
+  //   3ºB - 6ºA  ┘─ C3  ┘
+  //
+  // El `seed` no ordena el cuadro (eso ya lo hace la posición en el array):
+  // solo dice quién es el mejor ubicado de la fase regular, que es el que
+  // juega de local. Se numera por puesto en la zona (los dos 1º primero, los
+  // dos 2º después, y así), desempatando por puntos entre zonas.
   playoffSeedsFromZones(zoneATable, zoneBTable) {
     const a = zoneATable.slice(0, 8);
     const b = zoneBTable.slice(0, 8);
-    const order = [...a.slice(0, 4), ...b.slice(0, 4), ...a.slice(4, 8), ...b.slice(4, 8)];
-    return order.map((r, i) => ({ id: r.id, seed: i + 1 }));
+
+    const seedByClub = {};
+    for (let pos = 0; pos < 8; pos++) {
+      const pair = [a[pos], b[pos]].sort((x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf);
+      seedByClub[pair[0].id] = pos * 2 + 1;
+      seedByClub[pair[1].id] = pos * 2 + 2;
+    }
+
+    const bracket = [
+      a[0], b[7], b[3], a[4], // 1ºA-8ºB / 4ºB-5ºA  -> C1
+      b[1], a[6], a[2], b[5], // 2ºB-7ºA / 3ºA-6ºB  -> C4
+      b[0], a[7], a[3], b[4], // 1ºB-8ºA / 4ºA-5ºB  -> C2
+      a[1], b[6], b[2], a[5], // 2ºA-7ºB / 3ºB-6ºA  -> C3
+    ];
+    return bracket.map((r) => ({ id: r.id, seed: seedByClub[r.id] }));
   },
 
   // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
@@ -657,8 +686,7 @@ const Engine = {
       const { zoneATable, zoneBTable } = runZoneStage();
       const finalWinner = this.resolveKnockout(zoneATable[0].id, zoneBTable[0].id);
       const finalLoser = finalWinner === zoneATable[0].id ? zoneBTable[0].id : zoneATable[0].id;
-      const pool = zoneATable.slice(1, 8).concat(zoneBTable.slice(1, 8)).map((r) => r.id).concat([finalLoser]);
-      const reducidoWinner = this.simulateKnockoutPool(pool);
+      const reducidoWinner = this.simulateSeedsToChampion(this.reducidoBracket(zoneATable, zoneBTable, finalLoser)).champion;
       return { promoted: [finalWinner, reducidoWinner], zoneATable, zoneBTable };
     }
 
@@ -687,7 +715,7 @@ const Engine = {
       screen: 'pre-match',
       dt,
       clubId,
-      clubs: CLUB_TEMPLATES.map((c) => ({ ...c, history: [] })),
+      clubs: CLUB_TEMPLATES.map((c) => ({ ...c })),
       budget: 0,
       morale: dt && dt.style === 'ofensivo' ? 10 : 0,
       squad: null,
@@ -1038,7 +1066,7 @@ const Engine = {
     const ctx = s.matchContext;
     const myStrength = this.squadStrength() + option.tacticMod + this.currentFormation().mod + s.morale / 3;
     const oppStrength = this.clubStrength(ctx.opponentId);
-    const homeAdvantage = 4;
+    const homeAdvantage = ctx.isNeutral ? 0 : 4;
     const homeStrength = ctx.isHome ? myStrength : oppStrength;
     const awayStrength = ctx.isHome ? oppStrength : myStrength;
     const score = this.simulateScore(homeStrength, awayStrength, homeAdvantage);
@@ -1218,11 +1246,40 @@ const Engine = {
     }
   },
 
+  // El array ES el cuadro: se enfrentan los vecinos (0 con 1, 2 con 3, ...) y
+  // los ganadores quedan en ese mismo orden para la ronda siguiente. Así la
+  // llave es fija — el cruce de cada ronda ya está determinado de entrada, no
+  // se reordena por posición al terminar cada instancia. Quien arma el
+  // cuadro decide los cruces poniendo a cada uno en su lugar del array (ver
+  // playoffSeedsFromZones y seedOrderBestVsWorst).
   pairStage(alive) {
-    const sorted = [...alive].sort((a, b) => a.seed - b.seed);
     const pairs = [];
-    for (let i = 0; i < sorted.length / 2; i++) pairs.push([sorted[i], sorted[sorted.length - 1 - i]]);
+    for (let i = 0; i < alive.length; i += 2) pairs.push([alive[i], alive[i + 1]]);
     return pairs;
+  },
+
+  // Ordena una lista ya rankeada (de mejor a peor) para que la primera ronda
+  // enfrente al mejor con el peor, al segundo con el anteúltimo, etc. De ahí
+  // en adelante el cuadro queda fijo como cualquier otro.
+  seedOrderBestVsWorst(list) {
+    const order = [];
+    for (let i = 0; i < list.length / 2; i++) order.push(list[i], list[list.length - 1 - i]);
+    return order;
+  },
+
+  // Cuadro del Torneo Reducido de la Nacional: del 2º al 8º de cada zona más
+  // el perdedor de la Final por el ascenso (15 equipos), ordenados por lo que
+  // hicieron en la fase regular y cruzados el mejor contra el peor. Como son
+  // 15, el mejor de todos entra con fecha libre.
+  reducidoBracket(zoneATable, zoneBTable, finalLoserId) {
+    const rows = zoneATable.slice(1, 8).concat(zoneBTable.slice(1, 8));
+    const loserRow = zoneATable.concat(zoneBTable).find((r) => r.id === finalLoserId);
+    if (loserRow) rows.push(loserRow);
+    const ranked = rows
+      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf)
+      .map((r, i) => ({ id: r.id, seed: i + 1 }));
+    while (ranked.length < 16) ranked.push({ id: null, seed: ranked.length + 1 });
+    return this.seedOrderBestVsWorst(ranked);
   },
 
   resolveKnockout(idA, idB) {
@@ -1252,14 +1309,6 @@ const Engine = {
       alive = winners;
     }
     return { champion: alive[0] ? alive[0].id : null, runnerUp };
-  },
-
-  simulateKnockoutPool(ids) {
-    const seeds = ids.map((id, i) => ({ id, seed: i + 1 }));
-    let target = 2;
-    while (target < seeds.length) target *= 2;
-    while (seeds.length < target) seeds.push({ id: null, seed: seeds.length + 1 });
-    return this.simulateSeedsToChampion(seeds).champion;
   },
 
   bracketStageLabel() {
@@ -1308,7 +1357,16 @@ const Engine = {
       return;
     }
 
-    s.matchContext = { context: 'bracket', opponentId: opponentEntry.id, isHome: userEntry.seed < opponentEntry.seed };
+    // Local el mejor ubicado de la fase regular (seed más bajo). La final de
+    // los playoffs de Primera se juega en cancha neutral, así que ahí no hay
+    // ventaja para ninguno de los dos.
+    const isPlayoffFinal = s.bracket.pendingIsFinal && (s.bracket.kind === 'apertura' || s.bracket.kind === 'clausura');
+    s.matchContext = {
+      context: 'bracket',
+      opponentId: opponentEntry.id,
+      isHome: userEntry.seed < opponentEntry.seed,
+      isNeutral: isPlayoffFinal,
+    };
     this.pickDecision();
     s.screen = 'pre-match';
     this.save();
@@ -1384,9 +1442,7 @@ const Engine = {
       const loser = s.bracket.runnerUp;
       season.myD2.promotedDirect = winner;
       s.bracket = null;
-      const pool = season.myD2.zoneATable.slice(1, 8).concat(season.myD2.zoneBTable.slice(1, 8)).map((r) => r.id).concat([loser]);
-      const seeds = pool.map((id, i) => ({ id, seed: i + 1 }));
-      seeds.push({ id: null, seed: seeds.length + 1 }); // 15 equipos -> se completa a 16 con 1 bye
+      const seeds = this.reducidoBracket(season.myD2.zoneATable, season.myD2.zoneBTable, loser);
       this.startBracket('reducido', seeds, REDUCIDO_STAGES);
       return;
     }
@@ -1539,7 +1595,7 @@ const Engine = {
     this.save();
   },
 
-  // ---------- Fin de año: promedios, ascensos/descensos y cupos a copas ----------
+  // ---------- Fin de año: ascensos/descensos y cupos a copas ----------
 
   // Reparte de nuevo las zonas de una división para que queden equilibradas
   // (15/15 en Primera, 18/18 en la Nacional) después de mover clubes por
@@ -1554,57 +1610,36 @@ const Engine = {
     shuffled.forEach((club, i) => { club.zone = i < perZone ? 'A' : 'B'; });
   },
 
-  updateClubHistories(tablaAnualD1) {
-    tablaAnualD1.forEach((row) => {
-      const club = this.getClub(row.id);
-      if (!club.history) club.history = [];
-      club.history.push({ points: row.pts, played: row.played });
-      if (club.history.length > 3) club.history.shift();
-    });
-  },
-
-  assignQualification(d1Data, relegatedD1Ids) {
+  // Argentina tiene 6 cupos a la Libertadores y 6 a la Sudamericana.
+  //
+  // Los tres títulos del año —Apertura, Clausura y Copa Argentina— dan
+  // Libertadores directo, y un campeón que además descendió conserva igual su
+  // cupo. Los cupos de Libertadores que queden (porque un mismo club ganó más
+  // de un título) se completan corriendo la Tabla Anual, y el último de esos
+  // 6 entra por fase previa en vez de fase de grupos. Después de eso, los 6
+  // siguientes de la Tabla Anual van a la Sudamericana.
+  assignQualification(d1Data) {
     const s = this.state;
     const assigned = new Set();
     const results = [];
     const grant = (clubId, comp, stage) => {
-      if (!clubId || assigned.has(clubId)) return false;
+      if (!clubId || assigned.has(clubId)) return;
       assigned.add(clubId);
       results.push({ clubId, name: this.getClub(clubId).name, comp, stage });
-      return true;
     };
 
-    const relegatedSet = new Set(relegatedD1Ids);
-    let libertadoresPorTablaNeeded = 2; // 1° y 2° de la tabla anual
-    const grantTitle = (clubId) => {
-      if (!clubId) { libertadoresPorTablaNeeded++; return; }
-      if (relegatedSet.has(clubId)) { libertadoresPorTablaNeeded++; return; } // pierde el cupo por descenso
-      const granted = grant(clubId, 'Libertadores', 'Directo');
-      if (!granted) libertadoresPorTablaNeeded++; // ya clasificado por otro título: libera el cupo y se reparte por tabla
-    };
+    grant(d1Data.aperturaChampion, 'Libertadores', 'Fase de grupos');
+    grant(d1Data.clausuraChampion, 'Libertadores', 'Fase de grupos');
+    grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos');
 
-    grantTitle(d1Data.aperturaChampion);
-    grantTitle(d1Data.clausuraChampion);
-    grantTitle(s.copaBracket.champion);
-
-    const tablaAnual = d1Data.tablaAnualYear;
-
-    let cursor = 0;
-    while (libertadoresPorTablaNeeded > 0 && cursor < tablaAnual.length) {
-      if (!assigned.has(tablaAnual[cursor].id)) { grant(tablaAnual[cursor].id, 'Libertadores', 'Fase previa'); libertadoresPorTablaNeeded--; }
-      cursor++;
-    }
-
-    let repechajeIdx = 8; // 9° puesto (índice 8)
-    while (repechajeIdx < tablaAnual.length && assigned.has(tablaAnual[repechajeIdx].id)) repechajeIdx++;
-    if (repechajeIdx < tablaAnual.length) grant(tablaAnual[repechajeIdx].id, 'Libertadores', 'Repechaje');
-
-    let sudaNeeded = 6;
-    let sudaIdx = 2; // 3° puesto (índice 2)
-    while (sudaNeeded > 0 && sudaIdx < tablaAnual.length) {
-      if (!assigned.has(tablaAnual[sudaIdx].id)) { grant(tablaAnual[sudaIdx].id, 'Sudamericana', 'Fase de grupos'); sudaNeeded--; }
-      sudaIdx++;
-    }
+    const porTabla = d1Data.tablaAnualYear.filter((row) => !assigned.has(row.id));
+    const cuposLibertadores = Math.max(0, 6 - results.length);
+    porTabla.slice(0, cuposLibertadores).forEach((row, i) => {
+      grant(row.id, 'Libertadores', i === cuposLibertadores - 1 ? 'Fase previa' : 'Fase de grupos');
+    });
+    porTabla.slice(cuposLibertadores, cuposLibertadores + 6).forEach((row) => {
+      grant(row.id, 'Sudamericana', 'Fase de grupos');
+    });
 
     return results;
   },
@@ -1637,25 +1672,19 @@ const Engine = {
     const d1Data = divisionThisSeason === 'D1' ? myYearResult : bg;
     const d2Data = divisionThisSeason === 'D2' ? myYearResult : bg;
 
+    // En la realidad baja el último de la Tabla Anual y, aparte, el peor
+    // promedio de las últimas 3 temporadas. Acá bajan los dos últimos de la
+    // Tabla Anual: es una simplificación deliberada para no arrastrar una
+    // segunda tabla con el historial de cada club.
     const tablaAnualD1 = d1Data.tablaAnualYear;
-    this.updateClubHistories(tablaAnualD1);
-    const lastByTable = tablaAnualD1[tablaAnualD1.length - 1].id;
-    const promedios = tablaAnualD1.map((row) => {
-      const club = this.getClub(row.id);
-      const totalPts = club.history.reduce((sum, h) => sum + h.points, 0);
-      const totalPlayed = club.history.reduce((sum, h) => sum + h.played, 0);
-      return { id: row.id, coef: totalPlayed > 0 ? totalPts / totalPlayed : 0 };
-    }).sort((a, b) => a.coef - b.coef);
-    let worstPromedio = promedios[0].id;
-    if (worstPromedio === lastByTable) worstPromedio = promedios[1] ? promedios[1].id : null;
-    const relegated = worstPromedio && worstPromedio !== lastByTable ? [lastByTable, worstPromedio] : [lastByTable];
+    const relegated = tablaAnualD1.slice(-2).map((row) => row.id);
 
     const promoted = d2Data.promoted.filter((id) => !!id);
 
     relegated.forEach((id) => { this.getClub(id).division = 'D2'; });
     promoted.forEach((id) => { this.getClub(id).division = 'D1'; });
 
-    // Como el descenso (tabla anual + promedios) y el ascenso (Final directa +
+    // Como el descenso (los dos últimos de la Anual) y el ascenso (Final directa +
     // Reducido) no respetan las zonas de origen, hay que volver a repartir las
     // zonas para que queden 15/15 en Primera y 18/18 en la Nacional. Los
     // clubes que no se movieron pueden cambiar de zona igual: en la vida real
@@ -1663,7 +1692,7 @@ const Engine = {
     this.rebalanceZones('D1', 15);
     this.rebalanceZones('D2', 18);
 
-    const qualification = this.assignQualification(d1Data, relegated);
+    const qualification = this.assignQualification(d1Data);
 
     const userRelegated = relegated.includes(s.clubId);
     const userPromoted = promoted.includes(s.clubId);

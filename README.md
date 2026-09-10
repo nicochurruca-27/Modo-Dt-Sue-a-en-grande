@@ -57,10 +57,15 @@ abrir seguís donde quedaste.
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
 - **Apertura y Clausura**: en Primera se juegan dos torneos por año, cada uno
-  con fase de zonas a una rueda y playoffs de octavos a la final (clasifican
-  los 8 primeros de cada zona, cruzados entre zonas: 1ºA-8ºB, 2ºA-7ºB, y
-  así), con una ventana de pases entre ambos. La Nacional juega un solo
-  torneo anual a una rueda.
+  con fase de zonas a una rueda y playoffs de octavos a la final, con una
+  ventana de pases entre ambos. La Nacional juega un solo torneo anual a una
+  rueda.
+- **Playoffs con llave fija**: clasifican los 8 primeros de cada zona y el
+  cuadro queda armado de entrada, como en el reglamento de la LPF — ganar los
+  octavos ya te dice contra quién jugás en cuartos. Los octavos cruzan zonas
+  (1ºA-8ºB, 4ºB-5ºA, 2ºB-7ºA, 3ºA-6ºB por un lado; 1ºB-8ºA, 4ºA-5ºB, 2ºA-7ºB,
+  3ºB-6ºA por el otro). Todo a partido único, de local el mejor ubicado de la
+  fase regular y a penales si empatan; la final se juega en cancha neutral.
 - **Tabla Anual**: pestaña propia en el panel de tablas de Primera. Suma la
   fase de zonas del Apertura y la del Clausura (los playoffs no suman
   puntos) y se va actualizando fecha a fecha. Marca con colores los puestos
@@ -76,16 +81,18 @@ abrir seguís donde quedaste.
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
   Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
-  Copa Argentina, 1º y 2º de la Tabla Anual, y un repechaje anclado en el
-  9º— y 6 a Sudamericana (del 3º al 8º de la Tabla Anual). Siempre se
-  saltea a un club ya clasificado por otra vía, y si un campeón desciende
-  esa misma temporada pierde el cupo directo (se reparte igual por tabla).
+  Copa Argentina, y los 3 mejores de la Tabla Anual que no hayan clasificado
+  ya, el último de ellos por fase previa— y 6 a Sudamericana (los 6
+  siguientes de la Tabla Anual). Si un mismo club gana más de un título, el
+  cupo que libera se reparte corriendo la Tabla Anual hacia abajo. Un campeón
+  que además desciende conserva igual su cupo, como en la realidad.
 - **Ascensos y descensos** (a fin de año, 2 de cada): en Primera descienden
-  el último de la Tabla Anual y el club con peor promedio de puntos por
-  partido de las últimas 3 temporadas (si coinciden, el segundo descenso
-  pasa al siguiente peor promedio); en la Nacional ascienden el ganador de
+  los dos últimos de la Tabla Anual; en la Nacional ascienden el ganador de
   una Final directa entre los líderes de cada zona, y el ganador de un
   Torneo Reducido (2º a 8º de cada zona + el perdedor de la Final).
+  En la realidad el segundo descenso sale de la tabla de promedios de las
+  últimas 3 temporadas: acá se usan los dos últimos de la Anual a propósito,
+  para no arrastrar una segunda tabla con el historial de cada club.
 - **Mercado de pases**: en Primera, una ventana entre el Apertura y el
   Clausura; en la Nacional, una ventana a mitad de su único torneo. Justo
   antes de abrir el mercado, si algún jugador de tu plantel tiene el

@@ -111,15 +111,16 @@ function zoneRowZone(index, isD1) {
   return index === 0 ? 'champ' : 'playoff';
 }
 
-// Tabla Anual: 1º y 2º a la Libertadores, 3º a 8º a la Sudamericana, 9º al
-// repechaje de la Libertadores, y los dos últimos en zona de descenso. Los
-// campeones del Apertura, del Clausura y de la Copa Argentina entran por su
-// cuenta y corren la lista, así que estos son los cupos por tabla.
+// Tabla Anual: los 3 primeros van a la Libertadores (el 3º por fase previa),
+// del 4º al 9º a la Sudamericana, y los dos últimos descienden. Es la foto
+// del reparto suponiendo que los campeones del Apertura, del Clausura y de
+// la Copa Argentina son otros tres clubes; si alguno de ellos sale de estos
+// puestos, a fin de año la lista se corre hacia abajo un lugar por cada uno.
 function anualRowZone(index, total) {
   if (index >= total - 2) return 'desc';
   if (index <= 1) return 'lib';
-  if (index <= 7) return 'suda';
-  if (index === 8) return 'repechaje';
+  if (index === 2) return 'repechaje';
+  if (index <= 8) return 'suda';
   return null;
 }
 
@@ -149,11 +150,12 @@ function anualTableBody() {
       </table>
     </div>
     ${tableLegend([
-      { zone: 'lib', text: 'Copa Libertadores' },
-      { zone: 'repechaje', text: 'Repechaje de la Libertadores' },
+      { zone: 'lib', text: 'Copa Libertadores (fase de grupos)' },
+      { zone: 'repechaje', text: 'Copa Libertadores (fase previa)' },
       { zone: 'suda', text: 'Copa Sudamericana' },
-      { zone: 'desc', text: 'Zona de descenso: baja el último, y el segundo descenso sale del peor promedio' },
+      { zone: 'desc', text: 'Descienden a la Primera Nacional' },
     ])}
+    <p class="muted">Los campeones del Apertura, del Clausura y de la Copa Argentina van a la Libertadores por su cuenta: por cada uno que salga de estos puestos, la lista se corre un lugar hacia abajo.</p>
   `;
 }
 
@@ -714,7 +716,7 @@ function renderPreMatch() {
   app.innerHTML = `
     ${header()}
     <div class="card">
-      <p class="muted match-rival">${ctx.isHome ? 'Jugás de local' : 'Jugás de visitante'} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
+      <p class="muted match-rival">${ctx.isNeutral ? 'Se juega en cancha neutral' : ctx.isHome ? 'Jugás de local' : 'Jugás de visitante'} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
       <h2>${d.title}</h2>
       <p>${d.description}</p>
       <div class="options">
@@ -1125,7 +1127,7 @@ function renderSeasonEnd() {
 
       <h3>Ascensos y descensos de Primera División</h3>
       <p><strong>${movementText}</strong></p>
-      <p class="muted">Descendieron (último de la tabla anual + peor promedio): ${sum.relegated.join(', ')}.</p>
+      <p class="muted">Descendieron (los dos últimos de la tabla anual): ${sum.relegated.join(', ')}.</p>
       <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
       <p class="muted">${sum.economyNote}</p>
 
