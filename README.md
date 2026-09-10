@@ -89,7 +89,10 @@ abrir seguís donde quedaste.
 - **Valoración de jugadores**: cada jugador tiene una valoración (0-100) que
   puede subir o bajar con el tiempo por edad (los jóvenes mejoran, los
   grandes bajan), por rendimiento en cancha y por tus decisiones de
-  entrenamiento.
+  entrenamiento. El crecimiento de los jóvenes tiene un techo (`potential`
+  en `engine.js`, calculado una sola vez al armar el plantel según la edad):
+  no es ilimitado, así que un jugador de veintipico no termina llegando a
+  90+ de la nada, como mucho mejora unos pocos puntos con los años.
 - **Penales, con arquito y cinemática**: cuando hay un penal a favor, elegís
   primero quién lo patea y después tocás una de las 6 zonas del arco
   (izquierda/centro/derecha, arriba/abajo) donde querés que apunte; la
@@ -183,10 +186,16 @@ simplificó así:
 ## En progreso
 
 - **Jugadores reales**: `js/players.js` tiene los planteles reales que ya
-  se investigaron (nombre, edad, nacionalidad, contrato y una valoración
-  estimada), club por club. Un club sin entrada ahí sigue usando el
-  generador de jugadores al azar — no rompe nada mientras se van sumando
-  el resto. Ya está cargado: River Plate (28 jugadores).
+  se investigaron (nombre, edad, nacionalidad, posición general y detallada,
+  dorsal, contrato, préstamos si aplica, y una valoración estimada), club
+  por club. Un club sin entrada ahí sigue usando el generador de jugadores
+  al azar — no rompe nada mientras se van sumando el resto. Ya está cargado:
+  River Plate (27 jugadores). El flujo de carga cambió: en vez de investigar
+  cada plantel a mano, el usuario le pide a otra IA (con acceso a internet
+  real, algo que esta sesión de Claude Code no tiene disponible por la
+  política de red del entorno) que arme la lista con un prompt puntual, y la
+  pega acá para cargarla — mucho más rápido que sacarle captura a cada
+  plantel.
 - **Dorsales y colores reales**: se van completando junto con cada plantel.
   De River ya se cargaron los dorsales que confirmó el club para 2026 (los
   que no se pudieron confirmar con una fuente oficial quedan sin número, no

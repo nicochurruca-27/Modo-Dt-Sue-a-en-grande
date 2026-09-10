@@ -3,57 +3,63 @@
 // jugadores al azar (ver generateSquad en engine.js) — así se puede ir
 // completando de a poco sin romper nada.
 //
-// Edad, nacionalidad y año de vencimiento de contrato salen de fuentes como
-// Transfermarkt (capturas mandadas por el usuario). La valoración (rating,
-// 0-100) es una estimación nuestra en base al nivel del jugador, no un dato
-// oficial — no hay una base pública equivalente al "overall" de un videojuego
-// con licencia, así que esto es lo más parecido que se puede armar a mano.
+// Fuente de esta actualización: el usuario le pidió a ChatGPT la lista con
+// un prompt puntual (edad, nacionalidad, posición general y detallada,
+// dorsal, vencimiento de contrato, préstamos, valoración estimada) club por
+// club, y nos pasó el resultado. La valoración (rating, 0-100) sigue siendo
+// una estimación (no hay una base pública equivalente al "overall" de un
+// videojuego con licencia), pero ahora al menos sale de una investigación
+// puntual por jugador en vez de a mano nuestra.
 //
 // contractYears = temporadas que le quedan de contrato contando esta (por
 // ejemplo, un contrato que vence en 2026 = 1; en 2028 = 3).
 //
-// `number` = dorsal real. Se completó con los que confirmó River para la
-// temporada 2026 (fuente: cariverplate.com.ar / Infobae, ver README). Los
-// jugadores para los que no encontramos una fuente oficial confiable se
-// dejan sin número (no se inventa) hasta poder confirmarlo con una captura.
+// `number` = dorsal real, tal como lo confirmó la investigación.
 //
-// `role` (solo en mediocampistas): 'contención' | 'mixto' | 'ofensivo'.
-// Es nuestra lectura de cómo juega cada uno en la realidad (no hay una
-// fuente pública tipo "posición detallada" para esto, así que es una
-// estimación igual que el rating) — se usa para el aro de color de la
-// cancha en formaciones con línea de enganche, donde sí importa la
-// diferencia entre "el 5" y el enganche. Sin certeza sobre alguien joven
-// de reserva se le puso 'mixto' (no penaliza en ninguno de los dos casilleros).
+// `posDetail` = la posición real más específica (lateral derecho, defensor
+// central, mediocampista defensivo/mixto/ofensivo, delantero centro, etc.).
+// Todavía no se usa en la lógica del juego (que sigue trabajando con las 4
+// categorías generales POR/DEF/MED/DEL + `role` para el mediocampo), pero
+// queda guardada para el día que se quiera hacer más granular el sistema de
+// posiciones/aptitud.
+//
+// `role` (solo en mediocampistas): 'contención' | 'mixto' | 'ofensivo' — se
+// deriva directamente de `posDetail` para los MED. Se usa para el aro de
+// color de la cancha en formaciones con línea de enganche, donde sí importa
+// la diferencia entre "el 5" y el enganche.
+//
+// `loanFrom` / `loanUntil` (opcional): si el jugador está a préstamo, de qué
+// club es dueño y hasta cuándo. Es solo información — el juego todavía no
+// simula que el préstamo termine y el jugador vuelva a su club dueño.
 const REAL_ROSTERS = {
   river: [
-    { name: 'Santiago Beltrán', pos: 'POR', age: 21, nation: 'ARG', contractYears: 2, rating: 68, number: 41 },
-    { name: 'Ezequiel Centurión', pos: 'POR', age: 29, nation: 'ARG', contractYears: 1, rating: 73, number: 33 },
-    { name: 'Lautaro Rivero', pos: 'DEF', age: 22, nation: 'ARG', contractYears: 4, rating: 75, number: 13 },
-    { name: 'Lucas Martínez Quarta', pos: 'DEF', age: 30, nation: 'ARG', contractYears: 3, rating: 80, number: 28 },
-    { name: 'Tobías Ramírez', pos: 'DEF', age: 19, nation: 'ARG', contractYears: 4, rating: 68 },
-    { name: 'Juan Carlos Portillo', pos: 'DEF', age: 26, nation: 'ARG', contractYears: 3, rating: 70, number: 5 },
-    { name: 'Nicolás Otamendi', pos: 'DEF', age: 38, nation: 'ARG', contractYears: 2, rating: 78 },
-    { name: 'Facundo González', pos: 'DEF', age: 20, nation: 'ARG', contractYears: 3, rating: 67, number: 31 },
-    { name: 'Francisco Ortega', pos: 'DEF', age: 27, nation: 'ARG', contractYears: 4, rating: 71 },
-    { name: 'Matías Viña', pos: 'DEF', age: 28, nation: 'URU', contractYears: 1, rating: 75, number: 18 },
-    { name: 'Marcos Acuña', pos: 'DEF', age: 34, nation: 'ARG', contractYears: 2, rating: 80, number: 21 },
-    { name: 'Gonzalo Montiel', pos: 'DEF', age: 29, nation: 'ARG', contractYears: 3, rating: 81, number: 29 },
-    { name: 'Fabricio Bustos', pos: 'DEF', age: 30, nation: 'ARG', contractYears: 2, rating: 74, number: 16 },
-    { name: 'Giovanni González', pos: 'DEF', age: 31, nation: 'URU', contractYears: 2, rating: 72 },
-    { name: 'Aníbal Moreno', pos: 'MED', age: 27, nation: 'ARG', contractYears: 2, rating: 76, number: 6, role: 'contención' },
-    { name: 'Fausto Vera', pos: 'MED', age: 26, nation: 'ARG', contractYears: 1, rating: 74, number: 15, role: 'mixto' },
-    { name: 'Lucas Silva', pos: 'MED', age: 19, nation: 'ARG', contractYears: 3, rating: 65, role: 'mixto' },
-    { name: 'Tobías Andrada', pos: 'MED', age: 19, nation: 'ARG', contractYears: 5, rating: 64, role: 'mixto' },
-    { name: 'Mauro Arambarri', pos: 'MED', age: 30, nation: 'URU', contractYears: 3, rating: 77, role: 'contención' },
-    { name: 'Lautaro Pereyra', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 62, role: 'mixto' },
-    { name: 'Thiago Almada', pos: 'MED', age: 25, nation: 'ARG', contractYears: 4, rating: 84, role: 'ofensivo' },
-    { name: 'Tomás Galván', pos: 'MED', age: 26, nation: 'ARG', contractYears: 3, rating: 73, number: 26, role: 'mixto' },
-    { name: 'Juan Cruz Meza', pos: 'MED', age: 18, nation: 'ARG', contractYears: 3, rating: 63, role: 'mixto' },
-    { name: 'Ángel Correa', pos: 'MED', age: 31, nation: 'ARG', contractYears: 4, rating: 80, role: 'ofensivo' },
-    { name: 'Lucas Beltrán', pos: 'DEL', age: 25, nation: 'ARG', contractYears: 2, rating: 78 },
-    { name: 'Sebastián Driussi', pos: 'DEL', age: 30, nation: 'ARG', contractYears: 3, rating: 78, number: 9 },
-    { name: 'Rafael Santos Borré', pos: 'DEL', age: 30, nation: 'COL', contractYears: 4, rating: 79 },
-    { name: 'Agustín Ruberto', pos: 'DEL', age: 20, nation: 'ARG', contractYears: 2, rating: 66, number: 32 },
+    { name: 'Ezequiel Centurión', pos: 'POR', posDetail: 'arquero', age: 29, nation: 'ARG', contractYears: 1, rating: 68, number: 33 },
+    { name: 'Santiago Beltrán', pos: 'POR', posDetail: 'arquero', age: 21, nation: 'ARG', contractYears: 2, rating: 65, number: 41 },
+    { name: 'Jeremías Martinet', pos: 'POR', posDetail: 'arquero', age: 21, nation: 'ARG', contractYears: 3, rating: 62, number: 57 },
+    { name: 'Tobías Ramírez', pos: 'DEF', posDetail: 'defensor central', age: 19, nation: 'ARG', contractYears: 4, rating: 64, number: 2 },
+    { name: 'Francisco Ortega', pos: 'DEF', posDetail: 'lateral izquierdo', age: 27, nation: 'ARG', contractYears: 5, rating: 72, number: 3 },
+    { name: 'Lautaro Rivero', pos: 'DEF', posDetail: 'defensor central', age: 22, nation: 'ARG', contractYears: 4, rating: 73, number: 13 },
+    { name: 'Giovanni González', pos: 'DEF', posDetail: 'lateral derecho', age: 31, nation: 'URU', contractYears: 2, rating: 70, number: 20 },
+    { name: 'Marcos Acuña', pos: 'DEF', posDetail: 'lateral izquierdo', age: 34, nation: 'ARG', contractYears: 2, rating: 76, number: 21 },
+    { name: 'Lucas Martínez Quarta', pos: 'DEF', posDetail: 'defensor central', age: 30, nation: 'ARG', contractYears: 3, rating: 77, number: 28 },
+    { name: 'Gonzalo Montiel', pos: 'DEF', posDetail: 'lateral derecho', age: 29, nation: 'ARG', contractYears: 3, rating: 78, number: 29 },
+    { name: 'Nicolás Otamendi', pos: 'DEF', posDetail: 'defensor central', age: 38, nation: 'ARG', contractYears: 2, rating: 77, number: 30 },
+    { name: 'Facundo González', pos: 'DEF', posDetail: 'defensor central', age: 20, nation: 'ARG', contractYears: 3, rating: 62, number: 31 },
+    { name: 'Juan Carlos Portillo', pos: 'DEF', posDetail: 'defensor central', age: 26, nation: 'ARG', contractYears: 4, rating: 69, number: 5 },
+    { name: 'Aníbal Moreno', pos: 'MED', posDetail: 'mediocampista defensivo', age: 27, nation: 'ARG', contractYears: 4, rating: 78, number: 6, role: 'contención' },
+    { name: 'Mauro Arambarri', pos: 'MED', posDetail: 'mediocampista mixto', age: 30, nation: 'URU', contractYears: 3, rating: 77, number: 8, role: 'mixto' },
+    { name: 'Fausto Vera', pos: 'MED', posDetail: 'mediocampista defensivo', age: 26, nation: 'ARG', contractYears: 1, rating: 70, number: 15, role: 'contención', loanFrom: 'Atlético Mineiro', loanUntil: '31/12/2026' },
+    { name: 'Thiago Almada', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 25, nation: 'ARG', contractYears: 5, rating: 82, number: 23, role: 'ofensivo' },
+    { name: 'Juan Cruz Meza', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 18, nation: 'ARG', contractYears: 3, rating: 61, number: 24, role: 'ofensivo' },
+    { name: 'Tomás Galván', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 26, nation: 'ARG', contractYears: 3, rating: 66, number: 26, role: 'ofensivo' },
+    { name: 'Lucas Silva', pos: 'MED', posDetail: 'mediocampista defensivo', age: 19, nation: 'ARG', contractYears: 3, rating: 58, number: 44, role: 'contención' },
+    { name: 'Tobías Andrada', pos: 'MED', posDetail: 'mediocampista mixto', age: 19, nation: 'ARG', contractYears: 5, rating: 62, number: 50, role: 'mixto' },
+    { name: 'Lautaro Pereyra', pos: 'MED', posDetail: 'mediocampista mixto', age: 18, nation: 'ARG', contractYears: 3, rating: 57, number: 25, role: 'mixto' },
+    { name: 'Sebastián Driussi', pos: 'DEL', posDetail: 'delantero centro', age: 30, nation: 'ARG', contractYears: 3, rating: 77, number: 9 },
+    { name: 'Ángel Correa', pos: 'DEL', posDetail: 'delantero centro', age: 31, nation: 'ARG', contractYears: 4, rating: 82, number: 10 },
+    { name: 'Lucas Beltrán', pos: 'DEL', posDetail: 'delantero centro', age: 25, nation: 'ARG', contractYears: 2, rating: 74, number: 18, loanFrom: 'Fiorentina', loanUntil: '30/06/2027' },
+    { name: 'Rafael Santos Borré', pos: 'DEL', posDetail: 'delantero centro', age: 30, nation: 'COL', contractYears: 4, rating: 77, number: 19 },
+    { name: 'Agustín Ruberto', pos: 'DEL', posDetail: 'delantero centro', age: 20, nation: 'ARG', contractYears: 2, rating: 64, number: 32 },
   ],
 };
 

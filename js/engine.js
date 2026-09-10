@@ -121,6 +121,23 @@ const Engine = {
     return table[tier] || table[1];
   },
 
+  // Techo de crecimiento de un jugador: se calcula una sola vez, al armar el
+  // plantel, y no se vuelve a tocar en toda la carrera (representa su
+  // potencial, no algo que cambie solo). Los jóvenes tienen margen para
+  // mejorar unos puntos con el tiempo, pero nunca de forma exagerada — un
+  // jugador de 25 años con 82 de valoración no va a terminar llegando a los
+  // 90, como mucho a un par de puntos más. A partir de los 26 ya no hay
+  // margen adicional (ver developSquadAfterMatch, más abajo, para cómo se
+  // aplica este techo).
+  computePotential(rating, age) {
+    let margin = 0;
+    if (age <= 19) margin = 12;
+    else if (age <= 21) margin = 9;
+    else if (age <= 23) margin = 6;
+    else if (age <= 25) margin = 3;
+    return Math.min(99, rating + margin);
+  },
+
   // Si el club tiene un plantel real cargado en players.js, se usa ese en
   // vez de generar jugadores al azar. Ver REAL_ROSTERS en ese archivo.
   generateSquad(club) {
@@ -128,6 +145,8 @@ const Engine = {
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
         id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
+        posDetail: p.posDetail, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
+        potential: this.computePotential(p.rating, p.age),
       }));
     }
     const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
@@ -138,7 +157,7 @@ const Engine = {
       const nation = this.rollNation();
       const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
       const role = pos === 'MED' ? MED_ROLES[Math.floor(Math.random() * MED_ROLES.length)] : undefined;
-      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears, role };
+      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age) };
     });
   },
 
@@ -963,6 +982,10 @@ const Engine = {
       else if (p.age >= 32) { chance = 0.2; delta = -1; }
       else if (userWon) { chance = 0.08; delta = 1; }
       else if (userLost) { chance = 0.08; delta = -1; }
+      // Cualquier crecimiento (no la baja) respeta el techo de potencial del
+      // jugador, calculado una sola vez al armar el plantel — así un joven
+      // mejora de a poco pero nunca de forma exagerada.
+      if (delta > 0 && p.rating >= (p.potential ?? 99)) delta = 0;
       if (Math.random() < chance) p.rating = Math.max(35, Math.min(99, p.rating + delta));
     });
   },
