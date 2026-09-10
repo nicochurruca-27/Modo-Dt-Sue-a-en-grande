@@ -79,6 +79,17 @@ abrir seguís donde quedaste.
   un campeón real al final, lo ganes vos o no.
 - **Fechas FIFA**: pausan la liga; tus jugadores mejor valorados pueden ser
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
+- **Lesiones y suspensiones**: después de cada partido puede haber bajas —
+  una molestia muscular de un par de partidos, un desgarro, un esguince, una
+  lesión de rodilla larga, una expulsión o la quinta amarilla. Salen en el
+  parte médico junto con el resultado. Un jugador de baja no puede ser
+  titular: el once se recompone solo con el mejor reemplazo para ese puesto,
+  y si intentás ponerlo en la cancha el juego te avisa. El contador baja de a
+  un partido por cada partido del equipo.
+- **Once inicial**: se arma por puesto, no por puntaje. El casillero de
+  lateral izquierdo lo ocupa el lateral izquierdo del plantel aunque haya un
+  central con más puntaje, así que el equipo que aparece al empezar se parece
+  al que pondría el club de verdad.
 - **Resultados de los partidos**: la diferencia de nivel entre dos equipos
   define sobre todo quién gana, no por cuánto. Un grande de local contra un
   chico gana cerca del 70% de las veces, pero 2-0 o 1-0: las goleadas

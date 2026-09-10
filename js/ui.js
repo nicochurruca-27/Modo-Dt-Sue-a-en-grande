@@ -487,7 +487,15 @@ function handlePlayerTap(id) {
     render();
     return;
   }
-  Engine.swapPlayers(selectedPlayerId, id);
+  const ok = Engine.swapPlayers(selectedPlayerId, id);
+  if (!ok) {
+    // El único cambio que el motor rechaza es meter a la cancha a alguien
+    // lesionado o suspendido.
+    const lesionado = [selectedPlayerId, id]
+      .map((pid) => s.squad.find((p) => p.id === pid))
+      .find((p) => p && !Engine.isAvailable(p));
+    if (lesionado) alert(`${lesionado.name} no está disponible: ${Engine.outLabel(lesionado)}.`);
+  }
   selectedPlayerId = null;
   render();
 }
@@ -524,9 +532,11 @@ function renderSquadPanel() {
         ${bench.map((p) => {
           const abbrev = posDetailAbbrev(p.posDetail);
           const detail = abbrev ? ` (${abbrev})` : p.role ? ` (${p.role})` : '';
+          const baja = Engine.outLabel(p);
           return `
-          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}">
+          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''} ${baja ? 'unavailable' : ''}" data-player="${p.id}">
             <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${detail} (${p.rating})</span>
+            ${baja ? `<span class="out-tag">${baja}</span>` : ''}
           </div>
         `;
         }).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
@@ -965,6 +975,12 @@ function renderMatchResult() {
       ${penaltyText ? `<p class="muted">${penaltyText}</p>` : ''}
       ${shootoutText ? `<p class="shootout-line">${shootoutText}</p>` : ''}
       ${s.lastDecisionNote ? `<p class="muted">${s.lastDecisionNote}</p>` : ''}
+      ${(s.lastAvailabilityNotes || []).length ? `
+        <div class="injury-notes">
+          <h3>Parte médico</h3>
+          ${s.lastAvailabilityNotes.map((n) => `<p>${n}</p>`).join('')}
+        </div>
+      ` : ''}
       <button class="option-btn" id="continue-btn">Continuar</button>
     </div>
   `;

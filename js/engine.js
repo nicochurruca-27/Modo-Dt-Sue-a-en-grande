@@ -234,30 +234,67 @@ const Engine = {
     return slot === 'OFF' ? ['MED', 'DEL'] : [slot];
   },
 
-  // Arma el once automáticamente: para cada casillero busca el mejor jugador
-  // libre entre sus posiciones candidatas (ver preferredPositionsForSlot); si
-  // no alcanzan (plantel chico), completa los casilleros que queden vacíos
-  // con lo mejor que sobre. Se usa al arrancar la carrera y al cambiar de
-  // formación (ahí sí se resetean las elecciones manuales, porque cambiar de
-  // formación es una acción explícita del usuario).
+  // ¿Este jugador es de ese lado de la cancha? Un lateral izquierdo para el
+  // casillero de la izquierda, un central para los del medio. Solo aplica a
+  // DEF y DEL, que son las líneas donde el lado importa; si no tenemos el
+  // dato de posición detallada, no se lo descarta.
+  matchesSlotSide(player, slot, slotIndex, slotCount) {
+    if (slot !== 'DEF' && slot !== 'DEL') return true;
+    if (slotIndex === undefined || slotCount === undefined) return true;
+    const side = this.WIDTH_BY_POS_DETAIL[player.posDetail];
+    if (!side) return true;
+    return side === this.slotWidthCategory(slotIndex, slotCount);
+  },
+
+  // El mejor de una lista para un casillero puntual. Primero se queda con
+  // los que son de ese lado de la cancha (si no, un lateral derecho bueno se
+  // queda con el puesto de lateral izquierdo y el izquierdo natural termina
+  // en el banco), y entre esos elige por rendimiento REAL en el casillero
+  // (effectiveRating ya tiene en cuenta la posición detallada y el lado) en
+  // vez del rating pelado.
+  bestPlayerForSlot(candidatos, slot, slotIndex, slotCount, formation) {
+    if (!candidatos.length) return null;
+    const delLadoJusto = candidatos.filter((p) => this.matchesSlotSide(p, slot, slotIndex, slotCount));
+    const lista = delLadoJusto.length ? delLadoJusto : candidatos;
+    return lista.reduce((mejor, p) => (
+      this.effectiveRating(p, slot, formation, slotIndex, slotCount) > this.effectiveRating(mejor, slot, formation, slotIndex, slotCount) ? p : mejor
+    ));
+  },
+
+  // Arma el once automáticamente: para cada casillero busca al mejor jugador
+  // libre entre sus posiciones candidatas (ver preferredPositionsForSlot y
+  // bestPlayerForSlot). El once que sale se parece al equipo que pondría el
+  // club de verdad, en vez de ser los 11 de mejor puntaje amontonados.
+  //
+  // Se usa al arrancar la carrera y al cambiar de formación (ahí sí se
+  // resetean las elecciones manuales, porque cambiar de formación es una
+  // acción explícita del usuario).
   recomputeStartingSlots() {
     const s = this.state;
     const formation = this.currentFormation();
+    const slotCounts = { POR: 1, DEF: formation.def, MED: formation.med, OFF: formation.off || 0, DEL: formation.del };
+    const seenPerSlot = { POR: 0, DEF: 0, MED: 0, OFF: 0, DEL: 0 };
     const usedIds = new Set();
-    const bestFor = (slot) => {
+    const bestFor = (slot, slotIndex) => {
+      const slotCount = slotCounts[slot];
       for (const pos of this.preferredPositionsForSlot(slot)) {
-        const p = [...s.squad].filter((pl) => !usedIds.has(pl.id) && pl.pos === pos).sort((a, b) => b.rating - a.rating)[0];
-        if (p) return p;
+        const candidatos = s.squad.filter((pl) => !usedIds.has(pl.id) && pl.pos === pos && this.isAvailable(pl));
+        const pick = this.bestPlayerForSlot(candidatos, slot, slotIndex, slotCount, formation);
+        if (pick) return pick;
       }
       return null;
     };
     let slots = this.slotOrderForFormation(formation).map((slot) => {
-      const p = bestFor(slot);
+      const p = bestFor(slot, seenPerSlot[slot]++);
       if (!p) return { slot, playerId: null };
       usedIds.add(p.id);
       return { slot, playerId: p.id };
     });
-    const leftover = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating);
+    // Si el plantel no alcanza (muchos lesionados, plantel chico), se rellena
+    // con lo que sobre: primero los disponibles.
+    const leftover = [...s.squad]
+      .filter((p) => !usedIds.has(p.id))
+      .sort((a, b) => (this.isAvailable(b) - this.isAvailable(a)) || b.rating - a.rating);
     slots = slots.map((entry) => {
       if (entry.playerId) return entry;
       const p = leftover.shift();
@@ -273,20 +310,31 @@ const Engine = {
   repairStartingSlots() {
     const s = this.state;
     if (!s.startingSlots) { this.recomputeStartingSlots(); return; }
-    const squadIds = new Set(s.squad.map((p) => p.id));
+    const byId = Object.fromEntries(s.squad.map((p) => [p.id, p]));
     const usedIds = new Set();
+    // Se vacía el casillero de cualquiera que ya no esté en el plantel o que
+    // esté lesionado/suspendido: esos no pueden ser titulares.
     s.startingSlots = s.startingSlots.map((entry) => {
-      if (entry.playerId && squadIds.has(entry.playerId)) { usedIds.add(entry.playerId); return entry; }
+      const p = entry.playerId ? byId[entry.playerId] : null;
+      if (p && this.isAvailable(p)) { usedIds.add(p.id); return entry; }
       return { slot: entry.slot, playerId: null };
     });
+    const formation = this.currentFormation();
+    const slotCounts = { POR: 1, DEF: formation.def, MED: formation.med, OFF: formation.off || 0, DEL: formation.del };
+    const seenPerSlot = { POR: 0, DEF: 0, MED: 0, OFF: 0, DEL: 0 };
     s.startingSlots = s.startingSlots.map((entry) => {
+      const slotIndex = seenPerSlot[entry.slot]++;
       if (entry.playerId) return entry;
+      const slotCount = slotCounts[entry.slot];
+      const mejorDe = (lista) => this.bestPlayerForSlot(lista, entry.slot, slotIndex, slotCount, formation);
       let pick = null;
       for (const pos of this.preferredPositionsForSlot(entry.slot)) {
-        pick = [...s.squad].filter((p) => !usedIds.has(p.id) && p.pos === pos).sort((a, b) => b.rating - a.rating)[0];
+        pick = mejorDe(s.squad.filter((p) => !usedIds.has(p.id) && p.pos === pos && this.isAvailable(p)));
         if (pick) break;
       }
-      if (!pick) pick = [...s.squad].filter((p) => !usedIds.has(p.id)).sort((a, b) => b.rating - a.rating)[0];
+      // Último recurso, con el plantel diezmado: cualquiera que quede libre.
+      if (!pick) pick = mejorDe(s.squad.filter((p) => !usedIds.has(p.id) && this.isAvailable(p)));
+      if (!pick) pick = mejorDe(s.squad.filter((p) => !usedIds.has(p.id)));
       if (!pick) return entry;
       usedIds.add(pick.id);
       return { slot: entry.slot, playerId: pick.id };
@@ -492,7 +540,11 @@ const Engine = {
     const s = this.state;
     if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
     const startingSet = new Set(s.startingSlots.map((e) => e.playerId).filter(Boolean));
-    return [...s.squad].filter((p) => !startingSet.has(p.id)).sort((a, b) => b.rating - a.rating);
+    // Los lesionados y suspendidos van al final: arriba quedan los que
+    // realmente podés poner en la cancha.
+    return [...s.squad]
+      .filter((p) => !startingSet.has(p.id))
+      .sort((a, b) => (this.isAvailable(b) - this.isAvailable(a)) || b.rating - a.rating);
   },
 
   // Intercambia dos jugadores cualesquiera: dos titulares (se cambian de
@@ -505,6 +557,10 @@ const Engine = {
   swapPlayers(idA, idB) {
     const s = this.state;
     if (!s.startingSlots || idA === idB) return false;
+    // Un lesionado o suspendido no puede entrar a la cancha: el cambio se
+    // rechaza y la UI avisa por qué.
+    const entra = [idA, idB].map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
+    if (entra.some((p) => !this.isAvailable(p) && !s.startingSlots.some((e) => e.playerId === p.id))) return false;
     const slotA = s.startingSlots.find((e) => e.playerId === idA);
     const slotB = s.startingSlots.find((e) => e.playerId === idB);
     if (slotA && slotB) {
@@ -1354,8 +1410,84 @@ const Engine = {
         awayScore: userIsHomeSide === userWinsShootout ? loserGoals : winnerGoals,
       };
     }
+    // Las novedades físicas salen junto con el resultado, que es cuando el
+    // usuario se entera de todo lo que pasó en el partido.
+    s.lastAvailabilityNotes = this.updateAvailability();
     s.screen = 'match-result';
     this.save();
+  },
+
+  // ---------- Bajas: lesiones y suspensiones ----------
+  //
+  // Un jugador con `out` no puede ser titular hasta que se le acaben los
+  // partidos de baja. El contador baja de a uno por cada partido que juega el
+  // equipo, así que una baja de 3 partidos son 3 partidos de verdad, no días
+  // del calendario.
+
+  isAvailable(player) {
+    return !player.out || player.out.matches <= 0;
+  },
+
+  outLabel(player) {
+    if (this.isAvailable(player)) return null;
+    const p = player.out.matches === 1 ? 'partido' : 'partidos';
+    return `${player.out.detail} — ${player.out.matches} ${p}`;
+  },
+
+  // Después de cada partido: se descuentan las bajas en curso y se sortea si
+  // alguno de los que jugó se lesiona o se va expulsado. Devuelve los avisos
+  // para mostrarle al usuario en la pantalla del resultado.
+  updateAvailability() {
+    const s = this.state;
+    const avisos = [];
+
+    s.squad.forEach((p) => {
+      if (p.out && p.out.matches > 0) {
+        p.out.matches--;
+        if (p.out.matches === 0) {
+          avisos.push(`${p.name} se recuperó y ya está disponible.`);
+          p.out = null;
+        }
+      }
+    });
+
+    const titulares = this.getStartingXI().starters
+      .map((entry) => s.squad.find((p) => p.id === entry.id))
+      .filter((p) => p && this.isAvailable(p));
+    if (!titulares.length) return avisos;
+
+    const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
+
+    // Lesiones: alrededor de un jugador cada cuatro partidos. Las molestias
+    // leves son mucho más comunes que las lesiones largas.
+    if (Math.random() < 0.26) {
+      const p = sortear(titulares);
+      const tipo = sortear([
+        ...Array(5).fill({ detail: 'Molestia muscular', min: 1, max: 2 }),
+        ...Array(3).fill({ detail: 'Desgarro', min: 2, max: 4 }),
+        ...Array(2).fill({ detail: 'Esguince de tobillo', min: 3, max: 5 }),
+        { detail: 'Lesión de rodilla', min: 5, max: 9 },
+      ]);
+      const matches = tipo.min + Math.floor(Math.random() * (tipo.max - tipo.min + 1));
+      p.out = { reason: 'lesión', detail: tipo.detail, matches };
+      avisos.push(`${p.name} se lesionó: ${tipo.detail.toLowerCase()}. Se pierde ${matches} ${matches === 1 ? 'partido' : 'partidos'}.`);
+    }
+
+    // Suspensiones: una expulsión cada tantos partidos, o la quinta amarilla.
+    if (Math.random() < 0.12) {
+      const disponibles = titulares.filter((p) => this.isAvailable(p));
+      if (disponibles.length) {
+        const p = sortear(disponibles);
+        const roja = Math.random() < 0.45;
+        const matches = roja ? 1 + Math.floor(Math.random() * 2) : 1;
+        p.out = { reason: 'suspensión', detail: roja ? 'Expulsado' : 'Acumulación de amarillas', matches };
+        avisos.push(`${p.name} ${roja ? 'se fue expulsado' : 'llegó a la quinta amarilla'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.`);
+      }
+    }
+
+    // Si alguno de los que quedó afuera era titular, el hueco se cubre solo.
+    this.repairStartingSlots();
+    return avisos;
   },
 
   developSquadAfterMatch(userWon, userLost) {

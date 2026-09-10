@@ -320,6 +320,35 @@ h1, h2, h3 {
 .table tr.zone-suda td:first-child { border-left-color: #22d3ee; }
 .table tr.zone-desc td:first-child { border-left-color: #ef4444; }
 
+/* Lesionados y suspendidos: no se pueden poner en la cancha, así que la
+   fila del banco se ve apagada y con el motivo al costado. */
+.pick-row.unavailable {
+  opacity: 0.55;
+}
+
+.out-tag {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid #b91c1c;
+  background: #450a0a;
+  color: #fca5a5;
+  font-size: 0.75em;
+  white-space: nowrap;
+}
+
+.injury-notes {
+  border: 1px solid #b91c1c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  background: #1f1113;
+}
+
+.injury-notes h3 { margin-top: 0; }
+.injury-notes p { margin: 6px 0; }
+
 /* Fin de temporada: arriba el resumen de lo que pasó, y el detalle en
    secciones que se abren solo si querés verlas — si no, la pantalla queda
    larguísima para scrollear en el celular. */
