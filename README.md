@@ -120,11 +120,13 @@ abrir seguís donde quedaste.
   En la realidad el segundo descenso sale de la tabla de promedios de las
   últimas 3 temporadas: acá se usan los dos últimos de la Anual a propósito,
   para no arrastrar una segunda tabla con el historial de cada club.
-- **Mercado de pases**: en Primera, una ventana entre el Apertura y el
-  Clausura; en la Nacional, una ventana a mitad de su único torneo. Justo
-  antes de abrir el mercado, si algún jugador de tu plantel tiene el
-  contrato por vencer a fin de esa temporada, te avisa para que decidas
-  renovarlo (con costo) o dejarlo ir a fin de año. Un refuerzo suma al
+- **Mercado de pases**: hay dos ventanas por año. Una al terminar el
+  Apertura, y otra de pretemporada al terminar el Clausura, cuando ya sabés
+  en qué categoría vas a jugar. (La Nacional tiene la de pretemporada y otra
+  a mitad de su único torneo.) Justo antes de abrir el mercado, si algún
+  jugador de tu plantel tiene el contrato por vencer a fin de esa temporada,
+  te avisa para que decidas renovarlo (con costo) o dejarlo ir. Al arrancar
+  una carrera no hay mercado: empezás con el plantel del club tal cual. Un refuerzo suma al
   plantel (máximo 30 jugadores; con el plantel lleno hay que vender primero,
   y no se puede bajar de 14).
 - **Cuánto vale un jugador**: el precio duplica cada 6 puntos de valoración,

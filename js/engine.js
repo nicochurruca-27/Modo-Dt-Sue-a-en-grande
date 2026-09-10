@@ -995,7 +995,7 @@ const Engine = {
     this.state.budget = budget;
     this.state.squad = this.generateSquad(club);
     this.recomputeStartingSlots();
-    this.startNewSeason();
+    this.startNewSeason(true);
     // La presentación en sociedad solo aparece al arrancar la carrera (acá,
     // después de armar la primera temporada): las temporadas siguientes
     // arrancan directo por startNewSeason() sin pasar por acá.
@@ -1045,8 +1045,13 @@ const Engine = {
   },
 
   // Arranca un año nuevo completo: simula instantáneamente la división en la
-  // que el usuario no juega, y arranca la primera edición/etapa de la propia.
-  startNewSeason() {
+  // que el usuario no juega y abre el mercado de pases de pretemporada, que
+  // es el que se juega cuando terminó el Clausura y ya sabés en qué
+  // categoría vas a estar. Recién al cerrarlo arranca la primera etapa.
+  //
+  // `careerStart` es el arranque de la carrera: ahí no hay mercado (empezás
+  // con el plantel del club tal cual) y la pantalla la maneja newGame.
+  startNewSeason(careerStart = false) {
     const s = this.state;
     const club = this.getClub(s.clubId);
     const otherDivision = club.division === 'D1' ? 'D2' : 'D1';
@@ -1074,6 +1079,12 @@ const Engine = {
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
     this.setupCopaBracket();
 
+    if (careerStart) this.startFirstEdition();
+    else this.startTransferWindow('pre-season');
+  },
+
+  startFirstEdition() {
+    const club = this.getClub(this.state.clubId);
     this.startEdition(club.division === 'D1' ? 'apertura' : null);
   },
 
@@ -1797,12 +1808,14 @@ const Engine = {
 
   // ---------- Ventana de pases ----------
 
-  // A mitad de temporada (ventana entre Apertura y Clausura) es cuando en la
-  // vida real empiezan a preocupar los contratos que vencen a fin de año:
-  // por eso el aviso de renovación aparece acá, antes de abrir el mercado.
-  startTransferWindow() {
+  // Hay dos ventanas de pases por año: una al terminar el Apertura y otra de
+  // pretemporada, al terminar el Clausura (ahí ya sabés en qué categoría vas
+  // a jugar). En las dos, antes de abrir el mercado, aparece el aviso por los
+  // contratos que vencen a fin de esa temporada — que es cuando en la vida
+  // real empiezan a preocupar.
+  startTransferWindow(reason = 'between-editions') {
     const s = this.state;
-    s.season.transferReason = 'between-editions';
+    s.season.transferReason = reason;
     s.contractQueue = s.squad.filter((p) => p.contractYears <= 1).map((p) => p.id);
     this.showNextContractDecision();
   },
@@ -1920,6 +1933,7 @@ const Engine = {
   continueFromTransfer() {
     const s = this.state;
     if (s.season.transferReason === 'between-editions') this.startEdition('clausura');
+    else if (s.season.transferReason === 'pre-season') this.startFirstEdition();
     else this.enterEditionRound();
     this.save();
   },

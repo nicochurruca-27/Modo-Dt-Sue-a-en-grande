@@ -1015,9 +1015,10 @@ function renderContractRenewal() {
 
 function renderTransfer() {
   const s = Engine.state;
-  const windowLabel = s.season.transferReason === 'between-editions'
-    ? 'Mercado de pases — ventana entre el Apertura y el Clausura'
-    : 'Mercado de pases — ventana de mitad de temporada';
+  const windowLabel = {
+    'between-editions': 'Mercado de pases — entre el Apertura y el Clausura',
+    'pre-season': 'Mercado de pases — pretemporada',
+  }[s.season.transferReason] || 'Mercado de pases — mitad de temporada';
   app.innerHTML = `
     ${header()}
     <div class="card">
