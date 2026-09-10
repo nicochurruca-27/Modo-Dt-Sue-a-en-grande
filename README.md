@@ -160,6 +160,19 @@ abrir seguís donde quedaste.
   `posDetail` cargado), así que un jugador sin ese dato sigue funcionando
   exactamente como antes.
 
+  Algunos jugadores rinden bien en más de una posición real (`altPosDetail`
+  en `js/players.js`, ej. Thiago Almada: mediocampista ofensivo o extremo
+  izquierdo; Ángel Correa: delantero centro o mediocampista ofensivo) — si
+  lo ponés en un casillero que corresponde a una de esas posiciones
+  alternativas, el ajuste mejora un escalón (rojo→amarillo, amarillo→verde)
+  respecto de lo que daría su posición principal sola
+  (`Engine.applyAltPositionBonus`). Es un dato que se investiga puntualmente
+  jugador por jugador, no algo que se cargue para todo un plantel de una.
+
+  La valoración de cada titular y su abreviatura de posición (LD, DFC, MCO,
+  etc.) se muestran debajo del nombre en la cancha (y en la lista de
+  suplentes) — sin sacar nada de lo que ya había.
+
   La cancha en sí es un único `<svg>` armado a mano en
   `renderSquadPanel`/`buildPitchSvg` (`js/ui.js`): la posición de cada
   jugador se calcula con aritmética simple, no con flexbox — hubo varias

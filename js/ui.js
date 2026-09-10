@@ -173,7 +173,8 @@ function clubKit(club) {
 const PITCH_JERSEY_W = 40;
 const PITCH_JERSEY_H = 40;
 const PITCH_LABEL_H = 16; // alto de la placa con el nombre, debajo del dorsal
-const PITCH_ROW_H = 64; // separación vertical entre el arranque de una fila y la siguiente
+const PITCH_LABEL2_H = 13; // alto de la placa chica con posición + valoración, debajo del nombre
+const PITCH_ROW_H = 80; // separación vertical entre el arranque de una fila y la siguiente
 const PITCH_COL_GAP = 12;
 const PITCH_MARGIN_X = 26;
 const PITCH_MARGIN_Y = 22;
@@ -232,10 +233,17 @@ function playerMarkerSvg(p, club, x, y, selected) {
   const w = PITCH_JERSEY_W;
   const h = PITCH_JERSEY_H;
   const scale = w / 44;
+  // Placa chica debajo del nombre: posición detallada (si la tenemos
+  // investigada) + valoración, ej. "LD · 78". Sin posDetail se muestra
+  // solo la valoración, para que siempre se vea ese dato en la cancha
+  // aunque el jugador tenga dorsal (antes solo se veía la valoración si
+  // NO tenía dorsal, porque compartía el mismo lugar que el número).
+  const infoLine = posAbbrev ? `${posAbbrev} · ${p.rating}` : `${p.rating}`;
+  const label2Y = h + 3 + PITCH_LABEL_H + 2;
   return `
     <g class="player-marker" data-player="${p.id}" transform="translate(${x}, ${y})">
       ${title}
-      ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + 16}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
+      ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + 18}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
       ${fitStroke ? `<rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="none" stroke="${fitStroke}" stroke-width="2.5" />` : ''}
       <g transform="scale(${scale})">
         <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
@@ -244,6 +252,8 @@ function playerMarkerSvg(p, club, x, y, selected) {
       </g>
       <rect x="-3" y="${h + 3}" width="${w + 6}" height="${PITCH_LABEL_H}" rx="3" fill="rgba(0,0,0,0.6)" />
       <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>
+      <rect x="-3" y="${label2Y}" width="${w + 6}" height="${PITCH_LABEL2_H}" rx="3" fill="rgba(0,0,0,0.4)" />
+      <text x="${w / 2}" y="${label2Y + PITCH_LABEL2_H - 3.5}" text-anchor="middle" font-size="9" font-weight="600" fill="#cbd5e1">${infoLine}</text>
     </g>
   `;
 }
@@ -261,7 +271,7 @@ function buildPitchSvg(xi, club) {
   ];
   const maxCols = Math.max(...rows.map((r) => r.players.length), 1);
   const svgWidth = 2 * PITCH_MARGIN_X + maxCols * PITCH_JERSEY_W + Math.max(0, maxCols - 1) * PITCH_COL_GAP;
-  const rowContentH = PITCH_JERSEY_H + PITCH_LABEL_H + 6;
+  const rowContentH = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + 8;
   const svgHeight = 2 * PITCH_MARGIN_Y + Math.max(0, rows.length - 1) * PITCH_ROW_H + rowContentH;
   const fieldInnerWidth = svgWidth - 2 * PITCH_MARGIN_X;
 

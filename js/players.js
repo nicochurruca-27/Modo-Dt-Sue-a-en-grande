@@ -18,10 +18,19 @@
 //
 // `posDetail` = la posición real más específica (lateral derecho, defensor
 // central, mediocampista defensivo/mixto/ofensivo, delantero centro, etc.).
-// Todavía no se usa en la lógica del juego (que sigue trabajando con las 4
-// categorías generales POR/DEF/MED/DEL + `role` para el mediocampo), pero
-// queda guardada para el día que se quiera hacer más granular el sistema de
-// posiciones/aptitud.
+// Se usa en positionFit (engine.js) para afinar el color en DEF/DEL según
+// de qué lado de la cancha quedó el casillero (ver WIDTH_BY_POS_DETAIL /
+// slotWidthCategory) y se muestra abreviada (LD, DFC, MCO, etc.) en la
+// cancha y la lista de suplentes (ver POS_DETAIL_ABBREV en ui.js).
+//
+// `altPosDetail` (opcional, array): otras posiciones donde el jugador
+// también rinde bien en la realidad (ej. Thiago Almada: mediocampista
+// ofensivo o extremo izquierdo). Si lo ponés en un casillero que
+// corresponde a una de sus posiciones alternativas, el ajuste mejora un
+// escalón (rojo→amarillo, amarillo→verde) respecto de lo que daría su
+// posición principal sola — ver Engine.applyAltPositionBonus. Por ahora
+// solo se investigó puntualmente para algunos jugadores; no es necesario
+// cargarlo para todos.
 //
 // `role` (solo en mediocampistas): 'contención' | 'mixto' | 'ofensivo' — se
 // deriva directamente de `posDetail` para los MED. Se usa para el aro de
@@ -49,14 +58,14 @@ const REAL_ROSTERS = {
     { name: 'Aníbal Moreno', pos: 'MED', posDetail: 'mediocampista defensivo', age: 27, nation: 'ARG', contractYears: 4, rating: 78, number: 6, role: 'contención' },
     { name: 'Mauro Arambarri', pos: 'MED', posDetail: 'mediocampista mixto', age: 30, nation: 'URU', contractYears: 3, rating: 77, number: 8, role: 'mixto' },
     { name: 'Fausto Vera', pos: 'MED', posDetail: 'mediocampista defensivo', age: 26, nation: 'ARG', contractYears: 1, rating: 70, number: 15, role: 'contención', loanFrom: 'Atlético Mineiro', loanUntil: '31/12/2026' },
-    { name: 'Thiago Almada', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 25, nation: 'ARG', contractYears: 5, rating: 82, number: 23, role: 'ofensivo' },
+    { name: 'Thiago Almada', pos: 'MED', posDetail: 'mediocampista ofensivo', altPosDetail: ['extremo izquierdo'], age: 25, nation: 'ARG', contractYears: 5, rating: 82, number: 23, role: 'ofensivo' },
     { name: 'Juan Cruz Meza', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 18, nation: 'ARG', contractYears: 3, rating: 61, number: 24, role: 'ofensivo' },
     { name: 'Tomás Galván', pos: 'MED', posDetail: 'mediocampista ofensivo', age: 26, nation: 'ARG', contractYears: 3, rating: 66, number: 26, role: 'ofensivo' },
     { name: 'Lucas Silva', pos: 'MED', posDetail: 'mediocampista defensivo', age: 19, nation: 'ARG', contractYears: 3, rating: 58, number: 44, role: 'contención' },
     { name: 'Tobías Andrada', pos: 'MED', posDetail: 'mediocampista mixto', age: 19, nation: 'ARG', contractYears: 5, rating: 62, number: 50, role: 'mixto' },
     { name: 'Lautaro Pereyra', pos: 'MED', posDetail: 'mediocampista mixto', age: 18, nation: 'ARG', contractYears: 3, rating: 57, number: 25, role: 'mixto' },
     { name: 'Sebastián Driussi', pos: 'DEL', posDetail: 'delantero centro', age: 30, nation: 'ARG', contractYears: 3, rating: 77, number: 9 },
-    { name: 'Ángel Correa', pos: 'DEL', posDetail: 'delantero centro', age: 31, nation: 'ARG', contractYears: 4, rating: 82, number: 10 },
+    { name: 'Ángel Correa', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['mediocampista ofensivo'], age: 31, nation: 'ARG', contractYears: 4, rating: 82, number: 10 },
     { name: 'Lucas Beltrán', pos: 'DEL', posDetail: 'delantero centro', age: 25, nation: 'ARG', contractYears: 2, rating: 74, number: 18, loanFrom: 'Fiorentina', loanUntil: '30/06/2027' },
     { name: 'Rafael Santos Borré', pos: 'DEL', posDetail: 'delantero centro', age: 30, nation: 'COL', contractYears: 4, rating: 77, number: 19 },
     { name: 'Agustín Ruberto', pos: 'DEL', posDetail: 'delantero centro', age: 20, nation: 'ARG', contractYears: 2, rating: 64, number: 32 },

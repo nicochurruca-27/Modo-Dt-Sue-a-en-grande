@@ -145,7 +145,7 @@ const Engine = {
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
         id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
-        posDetail: p.posDetail, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
+        posDetail: p.posDetail, altPosDetail: p.altPosDetail, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
         potential: this.computePotential(p.rating, p.age),
       }));
     }
@@ -323,6 +323,43 @@ const Engine = {
     return 'center';
   },
 
+  // A qué casillero general (POR/DEF/MED/DEL) corresponde una posición
+  // detallada — se usa para saber si una posición ALTERNATIVA de un
+  // jugador (altPosDetail, ver más abajo) sirve para tapar un casillero.
+  BUCKET_BY_POS_DETAIL: {
+    arquero: 'POR',
+    'lateral izquierdo': 'DEF',
+    'lateral derecho': 'DEF',
+    'defensor central': 'DEF',
+    'mediocampista defensivo': 'MED',
+    'mediocampista mixto': 'MED',
+    'mediocampista ofensivo': 'MED',
+    'volante por izquierda': 'MED',
+    'volante por derecha': 'MED',
+    'delantero centro': 'DEL',
+    'extremo izquierdo': 'DEL',
+    'extremo derecho': 'DEL',
+  },
+
+  // Algunos jugadores rinden bien en más de una posición real (ej. Thiago
+  // Almada: mediocampista ofensivo o extremo izquierdo; Ángel Correa:
+  // delantero centro o mediocampista ofensivo) — `altPosDetail` en
+  // players.js guarda esas posiciones alternativas. Si el casillero donde
+  // lo pusiste corresponde a una de ellas, el ajuste sube un escalón
+  // (rojo→amarillo, amarillo→verde) respecto de lo que daría su posición
+  // principal sola. No se afina por lado de la cancha (sería demasiado
+  // detalle para un dato que today es más una lista corta que investigamos
+  // a mano) — es solo "¿le sirve este casillero en general, sí o no?".
+  applyAltPositionBonus(player, slot, fit) {
+    if (!player.altPosDetail || !player.altPosDetail.length || fit.color === 'green') return fit;
+    const altBuckets = player.altPosDetail.map((pd) => this.BUCKET_BY_POS_DETAIL[pd]).filter(Boolean);
+    const slotBuckets = slot === 'OFF' ? ['MED', 'DEL'] : [slot];
+    const matches = altBuckets.some((b) => slotBuckets.includes(b));
+    if (!matches) return fit;
+    if (fit.color === 'red') return { color: 'yellow', mult: Math.max(fit.mult, 0.85) };
+    return { color: 'green', mult: 1 }; // era amarillo
+  },
+
   // slotIndex/slotCount (posición del casillero dentro de su línea, ver
   // getStartingXI) afinan el color cuando el jugador ya está en su posición
   // general correcta (DEF o DEL) pero del lado equivocado de la cancha —
@@ -334,11 +371,11 @@ const Engine = {
     const playerPos = player.pos;
     if (playerPos === 'MED' && formation && formation.off && player.role) {
       if (slot === 'OFF') {
-        if (player.role === 'contención') return { color: 'red', mult: 0.55 };
+        if (player.role === 'contención') return this.applyAltPositionBonus(player, slot, { color: 'red', mult: 0.55 });
         return { color: 'green', mult: 1 }; // ofensivo o mixto: es lo suyo
       }
       if (slot === 'MED') {
-        if (player.role === 'ofensivo') return { color: 'yellow', mult: 0.85 };
+        if (player.role === 'ofensivo') return this.applyAltPositionBonus(player, slot, { color: 'yellow', mult: 0.85 });
         return { color: 'green', mult: 1 }; // contención o mixto: es lo suyo
       }
     }
@@ -363,7 +400,7 @@ const Engine = {
       'DEL-POR': { color: 'red', mult: 0.35 },
     };
     const key = [playerPos, slot].sort().join('-');
-    return table[key] || { color: 'red', mult: 0.5 };
+    return this.applyAltPositionBonus(player, slot, table[key] || { color: 'red', mult: 0.5 });
   },
 
   effectiveRating(player, slot, formation, slotIndex, slotCount) {
