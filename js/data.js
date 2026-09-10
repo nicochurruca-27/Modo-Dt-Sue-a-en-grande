@@ -11,7 +11,9 @@ const CALENDAR_START_DAY = 1;
 
 // division: 'D1' (Primera División) | 'D2' (Primera Nacional)
 // zone: 'A' | 'B' — D1 se juega en 2 zonas de 15 equipos, D2 en 2 zonas de 18.
-// Sin escudos por ahora: el juego muestra solo el nombre de cada club.
+// Los escudos reales están en escudos.js (por ahora solo los 30 de Primera
+// División). Un club sin escudo cargado se dibuja con uno genérico con sus
+// iniciales — ver clubCrest en ui.js.
 //
 // reputation (1-5): nivel deportivo del plantel (de dónde sale la fuerza en
 // cancha). budgetTier (1-5, opcional): situación económica real del club,

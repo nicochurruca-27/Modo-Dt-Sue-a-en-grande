@@ -166,6 +166,53 @@ h1, h2, h3 {
   background: #16321f;
 }
 
+/* Escudos. Siempre cuadrados y con object-fit: contain, así entra completo
+   cualquier forma de escudo (escudo, círculo, banderín) sin deformarse. */
+.club-crest {
+  object-fit: contain;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+/* Clubes sin escudo cargado todavía: círculo con las iniciales, para que la
+   pantalla se vea pareja igual (ver clubCrest en ui.js). */
+.club-crest-generic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.topbar-club {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-club {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match-rival {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.presentation-crest {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 4px;
+}
+
 .text-input {
   width: 100%;
   padding: 10px 12px;

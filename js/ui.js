@@ -133,7 +133,7 @@ function renderTablePanel() {
         <table class="table compact">
           <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
           <tbody>
-            ${table.map((r, i) => `<tr class="${r.id === s.clubId ? 'me' : ''}"><td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.pts}</td></tr>`).join('')}
+            ${table.map((r, i) => `<tr class="${r.id === s.clubId ? 'me' : ''}"><td>${i + 1}</td><td><span class="table-club">${clubCrest(r, 18)}${r.name}</span></td><td>${r.played}</td><td>${r.pts}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -153,6 +153,34 @@ function renderTablePanel() {
   `;
   document.getElementById('table-prev-btn').addEventListener('click', () => { tablePanelTab = prevTab.id; renderTablePanel(); });
   document.getElementById('table-next-btn').addEventListener('click', () => { tablePanelTab = nextTab.id; renderTablePanel(); });
+}
+
+// Escudo del club. Si está cargado (ver CLUB_CRESTS en escudos.js) se
+// muestra el escudo real; si no —hoy, todos los de Primera Nacional— se
+// dibuja uno genérico con las iniciales del club, para que la pantalla se
+// vea pareja igual y no queden huecos.
+//
+// `size` es el lado en píxeles: siempre cuadrado, así el escudo entra
+// completo sin deformarse sea cual sea su forma (escudo, círculo, banderín).
+function clubCrest(club, size) {
+  const crest = (typeof CLUB_CRESTS !== 'undefined' && CLUB_CRESTS[club.id]) || null;
+  if (crest) {
+    return `<img class="club-crest" src="${crest}" alt="Escudo de ${club.name}" width="${size}" height="${size}">`;
+  }
+  return `<span class="club-crest club-crest-generic" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.36)}px">${clubInitials(club.name)}</span>`;
+}
+
+// Iniciales para el escudo genérico: las primeras letras de las primeras
+// palabras que cuentan (se saltean "de", "y", etc.), hasta 3.
+function clubInitials(name) {
+  const ignorar = ['de', 'del', 'y', 'la', 'el', 'los', 'las'];
+  return name
+    .replace(/[()]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !ignorar.includes(w.toLowerCase()))
+    .slice(0, 3)
+    .map((w) => w[0].toUpperCase())
+    .join('');
 }
 
 // Colores reales si el club los tiene cargados (ver CLUB_COLORS en
@@ -482,6 +510,7 @@ function renderClubSelect() {
       <div class="club-grid">
         ${clubs.map((c) => `
           <button class="club-btn" data-club="${c.id}">
+            ${clubCrest(c, 56)}
             <strong>${c.name}</strong>
             <span class="muted">Reputación: ${'★'.repeat(c.reputation)}${'☆'.repeat(5 - c.reputation)}</span>
             <span class="muted">Presupuesto inicial: ${money(Engine.startingBudget(c))}</span>
@@ -509,6 +538,7 @@ function renderPresentation() {
   app.innerHTML = `
     <div class="card">
       <h1>Presentación en sociedad</h1>
+      <div class="presentation-crest">${clubCrest(club, 96)}</div>
       <p class="muted">La dirigencia de <strong>${club.name}</strong> te da la bienvenida${dt ? `, ${dt.name}` : ''}.</p>
       <p>"Este año el objetivo es claro: <strong>${s.objective.text}</strong>"</p>
       <h3>¿Cómo respondés?</h3>
@@ -547,7 +577,7 @@ function header() {
   const objectiveLine = s.objective ? `<div class="muted">Objetivo de la dirigencia: ${s.objective.text}</div>` : '';
   return `
     <div class="topbar">
-      <div><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></div>
+      <div class="topbar-club">${clubCrest(club, 28)}<span><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></span></div>
       ${dtLine}
       ${objectiveLine}
       <div class="muted">${competitionLabel()}</div>
@@ -605,7 +635,7 @@ function renderPreMatch() {
   app.innerHTML = `
     ${header()}
     <div class="card">
-      <p class="muted">${ctx.isHome ? 'Jugás de local' : 'Jugás de visitante'} vs <strong>${opponent.name}</strong></p>
+      <p class="muted match-rival">${ctx.isHome ? 'Jugás de local' : 'Jugás de visitante'} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
       <h2>${d.title}</h2>
       <p>${d.description}</p>
       <div class="options">
