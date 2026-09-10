@@ -264,19 +264,18 @@ function playerMarkerSvg(p, club, x, y, selected) {
 // Arma el <svg> completo: calcula el ancho según la fila con más jugadores
 // (nunca se achica un jugador para que "entre" — es la cancha la que mide
 // lo que haga falta) y centra cada fila dentro de ese ancho.
-// Ancho relativo (0-1) de filas puntuales que quedaban mal con el reparto
-// proporcional a la grilla completa — hoy solo la 4-2-2-2 (doble 5 muy
-// junto y central, enganches abiertos pero sin llegar al palo, delanteros
-// a un ancho intermedio), tal como se ve en un esquema táctico real. Toda
-// combinación (fila, cantidad) que no está acá sigue el reparto proporcional
-// de siempre, así ninguna otra formación ya revisada cambia.
-const ROW_WIDTH_FRACTION = {
-  del: { 2: 0.55 },
-  off: { 2: 0.78 },
-  med: { 2: 0.42 },
+// Ancho relativo (0-1) de cada categoría declarada en defWidth/medWidth/
+// offWidth/delWidth (ver FORMATIONS en data.js) — 'total' no está acá
+// porque ya es el default (fracción 1) cuando la formación no declara nada
+// para esa línea.
+const WIDTH_FRACTION_BY_CATEGORY = {
+  compacta: 0.4,
+  intermedio: 0.62,
+  abierta: 0.84,
 };
 
 function buildPitchSvg(xi, club) {
+  const f = xi.formation;
   const rows = [
     { type: 'del', players: xi.del },
     ...(xi.off.length ? [{ type: 'off', players: xi.off }] : []),
@@ -309,11 +308,13 @@ function buildPitchSvg(xi, club) {
   rows.forEach((row, i) => {
     const count = row.players.length;
     const y = PITCH_MARGIN_Y + i * PITCH_ROW_H;
-    // Filas que ya usan toda la grilla (como la defensa) no se tocan: la
-    // fracción da 1, o sea el mismo cálculo de siempre. Solo las (fila,
-    // cantidad) puntuales de ROW_WIDTH_FRACTION angostan y centran su
-    // propio tramo dentro de esa misma grilla.
-    const fraction = count === maxCols ? 1 : ROW_WIDTH_FRACTION[row.type]?.[count] ?? 1;
+    // Cada línea usa el ancho que le corresponde según la investigación
+    // táctica cargada en la formación (defWidth/medWidth/offWidth/
+    // delWidth); sin ese dato, 'total' = toda la grilla (comportamiento de
+    // siempre). Nunca aplica a una fila de un solo jugador (esa ya se
+    // centra aparte, más abajo).
+    const widthCategory = f && f[`${row.type}Width`];
+    const fraction = widthCategory ? WIDTH_FRACTION_BY_CATEGORY[widthCategory] ?? 1 : 1;
     const span = fraction * (maxCols - 1);
     const spanOffset = (maxCols - 1 - span) / 2;
     row.players.forEach((p, j) => {

@@ -104,57 +104,132 @@ const CLUB_TEMPLATES = [
 // simplemente no traen ese campo. `mod` es un pequeño empujón a favor o en
 // contra según qué tan ofensiva o defensiva es la formación, que se suma a
 // la fuerza del equipo en cada partido.
-// `medShape` / `offShape` (opcional): en algunas formaciones, la línea de
-// mediocampo o de enganches no es "una sola banda pareja" — tiene formas
-// distintas según el casillero (ej. un doble 5 con dos volantes abiertos a
-// los costados, o un mediocampista central más adelantado que los otros
+//
+// `medShape` / `offShape` (opcional): en la mayoría de las formaciones la
+// línea de mediocampo o de enganches no es "una sola banda pareja" — tiene
+// roles distintos según el casillero (ej. un doble 5 con un recuperador y
+// un organizador, o un mediocampista central más adelantado que los otros
 // dos). Cada array lista, de izquierda a derecha, la posición detallada
-// (`posDetail`, ver players.js) que se espera en ese casillero puntual.
-// Se usa en Engine.applyShapeRefinement: si el jugador que pusiste ahí no
+// (`posDetail`, ver players.js) que se espera en ese casillero puntual. Se
+// usa en Engine.applyShapeRefinement: si el jugador que pusiste ahí no
 // tiene exactamente esa posición (ni como alternativa), un casillero que
-// daría verde por las reglas generales baja a amarillo. Todavía no está
-// cargado para las 17 formaciones — se va completando de a una,
-// analizándolas con cuidado en vez de adivinar todas de una.
+// daría verde por las reglas generales baja a amarillo. Las líneas de un
+// solo jugador (ej. el pivote de la 4-1-4-1) también pueden tener un
+// medShape/offShape de un elemento, para afinar ese casillero único.
+//
+// `defWidth` / `medWidth` / `offWidth` / `delWidth` (opcional): qué tan
+// ancha se dibuja esa línea en la cancha (buildPitchSvg, ui.js) respecto
+// al ancho total disponible. Una línea sin este campo usa 'total' (todo
+// el ancho, de punta a punta, igual que la línea más ancha de la
+// formación) — es el valor por default y el que ya tenía el juego antes
+// de este campo, así que no hace falta declararlo en ese caso. Las otras
+// opciones son 'abierta' (se abre pero no llega al borde), 'intermedio'
+// (ancho moderado) y 'compacta' (angosta y centrada). Nunca afecta el
+// color de ajuste de posición (eso lo maneja medShape/offShape y el
+// sistema de WIDTH_BY_POS_DETAIL para DEF/DEL) — es pura ubicación visual.
+//
+// Todo este detalle (forma exacta de cada línea + ancho relativo) sale de
+// una investigación puntual del usuario contrastando varias fuentes de
+// análisis táctico (no es una suposición nuestra), formación por
+// formación, para las 17 formaciones del juego.
 const FORMATIONS = [
   // Defensivas
   {
     id: '541', name: '5-4-1', def: 5, med: 4, del: 1, style: 'Defensiva', mod: -3,
-    // MI - MC - MC - MD
-    medShape: ['volante por izquierda', 'mediocampista mixto', 'mediocampista mixto', 'volante por derecha'],
+    // MI - MCD (recuperador) - MCD (distribuidor) - MD, todo el ancho como la defensa
+    medShape: ['volante por izquierda', 'mediocampista defensivo', 'mediocampista defensivo', 'volante por derecha'],
   },
-  { id: '532', name: '5-3-2', def: 5, med: 3, del: 2, style: 'Defensiva', mod: -2 },
-  { id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Defensiva', mod: -1 },
-  { id: '5212', name: '5-2-1-2', def: 5, med: 2, off: 1, del: 2, style: 'Defensiva', mod: -2 },
+  {
+    id: '532', name: '5-3-2', def: 5, med: 3, del: 2, style: 'Defensiva', mod: -2,
+    // Interior izq (mixto) - MCD (pivote) - Interior der (mixto)
+    medShape: ['mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto'],
+    medWidth: 'intermedio', delWidth: 'compacta',
+  },
+  {
+    id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Defensiva', mod: -1,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
+    medWidth: 'compacta', delWidth: 'abierta',
+  },
+  {
+    id: '5212', name: '5-2-1-2', def: 5, med: 2, off: 1, del: 2, style: 'Defensiva', mod: -2,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
+    offShape: ['mediocampista ofensivo'],
+    medWidth: 'intermedio', delWidth: 'compacta',
+  },
   {
     id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1,
-    // MI - MC - MCD (contención, el más retrasado) - MC - MD
+    // MI - MC (interior) - MCD (pivote, el más retrasado) - MC (interior) - MD
     medShape: ['volante por izquierda', 'mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto', 'volante por derecha'],
   },
   // Equilibradas
-  { id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0 },
-  { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Equilibrada', mod: 1 },
-  { id: '4312', name: '4-3-1-2', def: 4, med: 3, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
-  { id: '3412', name: '3-4-1-2', def: 3, med: 4, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
+  {
+    id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0,
+    medShape: ['volante por izquierda', 'mediocampista defensivo', 'mediocampista mixto', 'volante por derecha'],
+    delWidth: 'compacta',
+  },
+  {
+    id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Equilibrada', mod: 1,
+    medShape: ['mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto'],
+    medWidth: 'intermedio', delWidth: 'abierta',
+  },
+  {
+    id: '4312', name: '4-3-1-2', def: 4, med: 3, off: 1, del: 2, style: 'Equilibrada', mod: 1,
+    medShape: ['mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto'],
+    offShape: ['mediocampista ofensivo'],
+    medWidth: 'intermedio', delWidth: 'compacta',
+  },
+  {
+    id: '3412', name: '3-4-1-2', def: 3, med: 4, off: 1, del: 2, style: 'Equilibrada', mod: 1,
+    medShape: ['carrilero izquierdo', 'mediocampista defensivo', 'mediocampista mixto', 'carrilero derecho'],
+    offShape: ['mediocampista ofensivo'],
+    defWidth: 'intermedio', delWidth: 'compacta',
+  },
   // Ofensivas
-  { id: '424', name: '4-2-4', def: 4, med: 2, del: 4, style: 'Ofensiva', mod: 4 },
+  {
+    id: '424', name: '4-2-4', def: 4, med: 2, del: 4, style: 'Ofensiva', mod: 4,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
+    medWidth: 'compacta',
+  },
   {
     id: '433o', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 3,
-    // MC - MCO (el más adelantado, el "10" del medio) - MC
-    medShape: ['mediocampista mixto', 'mediocampista ofensivo', 'mediocampista mixto'],
+    // Interior izq y der ofensivos (llegada de área), MCD en el medio como pivote
+    medShape: ['mediocampista ofensivo', 'mediocampista defensivo', 'mediocampista ofensivo'],
+    medWidth: 'intermedio', delWidth: 'abierta',
   },
-  { id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3 },
-  { id: '4231', name: '4-2-3-1', def: 4, med: 2, off: 3, del: 1, style: 'Ofensiva', mod: 2 },
-  { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Ofensiva', mod: 2 },
+  {
+    id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3,
+    medShape: ['volante por izquierda', 'mediocampista defensivo', 'mediocampista mixto', 'volante por derecha'],
+    defWidth: 'intermedio', delWidth: 'abierta',
+  },
+  {
+    id: '4231', name: '4-2-3-1', def: 4, med: 2, off: 3, del: 1, style: 'Ofensiva', mod: 2,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
+    offShape: ['extremo izquierdo', 'mediocampista ofensivo', 'extremo derecho'],
+    medWidth: 'intermedio', offWidth: 'abierta',
+  },
+  {
+    id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Ofensiva', mod: 2,
+    medShape: ['carrilero izquierdo', 'mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto', 'carrilero derecho'],
+    defWidth: 'intermedio', delWidth: 'compacta',
+  },
   {
     id: '4141', name: '4-1-4-1', def: 4, med: 1, off: 4, del: 1, style: 'Ofensiva', mod: 3,
+    medShape: ['mediocampista defensivo'],
     // Línea de enganches: MI - MCO - MCO - MD
     offShape: ['volante por izquierda', 'mediocampista ofensivo', 'mediocampista ofensivo', 'volante por derecha'],
   },
-  { id: '4222', name: '4-2-2-2', def: 4, med: 2, off: 2, del: 2, style: 'Ofensiva', mod: 4 },
+  {
+    id: '4222', name: '4-2-2-2', def: 4, med: 2, off: 2, del: 2, style: 'Ofensiva', mod: 4,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
+    offShape: ['mediocampista ofensivo', 'mediocampista ofensivo'],
+    medWidth: 'compacta', offWidth: 'intermedio', delWidth: 'compacta',
+  },
   {
     id: '325', name: '3-2-5', def: 3, med: 2, off: 4, del: 1, style: 'Ofensiva', mod: 5,
+    medShape: ['mediocampista defensivo', 'mediocampista mixto'],
     // Línea de enganches/extremos, más adelantada que en la 4-1-4-1: EI - MCO - MCO - ED
     offShape: ['extremo izquierdo', 'mediocampista ofensivo', 'mediocampista ofensivo', 'extremo derecho'],
+    medWidth: 'compacta', defWidth: 'intermedio',
   },
 ];
 
