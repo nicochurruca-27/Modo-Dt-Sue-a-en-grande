@@ -57,9 +57,16 @@ abrir seguís donde quedaste.
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
 - **Apertura y Clausura**: en Primera se juegan dos torneos por año, cada uno
-  con fase de zonas a una rueda y playoffs de octavos a la final, con una
-  ventana de pases entre ambos. La Nacional juega un solo torneo anual a una
-  rueda.
+  con 16 fechas de fase regular y playoffs de octavos a la final. La Nacional
+  juega un solo torneo anual de 17 fechas.
+- **Fechas interzonales**: de las 16 fechas, 14 son contra los equipos de tu
+  zona y 2 contra la otra: una es el **clásico** (Boca-River,
+  Racing-Independiente, Estudiantes-Gimnasia, etc., ver `CLASICOS` en
+  `data.js`) y la otra un cruce de emparejamiento en la fecha que te tocaría
+  estar libre. Los puntos suman en tu zona igual que cualquier otro partido.
+  Al sortear las zonas cada temporada, los pares de clásicos se separan
+  siempre en zonas distintas — si no, esa fecha no existiría — y nadie
+  termina jugando dos veces contra el mismo rival.
 - **Playoffs con llave fija**: clasifican los 8 primeros de cada zona y el
   cuadro queda armado de entrada, como en el reglamento de la LPF — ganar los
   octavos ya te dice contra quién jugás en cuartos. Los octavos cruzan zonas

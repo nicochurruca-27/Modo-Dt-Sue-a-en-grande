@@ -673,7 +673,8 @@ function competitionLabel() {
   if (!ctx) return '';
   if (ctx.context === 'league') {
     const editionLabel = s.season.edition ? `${s.season.edition === 'apertura' ? 'Apertura' : 'Clausura'} — ` : '';
-    return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}`;
+    const extra = ctx.clasico ? ' · Clásico' : ctx.interzonal ? ' · Interzonal' : '';
+    return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
   }
   if (ctx.context === 'bracket') return Engine.bracketStageLabel();
   return '';

@@ -5,7 +5,9 @@
 // Estructura de la temporada (basada en el formato real de AFA 2026, con
 // algunas simplificaciones documentadas en el README):
 // - Primera División: 30 clubes en 2 zonas de 15. Se juegan DOS torneos por
-//   año —Apertura y Clausura—, cada uno con fase de zonas a una rueda y
+//   año —Apertura y Clausura—, cada uno con 16 fechas de fase regular (14
+//   contra los equipos de la propia zona, más dos interzonales: uno de
+//   emparejamiento y el clásico contra el rival histórico de la otra zona) y
 //   playoffs de octavos a la final: clasifican los 8 primeros de cada zona,
 //   cruzados entre zonas (1ºA-8ºB, 2ºA-7ºB, y así). Entre ambos torneos hay
 //   una ventana de pases.
@@ -41,7 +43,11 @@ const FIFA_ROUNDS = [5, 11];
 const COPA_ROUNDS = [2, 4, 7, 10, 13];
 const COPA_STAGE_NAMES = ['Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su único torneo
-const TOTAL_ROUNDS = { D1: 15, D2: 17 };
+// Primera juega 16 fechas: las 15 del fixture de su zona (14 partidos contra
+// su zona + el interzonal de emparejamiento en la fecha que le tocaría estar
+// libre) más una última fecha de clásicos, también interzonal. La Nacional
+// son 17 fechas a una rueda contra su propia zona de 18.
+const TOTAL_ROUNDS = { D1: 16, D2: 17 };
 // Límites del plantel: con el máximo lleno hay que vender para poder
 // comprar, y con el mínimo no se puede vender más (si no te quedás sin
 // equipo).
@@ -609,6 +615,117 @@ const Engine = {
     return rounds;
   },
 
+  // Fechas interzonales de Primera. Con 15 equipos por zona, el fixture de
+  // zona deja a uno libre por fecha: en vez de perder esa fecha, el que
+  // descansa en la zona A juega contra el que descansa en la zona B. Eso da
+  // el interzonal "de emparejamiento", uno por equipo.
+  //
+  // Después se agrega una fecha más, la última, donde juegan TODOS contra su
+  // clásico de la otra zona (los clubes sin clásico en la categoría se
+  // emparejan al azar). Así cada equipo termina con 16 partidos: 14 contra su
+  // zona y 2 interzonales.
+  //
+  // Los puntos de estos partidos suman en la tabla de la zona de cada uno,
+  // como en el torneo real.
+  buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB) {
+    const libreDe = (schedule, ids, roundIndex) => {
+      const round = schedule[roundIndex] || [];
+      const jugando = new Set(round.flatMap((f) => [f.home, f.away]));
+      return ids.find((id) => !jugando.has(id)) || null;
+    };
+
+    const total = Math.max(scheduleA.length, scheduleB.length);
+    const libresA = [];
+    const libresB = [];
+    for (let r = 0; r < total; r++) {
+      libresA.push(libreDe(scheduleA, idsA, r));
+      libresB.push(libreDe(scheduleB, idsB, r));
+    }
+
+    // Si a dos clásicos les toca descansar la misma fecha, este cruce sería
+    // justo el clásico, que ya se juega en la última fecha — y terminarían
+    // enfrentándose dos veces en el mismo torneo. Cuando pasa, se intercambia
+    // el rival con otra fecha donde el cambio no arme otro clásico.
+    const esClasico = (uno, otro) => !!uno && !!otro
+      && CLASICOS.some(([x, y]) => (x === uno && y === otro) || (x === otro && y === uno));
+    for (let r = 0; r < total; r++) {
+      if (!esClasico(libresA[r], libresB[r])) continue;
+      const otra = libresB.findIndex((_, o) => o !== r
+        && !esClasico(libresA[r], libresB[o])
+        && !esClasico(libresA[o], libresB[r]));
+      if (otra >= 0) [libresB[r], libresB[otra]] = [libresB[otra], libresB[r]];
+    }
+
+    const rounds = libresA.map((a, r) => {
+      const b = libresB[r];
+      // De local va uno u otro según la fecha, para que no sea siempre el
+      // mismo lado el que recibe.
+      return a && b ? [r % 2 === 0 ? { home: a, away: b } : { home: b, away: a }] : [];
+    });
+
+    // Contra quién jugó cada uno su interzonal de emparejamiento, para que la
+    // fecha de clásicos no vuelva a cruzarlos.
+    const yaEnfrentado = {};
+    libresA.forEach((a, r) => {
+      const b = libresB[r];
+      if (a && b) { yaEnfrentado[a] = b; yaEnfrentado[b] = a; }
+    });
+
+    rounds.push(this.buildClasicoRound(idsA, idsB, yaEnfrentado));
+    return rounds;
+  },
+
+  buildClasicoRound(idsA, idsB, yaEnfrentado = {}) {
+    const enA = new Set(idsA);
+    const pendientes = { A: [...idsA], B: [...idsB] };
+    const sacar = (id, zona) => {
+      const i = pendientes[zona].indexOf(id);
+      if (i >= 0) pendientes[zona].splice(i, 1);
+    };
+
+    const round = [];
+    CLASICOS.forEach(([unId, otroId]) => {
+      const zonaDeUno = enA.has(unId) ? 'A' : 'B';
+      const zonaDeOtro = enA.has(otroId) ? 'A' : 'B';
+      const estanCruzados = pendientes[zonaDeUno].includes(unId)
+        && pendientes[zonaDeOtro].includes(otroId)
+        && zonaDeUno !== zonaDeOtro;
+      if (!estanCruzados) return;
+      sacar(unId, zonaDeUno);
+      sacar(otroId, zonaDeOtro);
+      round.push(Math.random() < 0.5 ? { home: unId, away: otroId } : { home: otroId, away: unId });
+    });
+
+    // Los que no tienen clásico en la categoría se cruzan al azar contra
+    // alguno de la otra zona, salteando al que ya enfrentaron en el
+    // interzonal de emparejamiento para que nadie juegue dos veces contra el
+    // mismo rival en el torneo.
+    const disponibles = this.shuffled(pendientes.B);
+    const parejas = [];
+    this.shuffled(pendientes.A).forEach((id) => {
+      if (!disponibles.length) return;
+      let i = disponibles.findIndex((rival) => yaEnfrentado[id] !== rival);
+      if (i < 0) i = 0; // no quedaba otro: se corrige con el intercambio de abajo
+      parejas.push([id, disponibles[i]]);
+      disponibles.splice(i, 1);
+    });
+
+    // Si al último le tocó justo el rival prohibido, se le cambia el rival
+    // con otra pareja a la que el intercambio no le arme el mismo problema.
+    parejas.forEach((par, i) => {
+      if (yaEnfrentado[par[0]] !== par[1]) return;
+      const otra = parejas.findIndex((p, j) => j !== i
+        && yaEnfrentado[p[0]] !== par[1]
+        && yaEnfrentado[par[0]] !== p[1]);
+      if (otra >= 0) [par[1], parejas[otra][1]] = [parejas[otra][1], par[1]];
+    });
+
+    parejas.forEach(([local, visitante], i) => {
+      round.push(i % 2 === 0 ? { home: local, away: visitante } : { home: visitante, away: local });
+    });
+    return round;
+  },
+
   emptyTableRow() {
     return { played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, pts: 0 };
   },
@@ -932,8 +1049,24 @@ const Engine = {
     const runZoneStage = () => {
       const tableA = Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()]));
       const tableB = Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()]));
-      this.buildSchedule(idsA).forEach((round) => this.simulateRoundOntoTable(round, tableA));
-      this.buildSchedule(idsB).forEach((round) => this.simulateRoundOntoTable(round, tableB));
+      const scheduleA = this.buildSchedule(idsA);
+      const scheduleB = this.buildSchedule(idsB);
+      scheduleA.forEach((round) => this.simulateRoundOntoTable(round, tableA));
+      scheduleB.forEach((round) => this.simulateRoundOntoTable(round, tableB));
+      // Primera juega además sus dos fechas interzonales, así que acá se
+      // simulan igual que en la división del usuario: si no, las dos mitades
+      // del país llegarían a fin de año con distinta cantidad de partidos
+      // jugados y la Tabla Anual no cerraría.
+      if (division === 'D1') {
+        const enA = new Set(idsA);
+        this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB).forEach((round) => {
+          round.forEach((fixture) => {
+            const score = this.simulateScore(this.clubStrength(fixture.home), this.clubStrength(fixture.away), 4);
+            this.updateTableRow(enA.has(fixture.home) ? tableA : tableB, fixture.home, score.homeGoals, score.awayGoals);
+            this.updateTableRow(enA.has(fixture.away) ? tableA : tableB, fixture.away, score.awayGoals, score.homeGoals);
+          });
+        });
+      }
       return { zoneATable: this.sortTable(tableA), zoneBTable: this.sortTable(tableB) };
     };
 
@@ -1127,10 +1260,18 @@ const Engine = {
     const zoneBId = `${club.division}-B`;
     const idsA = s.clubs.filter((c) => c.division === club.division && c.zone === 'A').map((c) => c.id);
     const idsB = s.clubs.filter((c) => c.division === club.division && c.zone === 'B').map((c) => c.id);
+    const scheduleA = this.buildSchedule(idsA);
+    const scheduleB = this.buildSchedule(idsB);
     season.zones = {
-      [zoneAId]: { clubIds: idsA, schedule: this.buildSchedule(idsA), table: Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()])) },
-      [zoneBId]: { clubIds: idsB, schedule: this.buildSchedule(idsB), table: Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()])) },
+      [zoneAId]: { clubIds: idsA, schedule: scheduleA, table: Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()])) },
+      [zoneBId]: { clubIds: idsB, schedule: scheduleB, table: Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()])) },
     };
+    // Solo Primera tiene fechas interzonales: en la Nacional las zonas son de
+    // 18 equipos, así que no queda nadie libre y el torneo son 17 fechas
+    // contra la propia zona.
+    season.interzonal = club.division === 'D1'
+      ? this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB)
+      : [];
 
     this.enterEditionRound();
   },
@@ -1251,21 +1392,26 @@ const Engine = {
       return;
     }
 
-    const zoneKey = this.myZoneKey();
-    const zone = season.zones[zoneKey];
-    const round = zone.schedule[season.roundIndex];
-    const userMatch = round.find((f) => f.home === s.clubId || f.away === s.clubId);
+    const encontrado = this.findUserMatch(season.roundIndex);
 
-    if (!userMatch) {
-      Object.keys(season.zones).forEach((k) => this.simulateZoneRound(k, season.roundIndex, null));
+    if (!encontrado) {
+      this.simulateWholeRound(season.roundIndex, null);
       s.log.unshift('Fecha libre para tu equipo.');
       season.roundIndex++;
       this.enterEditionRound();
       return;
     }
 
+    const userMatch = encontrado.fixture;
     const isHome = userMatch.home === s.clubId;
-    s.matchContext = { context: 'league', opponentId: isHome ? userMatch.away : userMatch.home, isHome };
+    s.matchContext = {
+      context: 'league',
+      opponentId: isHome ? userMatch.away : userMatch.home,
+      isHome,
+      interzonal: encontrado.interzonal,
+      // La última fecha de Primera es la de los clásicos.
+      clasico: encontrado.interzonal && season.interzonal && season.roundIndex === season.interzonal.length - 1,
+    };
     this.pickDecision();
     s.screen = 'pre-match';
     this.save();
@@ -1310,6 +1456,47 @@ const Engine = {
       this.updateTableRow(zone.table, fixture.home, score.homeGoals, score.awayGoals);
       this.updateTableRow(zone.table, fixture.away, score.awayGoals, score.homeGoals);
     });
+  },
+
+  // La tabla donde suma un club es siempre la de SU zona, aunque el rival sea
+  // de la otra: por eso un partido interzonal toca las dos tablas.
+  zoneTableOf(clubId) {
+    const zones = this.state.season.zones;
+    const key = Object.keys(zones).find((k) => zones[k].clubIds.includes(clubId));
+    return key ? zones[key].table : null;
+  },
+
+  simulateInterzonalRound(roundIndex, excludeMatch) {
+    const season = this.state.season;
+    const round = (season.interzonal || [])[roundIndex] || [];
+    round.forEach((fixture) => {
+      if (excludeMatch && fixture.home === excludeMatch.home && fixture.away === excludeMatch.away) return;
+      const score = this.simulateScore(this.clubStrength(fixture.home), this.clubStrength(fixture.away), 4);
+      const homeTable = this.zoneTableOf(fixture.home);
+      const awayTable = this.zoneTableOf(fixture.away);
+      if (homeTable) this.updateTableRow(homeTable, fixture.home, score.homeGoals, score.awayGoals);
+      if (awayTable) this.updateTableRow(awayTable, fixture.away, score.awayGoals, score.homeGoals);
+    });
+  },
+
+  // Todos los partidos de una fecha: los de cada zona más los interzonales.
+  simulateWholeRound(roundIndex, excludeMatch) {
+    Object.keys(this.state.season.zones).forEach((k) => this.simulateZoneRound(k, roundIndex, excludeMatch));
+    this.simulateInterzonalRound(roundIndex, excludeMatch);
+  },
+
+  // El partido del usuario en una fecha puede estar en el fixture de su zona
+  // o ser uno de los dos interzonales del año (el clásico o el de
+  // emparejamiento).
+  findUserMatch(roundIndex) {
+    const s = this.state;
+    const season = s.season;
+    const esSuyo = (f) => f.home === s.clubId || f.away === s.clubId;
+    const zone = season.zones[this.myZoneKey()];
+    const enZona = (zone.schedule[roundIndex] || []).find(esSuyo);
+    if (enZona) return { fixture: enZona, interzonal: false };
+    const enInterzonal = ((season.interzonal || [])[roundIndex] || []).find(esSuyo);
+    return enInterzonal ? { fixture: enInterzonal, interzonal: true } : null;
   },
 
   // ---------- Un partido interactivo (liga, copa o cuadro eliminatorio) ----------
@@ -1550,13 +1737,14 @@ const Engine = {
     this.developSquadAfterMatch(userWon, userLost);
 
     if (m.context === 'league') {
-      const zoneKey = this.myZoneKey();
-      const zone = s.season.zones[zoneKey];
-      this.updateTableRow(zone.table, m.home, m.homeGoals, m.awayGoals);
-      this.updateTableRow(zone.table, m.away, m.awayGoals, m.homeGoals);
+      // Los dos equipos suman en su propia tabla: en un interzonal, cada uno
+      // en la zona que le toca.
+      const homeTable = this.zoneTableOf(m.home);
+      const awayTable = this.zoneTableOf(m.away);
+      if (homeTable) this.updateTableRow(homeTable, m.home, m.homeGoals, m.awayGoals);
+      if (awayTable) this.updateTableRow(awayTable, m.away, m.awayGoals, m.homeGoals);
       s.log.unshift(`Liga: ${clubName(m.home)} ${m.homeGoals}-${m.awayGoals} ${clubName(m.away)}`);
-      this.simulateZoneRound(zoneKey, s.season.roundIndex, m);
-      Object.keys(s.season.zones).filter((k) => k !== zoneKey).forEach((k) => this.simulateZoneRound(k, s.season.roundIndex, null));
+      this.simulateWholeRound(s.season.roundIndex, m);
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
@@ -1980,14 +2168,40 @@ const Engine = {
   // Reparte de nuevo las zonas de una división para que queden equilibradas
   // (15/15 en Primera, 18/18 en la Nacional) después de mover clubes por
   // ascenso/descenso. Se mezcla al azar, igual que un sorteo de zonas real.
+  // Reparte los clubes de una división en las dos zonas. En Primera los pares
+  // de clásicos (ver CLASICOS en data.js) van SIEMPRE uno en cada zona: si
+  // cayeran juntos no se podría jugar la fecha del clásico, que es interzonal.
+  // Cuál de los dos va a cada zona se sortea, así el reparto igual cambia
+  // todos los años.
   rebalanceZones(division, perZone) {
     const clubs = this.state.clubs.filter((c) => c.division === division);
-    const shuffled = [...clubs];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    const byId = Object.fromEntries(clubs.map((c) => [c.id, c]));
+    const zonas = { A: [], B: [] };
+    const yaUbicado = new Set();
+
+    if (division === 'D1') {
+      this.shuffled(CLASICOS).forEach(([unId, otroId]) => {
+        const uno = byId[unId];
+        const otro = byId[otroId];
+        // Un clásico solo se separa si los dos están en la categoría: si uno
+        // descendió, el que quedó se reparte como cualquier otro club.
+        if (!uno || !otro) return;
+        const [primero, segundo] = Math.random() < 0.5 ? [uno, otro] : [otro, uno];
+        if (zonas.A.length < perZone && zonas.B.length < perZone) {
+          zonas.A.push(primero);
+          zonas.B.push(segundo);
+          yaUbicado.add(primero.id);
+          yaUbicado.add(segundo.id);
+        }
+      });
     }
-    shuffled.forEach((club, i) => { club.zone = i < perZone ? 'A' : 'B'; });
+
+    this.shuffled(clubs.filter((c) => !yaUbicado.has(c.id))).forEach((club) => {
+      (zonas.A.length < perZone ? zonas.A : zonas.B).push(club);
+    });
+
+    zonas.A.forEach((c) => { c.zone = 'A'; });
+    zonas.B.forEach((c) => { c.zone = 'B'; });
   },
 
   // Argentina tiene 6 cupos a la Libertadores y 6 a la Sudamericana.

@@ -99,6 +99,27 @@ const CLUB_TEMPLATES = [
   { id: 'midland', name: 'Ferrocarril Midland', division: 'D2', zone: 'B', reputation: 1 },
 ];
 
+// Clásicos de Primera División. En el torneo argentino, además de las 14
+// fechas contra los equipos de tu propia zona hay dos fechas interzonales, y
+// una de ellas es SIEMPRE contra el clásico rival. Por eso al sortear las
+// zonas se separa a cada par: si los dos clásicos cayeran en la misma zona,
+// esa fecha no existiría (ver Engine.rebalanceZones).
+//
+// Están solamente los clásicos de verdad, con los dos equipos en Primera.
+// Los clubes que no aparecen acá (porque su clásico juega en otra categoría,
+// como Unión con Colón o Aldosivi con Alvarado) se emparejan al azar cada
+// temporada para esa fecha, igual que hace la AFA.
+const CLASICOS = [
+  ['boca', 'river'],
+  ['racing', 'independiente'],
+  ['sanlorenzo', 'huracan'],
+  ['rosariocentral', 'newells'],
+  ['estudianteslp', 'gimnasialp'],
+  ['lanus', 'banfield'],
+  ['talleres', 'belgrano'],
+  ['gimnasiamendoza', 'independienterivadavia'],
+];
+
 // Formaciones tácticas disponibles. def/med/off/del son la cantidad de
 // jugadores de cada línea (siempre suman 10 + el arquero = 11). `off` es la
 // línea de enganches/mediapuntas/extremos entre el mediocampo y el ataque
