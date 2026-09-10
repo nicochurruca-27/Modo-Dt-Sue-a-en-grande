@@ -330,6 +330,11 @@ js/escudos.js → escudos reales embebidos como data URI
 js/noticias.js → portal de noticias: arma los titulares a partir de lo que
                 va pasando en la partida (resultados, lesiones, mercado,
                 copas) y los guarda en s.noticias
+js/mercado.js → mercado de pases club por club: genera el plantel de cada
+                club con un generador sembrado (mismo resultado siempre, sin
+                guardarlo en la partida), define en qué situación de contrato
+                está cada jugador y maneja las negociaciones, que se firman
+                recién cuando abre la ventana de pases
 js/players.js → planteles reales investigados club por club (se van
                 sumando de a poco; sin entrada ahí = jugadores al azar)
 js/engine.js  → toda la lógica: arma planteles, arma el calendario de cada

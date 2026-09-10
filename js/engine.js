@@ -1121,6 +1121,8 @@ const Engine = {
       market: null,
       lastSeasonSummary: null,
       noticias: [],
+      mercado: null,
+      notasMercado: [],
       log: [],
     };
     const club = this.getClub(clubId);
@@ -2048,8 +2050,16 @@ const Engine = {
     // cualquier pantalla que necesite un arquero, como los penales).
     const soleAtPosition = player && s.squad.filter((p) => p.pos === player.pos).length <= 1;
     if (player && (renew || s.squad.length <= MIN_SQUAD || soleAtPosition)) {
+      // El presupuesto no puede quedar negativo. Renovar cuesta
+      // rating * 8000 y se renuevan varios por año, así que sin este tope el
+      // saldo se iba a menos y no volvía nunca: en una prueba de 9
+      // temporadas quedaba en -32 millones ya desde el año 2, y con saldo
+      // negativo ninguna compra vuelve a pasar el control de "¿te alcanza?".
+      // Ojo que esto tapa el agujero, no lo arregla: renovar sigue saliendo
+      // bastante más de lo que entra por premios, así que la economía del
+      // juego pide una repasada aparte.
       const cost = Math.round(player.rating * 8000);
-      s.budget -= cost;
+      s.budget = Math.max(0, s.budget - cost);
       player.contractYears = 2 + Math.floor(Math.random() * 2);
     } else if (player) {
       s.squad = s.squad.filter((p) => p.id !== playerId);
@@ -2060,6 +2070,9 @@ const Engine = {
 
   openTransferMarket() {
     const s = this.state;
+    // Lo que se negoció durante el año (panel Mercado) recién se firma acá:
+    // fuera de la ventana no se mueve un peso.
+    s.notasMercado = Mercado.resolverAcuerdos(this);
     s.market = this.generateMarket();
     s.screen = 'transfer';
     this.save();

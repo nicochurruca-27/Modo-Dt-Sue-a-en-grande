@@ -105,6 +105,7 @@ function render() {
   else if (s.screen === 'season-end') renderSeasonEnd();
   renderTablePanel();
   renderSquadPanel();
+  renderMarketPanel();
   const endCareerBtn = document.getElementById('end-career-btn');
   if (endCareerBtn) {
     endCareerBtn.addEventListener('click', () => {
@@ -1238,6 +1239,12 @@ function renderTransfer() {
     <div class="card">
       <h2>${windowLabel}</h2>
       <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tenés que vender.</p>
+      ${(s.notasMercado || []).length ? `
+        <div class="mercado-acuerdos">
+          <strong>Se concretaron los acuerdos que veníamos negociando</strong>
+          <ul>${s.notasMercado.map((n) => `<li>${n}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
       <h3>Ofertas disponibles</h3>
       <div class="options" id="market-list">
         ${s.market.map((p, i) => {
@@ -1433,9 +1440,148 @@ function renderSeasonEnd() {
   document.getElementById('restart-btn').addEventListener('click', () => { Engine.resetGame(); render(); });
 }
 
-// Barra de pestañas de solo celular (vertical): cambia cuál de los 3
-// paneles se ve sin tener que scrollear. En PC / celular horizontal esta
-// barra está oculta y los 3 paneles se ven siempre juntos (ver style.css).
+// ---------- Panel del mercado de pases ----------
+//
+// En la PC vive abajo del bloque de noticias (los dos están en la columna
+// del medio, ver .center-col en style.css); en el celular es la cuarta
+// pestaña. Es el mismo HTML en los dos lados, no hay versión duplicada.
+//
+// La lógica de planteles, estados y negociación está toda en js/mercado.js.
+// Acá solo se dibuja y se enganchan los botones.
+
+let mercadoClubId = null;   // club que se está mirando
+let mercadoBusqueda = '';   // texto del buscador
+
+function mercadoEstadoPill(estado) {
+  const e = MERCADO_ESTADOS[estado];
+  if (!e) return '';
+  return `<span class="mercado-pill" style="background:${e.color}1f;color:${e.color};border-color:${e.color}55;">${e.label}</span>`;
+}
+
+// Qué se muestra como valor según en qué situación está el jugador. Antes de
+// consultarlo solo se ve un rango estimado; después, el número exacto.
+function mercadoValorTexto(j) {
+  if (j.estado === 'fin-contrato') {
+    return `Libre en ${j.meses} ${j.meses === 1 ? 'mes' : 'meses'} · prima ${j.consultado ? Mercado.plata(j.prima) : Mercado.rango(j.prima)}`;
+  }
+  if (j.estado === 'clausula') return `Cláusula ${Mercado.plata(j.precio)}`;
+  return j.consultado ? Mercado.plata(j.precio) : Mercado.rango(j.precio);
+}
+
+function mercadoBotonNegociar(j) {
+  if (j.estado === 'fin-contrato') return 'Tentar libre';
+  if (j.estado === 'clausula') return 'Pagar cláusula';
+  return 'Hacer oferta';
+}
+
+function mercadoJugadorHtml(j) {
+  const detalle = j.posDetail && POS_DETAIL_ABBREV[j.posDetail] ? POS_DETAIL_ABBREV[j.posDetail] : j.pos;
+  const respuesta = Engine.state.mercado.respuestas[j.id];
+  const bloqueado = j.acordado || j.rechazado || !!j.loanFrom;
+  return `
+    <li class="mercado-jugador${j.acordado ? ' acordado' : ''}">
+      <div class="mercado-jugador-datos">
+        <div class="mercado-jugador-nombre">
+          <strong>${j.name}</strong>
+          <span class="muted">${detalle} · ${j.rating} · ${j.age} años</span>
+        </div>
+        ${mercadoEstadoPill(j.estado)}
+      </div>
+      <div class="mercado-valor">${mercadoValorTexto(j)}</div>
+      ${j.loanFrom ? `<p class="muted mercado-nota">A préstamo de ${j.loanFrom}: el club no lo puede vender.</p>` : ''}
+      ${respuesta ? `<p class="mercado-respuesta">${respuesta}</p>` : ''}
+      <div class="mercado-acciones">
+        <button class="option-btn small" data-mercado-consultar="${j.id}">Consultar</button>
+        ${j.acordado
+          ? `<button class="option-btn small danger" data-mercado-cancelar="${j.id}">Cancelar acuerdo</button>`
+          : `<button class="option-btn small" data-mercado-negociar="${j.id}" ${bloqueado ? 'disabled' : ''}>${mercadoBotonNegociar(j)}</button>`}
+      </div>
+    </li>
+  `;
+}
+
+function renderMarketPanel() {
+  const panel = document.getElementById('market-panel');
+  if (!panel) return;
+  const s = Engine.state;
+  // Sin temporada armada (elegir DT / elegir club) no hay mercado que mostrar.
+  if (!s || !s.clubId || !s.season) { panel.innerHTML = ''; return; }
+  Mercado.init(s);
+
+  const clubes = Mercado.clubes(Engine);
+  const filtro = mercadoBusqueda.trim().toLowerCase();
+  const filtrados = filtro ? clubes.filter((c) => c.name.toLowerCase().includes(filtro)) : clubes;
+  const elegido = mercadoClubId && clubes.some((c) => c.id === mercadoClubId) ? mercadoClubId : null;
+  const acuerdos = s.mercado.acuerdos;
+
+  const listaClubes = filtrados.length
+    ? filtrados.map((c) => `
+        <button class="mercado-club ${c.id === elegido ? 'active' : ''}" data-mercado-club="${c.id}">
+          ${clubCrest(c, 20)}<span>${c.name}</span>
+          <span class="muted mercado-club-div">${c.division === 'D1' ? '1ª' : 'Nac'}</span>
+        </button>
+      `).join('')
+    : '<p class="muted">Ningún club coincide con esa búsqueda.</p>';
+
+  const jugadores = elegido ? Mercado.plantel(Engine, elegido) : [];
+
+  panel.innerHTML = `
+    <div class="card mercado-card">
+      <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
+      <p class="muted mercado-aviso">Podés negociar cuando quieras, pero nada se firma hasta que abra el mercado (al terminar el Apertura y en la pretemporada). Un acuerdo cerrado se concreta ahí.</p>
+
+      ${acuerdos.length ? `
+        <div class="mercado-acuerdos">
+          <strong>Acuerdos cerrados (${acuerdos.length})</strong>
+          <ul>
+            ${acuerdos.map((a) => `<li>${a.jugador.name} <span class="muted">— ${Engine.getClub(a.clubId).name} · ${Mercado.plata(a.precio)}</span></li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      <input id="mercado-buscador" class="text-input" type="text" placeholder="Buscar club…" value="${mercadoBusqueda.replace(/"/g, '&quot;')}" />
+      <div class="mercado-clubes">${listaClubes}</div>
+
+      ${elegido ? `
+        <div class="mercado-plantel">
+          <div class="mercado-plantel-titulo">${clubCrest(Engine.getClub(elegido), 24)}<strong>${Engine.getClub(elegido).name}</strong></div>
+          <ul class="mercado-lista">${jugadores.map(mercadoJugadorHtml).join('')}</ul>
+        </div>
+      ` : '<p class="muted">Elegí un club para ver cómo está cada jugador de contrato.</p>'}
+    </div>
+  `;
+
+  const buscador = document.getElementById('mercado-buscador');
+  if (buscador) {
+    buscador.addEventListener('input', (ev) => {
+      mercadoBusqueda = ev.target.value;
+      renderMarketPanel();
+      // Escribir no debe hacer perder el foco ni el cursor.
+      const nuevo = document.getElementById('mercado-buscador');
+      if (nuevo) { nuevo.focus(); nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); }
+    });
+  }
+  panel.querySelectorAll('[data-mercado-club]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      mercadoClubId = btn.dataset.mercadoClub === mercadoClubId ? null : btn.dataset.mercadoClub;
+      renderMarketPanel();
+    });
+  });
+  panel.querySelectorAll('[data-mercado-consultar]').forEach((btn) => {
+    btn.addEventListener('click', () => { Mercado.consultar(Engine, elegido, btn.dataset.mercadoConsultar); renderMarketPanel(); });
+  });
+  panel.querySelectorAll('[data-mercado-negociar]').forEach((btn) => {
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoNegociar); renderMarketPanel(); });
+  });
+  panel.querySelectorAll('[data-mercado-cancelar]').forEach((btn) => {
+    btn.addEventListener('click', () => { Mercado.cancelarAcuerdo(Engine, btn.dataset.mercadoCancelar); renderMarketPanel(); });
+  });
+}
+
+// Barra de pestañas de solo celular (vertical): cambia cuál de los 4
+// paneles se ve sin tener que scrollear (Tabla, Partido, Plantel, Mercado).
+// En PC / celular horizontal esta barra está oculta y los paneles se ven
+// todos juntos, con el mercado abajo del partido (ver style.css).
 function setupMobileTabs() {
   const layout = document.querySelector('.layout');
   const buttons = document.querySelectorAll('#mobile-tabs button');

@@ -11,15 +11,24 @@
     <button data-view="table">Tabla</button>
     <button data-view="app" class="active">Partido</button>
     <button data-view="squad">Plantel</button>
+    <button data-view="market">Mercado</button>
   </nav>
   <div class="layout" data-view="app">
     <aside id="table-panel" class="side-panel"></aside>
-    <main id="app"></main>
+    <!-- #app y #market-panel van juntos en la columna del medio: así en la
+         PC el mercado cae justo abajo de #app (que termina en el bloque de
+         noticias) sin necesidad de duplicar el HTML, y en el celular cada
+         uno es su propia pestaña. -->
+    <div class="center-col">
+      <main id="app"></main>
+      <section id="market-panel"></section>
+    </div>
     <aside id="squad-panel" class="side-panel"></aside>
   </div>
   <script src="js/data.js"></script>
   <script src="js/internacional.js"></script>
   <script src="js/noticias.js"></script>
+  <script src="js/mercado.js"></script>
   <script src="js/escudos.js"></script>
   <script src="js/players.js"></script>
   <script src="js/engine.js"></script>

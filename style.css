@@ -30,11 +30,20 @@ body {
   align-items: flex-start;
 }
 
-#app {
+/* La columna del medio: arriba la pantalla del juego (#app) y abajo el
+   mercado de pases. Las medidas de columna viven acá, no en #app, porque
+   ahora #app es solo el bloque de arriba de esta columna. */
+.center-col {
   flex: 1 1 480px;
   min-width: 0;
   max-width: 640px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  min-width: 0;
 }
 
 .side-panel {
@@ -88,18 +97,28 @@ body {
   /* El width: 100% es necesario, no decorativo: .layout usa
      align-items: flex-start, así que apilado en columna cada panel se
      achica al ancho de su contenido en vez de ocupar la pantalla. Los
-     paneles laterales ya lo tenían; a #app le faltaba, y por eso una
-     pantalla de contenido angosto (por ejemplo la del penal) quedaba
+     paneles laterales ya lo tenían; a la columna del medio le faltaba, y por
+     eso una pantalla de contenido angosto (por ejemplo la del penal) quedaba
      apretada contra la izquierda en vez de usar todo el ancho. */
-  #app { max-width: 100%; width: 100%; margin: 0; }
+  .center-col { max-width: 100%; width: 100%; margin: 0; }
   .side-panel { flex: 1 1 auto; width: 100%; position: static; }
 
+  /* Una pestaña por vez. El mercado es la cuarta: en el celular es su propia
+     columna y no cuelga abajo de #app como en la PC. */
+  #mobile-tabs button { font-size: 0.9em; padding: 10px 4px; }
+
   .layout[data-view="app"] #table-panel,
-  .layout[data-view="app"] #squad-panel { display: none; }
+  .layout[data-view="app"] #squad-panel,
+  .layout[data-view="app"] #market-panel { display: none; }
   .layout[data-view="table"] #app,
-  .layout[data-view="table"] #squad-panel { display: none; }
+  .layout[data-view="table"] #squad-panel,
+  .layout[data-view="table"] #market-panel { display: none; }
   .layout[data-view="squad"] #app,
-  .layout[data-view="squad"] #table-panel { display: none; }
+  .layout[data-view="squad"] #table-panel,
+  .layout[data-view="squad"] #market-panel { display: none; }
+  .layout[data-view="market"] #app,
+  .layout[data-view="market"] #table-panel,
+  .layout[data-view="market"] #squad-panel { display: none; }
 }
 
 /* Celular en horizontal: el ancho ya alcanza para las 3 columnas como en
@@ -865,3 +884,160 @@ h1, h2, h3 {
   color: var(--muted);
   font-size: 0.75em;
 }
+
+/* ---- Mercado de pases club por club ---- */
+/* En la PC este bloque es lo último de la columna del medio, o sea que cae
+   justo abajo de las noticias; en el celular es la cuarta pestaña y ocupa la
+   pantalla entera. El mismo HTML sirve para los dos casos. */
+.mercado-card {
+  border-top: 3px solid #38bdf8;
+}
+
+.mercado-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mercado-cabecera h3 { margin: 0; }
+
+.mercado-aviso {
+  font-size: 0.82em;
+  margin: 0 0 10px;
+}
+
+.mercado-acuerdos {
+  border: 1px solid #334155;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 0.86em;
+}
+
+.mercado-acuerdos ul { margin: 4px 0 0; padding-left: 18px; }
+
+#mercado-buscador { width: 100%; margin-bottom: 8px; }
+
+/* La lista de clubes scrollea adentro: son 65, no pueden empujar la página
+   entera hacia abajo. */
+.mercado-clubes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mercado-club {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: var(--text);
+  font-size: 0.88em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mercado-club:hover { border-color: #38bdf8; }
+
+.mercado-club.active {
+  border-color: #38bdf8;
+  background: #10283c;
+}
+
+.mercado-club span:not(.mercado-club-div) { flex: 1 1 auto; min-width: 0; }
+
+.mercado-club-div {
+  flex: 0 0 auto;
+  font-size: 0.85em;
+}
+
+.mercado-plantel-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+
+.mercado-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.mercado-jugador {
+  border-top: 1px solid #1f2937;
+  padding: 9px 0;
+}
+
+.mercado-jugador:first-child { border-top: none; }
+
+.mercado-jugador.acordado {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+
+.mercado-jugador-datos {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mercado-jugador-nombre { min-width: 0; }
+
+.mercado-jugador-nombre strong { display: block; font-size: 0.95em; }
+
+.mercado-jugador-nombre .muted { font-size: 0.8em; }
+
+.mercado-pill {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.68em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.mercado-valor {
+  margin-top: 3px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.mercado-nota { margin: 4px 0 0; font-size: 0.78em; }
+
+.mercado-respuesta {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #0f1b2d;
+  border: 1px solid #1e3a5f;
+  font-size: 0.8em;
+  line-height: 1.35;
+}
+
+.mercado-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.mercado-acciones .option-btn { flex: 1 1 auto; }
