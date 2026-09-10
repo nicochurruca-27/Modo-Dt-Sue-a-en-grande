@@ -304,10 +304,13 @@ const Engine = {
   WIDTH_BY_POS_DETAIL: {
     'lateral izquierdo': 'left',
     'lateral derecho': 'right',
+    'carrilero izquierdo': 'left',
+    'carrilero derecho': 'right',
     'defensor central': 'center',
     'extremo izquierdo': 'left',
     'extremo derecho': 'right',
     'delantero centro': 'center',
+    'segundo delantero': 'center',
   },
 
   // A qué lado corresponde el casillero N de un total de `count` en una
@@ -330,6 +333,8 @@ const Engine = {
     arquero: 'POR',
     'lateral izquierdo': 'DEF',
     'lateral derecho': 'DEF',
+    'carrilero izquierdo': 'DEF',
+    'carrilero derecho': 'DEF',
     'defensor central': 'DEF',
     'mediocampista defensivo': 'MED',
     'mediocampista mixto': 'MED',
@@ -339,22 +344,33 @@ const Engine = {
     'delantero centro': 'DEL',
     'extremo izquierdo': 'DEL',
     'extremo derecho': 'DEL',
+    'segundo delantero': 'DEL',
   },
 
   // Algunos jugadores rinden bien en más de una posición real (ej. Thiago
-  // Almada: mediocampista ofensivo o extremo izquierdo; Ángel Correa:
-  // delantero centro o mediocampista ofensivo) — `altPosDetail` en
-  // players.js guarda esas posiciones alternativas. Si el casillero donde
-  // lo pusiste corresponde a una de ellas, el ajuste sube un escalón
-  // (rojo→amarillo, amarillo→verde) respecto de lo que daría su posición
-  // principal sola. No se afina por lado de la cancha (sería demasiado
-  // detalle para un dato que today es más una lista corta que investigamos
-  // a mano) — es solo "¿le sirve este casillero en general, sí o no?".
-  applyAltPositionBonus(player, slot, fit) {
+  // Almada: mediocampista ofensivo o extremo izquierdo; Gonzalo Montiel:
+  // lateral derecho o izquierdo) — `altPosDetail` en players.js guarda esas
+  // posiciones alternativas (una lista, puede tener más de una). Si el
+  // casillero donde lo pusiste corresponde a una de ellas, el ajuste sube
+  // un escalón (rojo→amarillo, amarillo→verde) respecto de lo que daría su
+  // posición principal sola. En DEF/DEL también se compara el lado: la
+  // alternativa de Montiel es "lateral izquierdo", así que solo lo
+  // beneficia del lado izquierdo, no le regala verde en cualquier
+  // casillero de defensa.
+  applyAltPositionBonus(player, slot, fit, slotIndex, slotCount) {
     if (!player.altPosDetail || !player.altPosDetail.length || fit.color === 'green') return fit;
-    const altBuckets = player.altPosDetail.map((pd) => this.BUCKET_BY_POS_DETAIL[pd]).filter(Boolean);
     const slotBuckets = slot === 'OFF' ? ['MED', 'DEL'] : [slot];
-    const matches = altBuckets.some((b) => slotBuckets.includes(b));
+    const hasWidthInfo = (slot === 'DEF' || slot === 'DEL') && slotIndex !== undefined && slotCount !== undefined;
+    const slotSide = hasWidthInfo ? this.slotWidthCategory(slotIndex, slotCount) : null;
+    const matches = player.altPosDetail.some((pd) => {
+      const bucket = this.BUCKET_BY_POS_DETAIL[pd];
+      if (!bucket || !slotBuckets.includes(bucket)) return false;
+      if (hasWidthInfo) {
+        const altSide = this.WIDTH_BY_POS_DETAIL[pd];
+        if (altSide) return altSide === slotSide;
+      }
+      return true;
+    });
     if (!matches) return fit;
     if (fit.color === 'red') return { color: 'yellow', mult: Math.max(fit.mult, 0.85) };
     return { color: 'green', mult: 1 }; // era amarillo
@@ -371,11 +387,11 @@ const Engine = {
     const playerPos = player.pos;
     if (playerPos === 'MED' && formation && formation.off && player.role) {
       if (slot === 'OFF') {
-        if (player.role === 'contención') return this.applyAltPositionBonus(player, slot, { color: 'red', mult: 0.55 });
+        if (player.role === 'contención') return this.applyAltPositionBonus(player, slot, { color: 'red', mult: 0.55 }, slotIndex, slotCount);
         return { color: 'green', mult: 1 }; // ofensivo o mixto: es lo suyo
       }
       if (slot === 'MED') {
-        if (player.role === 'ofensivo') return this.applyAltPositionBonus(player, slot, { color: 'yellow', mult: 0.85 });
+        if (player.role === 'ofensivo') return this.applyAltPositionBonus(player, slot, { color: 'yellow', mult: 0.85 }, slotIndex, slotCount);
         return { color: 'green', mult: 1 }; // contención o mixto: es lo suyo
       }
     }
@@ -383,7 +399,7 @@ const Engine = {
       if ((slot === 'DEF' || slot === 'DEL') && player.posDetail && slotIndex !== undefined && slotCount !== undefined) {
         const playerSide = this.WIDTH_BY_POS_DETAIL[player.posDetail];
         const slotSide = this.slotWidthCategory(slotIndex, slotCount);
-        if (playerSide && playerSide !== slotSide) return { color: 'yellow', mult: 0.9 };
+        if (playerSide && playerSide !== slotSide) return this.applyAltPositionBonus(player, slot, { color: 'yellow', mult: 0.9 }, slotIndex, slotCount);
       }
       return { color: 'green', mult: 1 };
     }
@@ -400,7 +416,7 @@ const Engine = {
       'DEL-POR': { color: 'red', mult: 0.35 },
     };
     const key = [playerPos, slot].sort().join('-');
-    return this.applyAltPositionBonus(player, slot, table[key] || { color: 'red', mult: 0.5 });
+    return this.applyAltPositionBonus(player, slot, table[key] || { color: 'red', mult: 0.5 }, slotIndex, slotCount);
   },
 
   effectiveRating(player, slot, formation, slotIndex, slotCount) {

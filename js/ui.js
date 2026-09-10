@@ -29,6 +29,8 @@ const POS_DETAIL_ABBREV = {
   arquero: 'POR',
   'lateral derecho': 'LD',
   'lateral izquierdo': 'LI',
+  'carrilero derecho': 'CD',
+  'carrilero izquierdo': 'CI',
   'defensor central': 'DFC',
   'mediocampista defensivo': 'MCD',
   'mediocampista mixto': 'MC',
@@ -38,6 +40,7 @@ const POS_DETAIL_ABBREV = {
   'delantero centro': 'DC',
   'extremo izquierdo': 'EI',
   'extremo derecho': 'ED',
+  'segundo delantero': 'SD',
 };
 function posDetailAbbrev(posDetail) {
   return POS_DETAIL_ABBREV[posDetail] || null;

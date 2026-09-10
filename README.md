@@ -162,12 +162,15 @@ abrir seguís donde quedaste.
 
   Algunos jugadores rinden bien en más de una posición real (`altPosDetail`
   en `js/players.js`, ej. Thiago Almada: mediocampista ofensivo o extremo
-  izquierdo; Ángel Correa: delantero centro o mediocampista ofensivo) — si
-  lo ponés en un casillero que corresponde a una de esas posiciones
-  alternativas, el ajuste mejora un escalón (rojo→amarillo, amarillo→verde)
-  respecto de lo que daría su posición principal sola
-  (`Engine.applyAltPositionBonus`). Es un dato que se investiga puntualmente
-  jugador por jugador, no algo que se cargue para todo un plantel de una.
+  izquierdo; Gonzalo Montiel: lateral derecho o izquierdo) — si lo ponés en
+  un casillero que corresponde a una de esas posiciones alternativas, el
+  ajuste mejora un escalón (rojo→amarillo, amarillo→verde) respecto de lo
+  que daría su posición principal sola (`Engine.applyAltPositionBonus`). En
+  DEF/DEL esto también respeta el lado de la cancha: la alternativa de
+  Montiel es específicamente "lateral izquierdo", así que solo lo beneficia
+  del lado izquierdo, no en cualquier casillero de defensa. Es un dato que
+  se investiga puntualmente jugador por jugador, no algo que se cargue para
+  todo un plantel de una.
 
   La valoración de cada titular y su abreviatura de posición (LD, DFC, MCO,
   etc.) se muestran debajo del nombre en la cancha (y en la lista de
