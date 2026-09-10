@@ -295,7 +295,42 @@ const Engine = {
   // más ofensivo), y no es lo mismo poner a cualquier mediocampista en
   // cualquiera de los dos. En formaciones de 3 líneas (sin OFF) el mediocampo
   // es una sola banda sin esa distinción, así que el rol no cambia nada ahí.
-  positionFit(player, slot, formation) {
+  // A qué lado de la cancha corresponde una posición detallada (posDetail,
+  // ver players.js). Solo se define para DEF y DEL: un lateral/extremo es
+  // claramente de un lado, un central/delantero centro es del medio. En el
+  // mediocampo no se aplica (los casilleros MED son de profundidad —
+  // contención/mixto/ofensivo, ya cubierto por `role`— no de ancho: un
+  // doble/triple cinco no se arma como "izquierda/centro/derecha").
+  WIDTH_BY_POS_DETAIL: {
+    'lateral izquierdo': 'left',
+    'lateral derecho': 'right',
+    'defensor central': 'center',
+    'extremo izquierdo': 'left',
+    'extremo derecho': 'right',
+    'delantero centro': 'center',
+  },
+
+  // A qué lado corresponde el casillero N de un total de `count` en una
+  // misma línea, según su posición de izquierda a derecha en la cancha
+  // (índice 0 = más a la izquierda, ver buildPitchSvg en ui.js). Con 3 o
+  // más casilleros, los de las puntas son de banda y el resto del medio.
+  // Con 1 o 2 (un delantero solo, o una dupla de delanteros centrales, que
+  // es lo más común en el fútbol argentino) no hay banda: todos del medio.
+  slotWidthCategory(index, count) {
+    if (count <= 2) return 'center';
+    if (index === 0) return 'left';
+    if (index === count - 1) return 'right';
+    return 'center';
+  },
+
+  // slotIndex/slotCount (posición del casillero dentro de su línea, ver
+  // getStartingXI) afinan el color cuando el jugador ya está en su posición
+  // general correcta (DEF o DEL) pero del lado equivocado de la cancha —
+  // por ejemplo un lateral derecho jugando de central, o un extremo
+  // izquierdo puesto de "9". Es un matiz menor (amarillo, no rojo) y solo
+  // se aplica si tenemos el dato de posDetail del jugador; sin ese dato el
+  // comportamiento es exactamente el de antes.
+  positionFit(player, slot, formation, slotIndex, slotCount) {
     const playerPos = player.pos;
     if (playerPos === 'MED' && formation && formation.off && player.role) {
       if (slot === 'OFF') {
@@ -307,7 +342,14 @@ const Engine = {
         return { color: 'green', mult: 1 }; // contención o mixto: es lo suyo
       }
     }
-    if (playerPos === slot) return { color: 'green', mult: 1 };
+    if (playerPos === slot) {
+      if ((slot === 'DEF' || slot === 'DEL') && player.posDetail && slotIndex !== undefined && slotCount !== undefined) {
+        const playerSide = this.WIDTH_BY_POS_DETAIL[player.posDetail];
+        const slotSide = this.slotWidthCategory(slotIndex, slotCount);
+        if (playerSide && playerSide !== slotSide) return { color: 'yellow', mult: 0.9 };
+      }
+      return { color: 'green', mult: 1 };
+    }
     const table = {
       'DEF-MED': { color: 'yellow', mult: 0.85 },
       'DEL-MED': { color: 'yellow', mult: 0.85 },
@@ -324,21 +366,25 @@ const Engine = {
     return table[key] || { color: 'red', mult: 0.5 };
   },
 
-  effectiveRating(player, slot, formation) {
-    return Math.round(player.rating * this.positionFit(player, slot, formation).mult);
+  effectiveRating(player, slot, formation, slotIndex, slotCount) {
+    return Math.round(player.rating * this.positionFit(player, slot, formation, slotIndex, slotCount).mult);
   },
 
   getStartingXI() {
     const s = this.state;
     if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
     const formation = this.currentFormation();
+    const slotCounts = { POR: 1, DEF: formation.def, MED: formation.med, OFF: formation.off || 0, DEL: formation.del };
+    const seenPerSlot = { POR: 0, DEF: 0, MED: 0, OFF: 0, DEL: 0 };
     const rows = { POR: [], DEF: [], MED: [], OFF: [], DEL: [] };
     const starters = [];
     s.startingSlots.forEach(({ slot, playerId }) => {
       const p = s.squad.find((pl) => pl.id === playerId);
+      const slotIndex = seenPerSlot[slot]++;
       if (!p) return;
-      const fit = this.positionFit(p, slot, formation);
-      const entry = { ...p, slot, fit: fit.color, effectiveRating: this.effectiveRating(p, slot, formation) };
+      const slotCount = slotCounts[slot];
+      const fit = this.positionFit(p, slot, formation, slotIndex, slotCount);
+      const entry = { ...p, slot, fit: fit.color, effectiveRating: this.effectiveRating(p, slot, formation, slotIndex, slotCount) };
       rows[slot].push(entry);
       starters.push(entry);
     });

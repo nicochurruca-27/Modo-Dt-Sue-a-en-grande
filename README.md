@@ -145,8 +145,22 @@ abrir seguís donde quedaste.
   3-4-1-2, 4-2-3-1, 5-2-1-2, 3-2-5): ahí un mediocampista ofensivo puesto
   de "5" es amarillo (no es su lugar natural) y uno de marca puesto de
   enganche es directamente rojo — en formaciones sin esa línea, el
-  mediocampo es una sola banda y el rol no cambia nada. La cancha en sí es
-  un único `<svg>` armado a mano en
+  mediocampo es una sola banda y el rol no cambia nada.
+
+  De forma parecida, en defensa y ataque se distingue de qué lado de la
+  cancha juega cada uno en la realidad (`posDetail` en `js/players.js`:
+  lateral derecho/izquierdo, defensor central, extremo derecho/izquierdo,
+  delantero centro — se muestra abreviado como LD/LI/DFC/ED/EI/DC en la
+  lista de suplentes). Un lateral derecho puesto en un casillero de defensor
+  central (o del lado izquierdo) rinde amarillo, no verde — se calcula solo
+  según en qué punta o el medio de la línea quedó ese casillero
+  (`Engine.slotWidthCategory`), sin necesidad de que la formación distinga
+  explícitamente "lateral" de "central" como casilleros separados. Esto
+  todavía no se investigó para todos los clubes (depende de tener
+  `posDetail` cargado), así que un jugador sin ese dato sigue funcionando
+  exactamente como antes.
+
+  La cancha en sí es un único `<svg>` armado a mano en
   `renderSquadPanel`/`buildPitchSvg` (`js/ui.js`): la posición de cada
   jugador se calcula con aritmética simple, no con flexbox — hubo varias
   vueltas con enfoques basados en CSS que fallaban en algunos navegadores

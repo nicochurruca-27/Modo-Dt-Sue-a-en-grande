@@ -20,6 +20,29 @@ function zoneLabel(id) {
   return z ? z.label : '';
 }
 
+// Abreviatura de la posición detallada de un jugador (posDetail, ver
+// players.js), para mostrar algo corto en la lista de suplentes en vez del
+// texto completo. Un jugador sin posDetail cargado (club sin investigar
+// todavía, o generado al azar) simplemente no muestra nada acá — no rompe
+// nada, es la misma degradación elegante que ya usa `role`.
+const POS_DETAIL_ABBREV = {
+  arquero: 'POR',
+  'lateral derecho': 'LD',
+  'lateral izquierdo': 'LI',
+  'defensor central': 'DFC',
+  'mediocampista defensivo': 'MCD',
+  'mediocampista mixto': 'MC',
+  'mediocampista ofensivo': 'MCO',
+  'volante por izquierda': 'MI',
+  'volante por derecha': 'MD',
+  'delantero centro': 'DC',
+  'extremo izquierdo': 'EI',
+  'extremo derecho': 'ED',
+};
+function posDetailAbbrev(posDetail) {
+  return POS_DETAIL_ABBREV[posDetail] || null;
+}
+
 // Convierte el contador de días (s.calendar.dayCount, un simple entero
 // que sobrevive bien al save/load) en una fecha legible, sumando días
 // sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
@@ -203,7 +226,8 @@ function playerMarkerSvg(p, club, x, y, selected) {
     ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
     : '';
   const fitStroke = p.fit === 'green' ? 'var(--accent)' : p.fit === 'yellow' ? '#eab308' : p.fit === 'red' ? 'var(--danger)' : null;
-  const roleNote = p.role ? ` (rol: ${p.role})` : '';
+  const posAbbrev = posDetailAbbrev(p.posDetail);
+  const roleNote = posAbbrev ? ` (${posAbbrev})` : p.role ? ` (rol: ${p.role})` : '';
   const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}${roleNote}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
   const w = PITCH_JERSEY_W;
   const h = PITCH_JERSEY_H;
@@ -317,11 +341,15 @@ function renderSquadPanel() {
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       <h3>Suplentes</h3>
       <div class="bench-list">
-        ${bench.map((p) => `
+        ${bench.map((p) => {
+          const abbrev = posDetailAbbrev(p.posDetail);
+          const detail = abbrev ? ` (${abbrev})` : p.role ? ` (${p.role})` : '';
+          return `
           <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''}" data-player="${p.id}">
-            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${p.role ? ` (${p.role})` : ''} (${p.rating})</span>
+            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${detail} (${p.rating})</span>
           </div>
-        `).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
+        `;
+        }).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
       </div>
     </div>
   `;
