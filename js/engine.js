@@ -1120,6 +1120,7 @@ const Engine = {
       fifaEvent: null,
       market: null,
       lastSeasonSummary: null,
+      noticias: [],
       log: [],
     };
     const club = this.getClub(clubId);
@@ -1330,6 +1331,7 @@ const Engine = {
     while (true) {
       cal.dayInWeek++;
       cal.dayCount++;
+      Noticias.tick(this);
 
       if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
         cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
@@ -1396,6 +1398,7 @@ const Engine = {
 
     if (!encontrado) {
       this.simulateWholeRound(season.roundIndex, null);
+      Noticias.trasLaFecha(this);
       s.log.unshift('Fecha libre para tu equipo.');
       season.roundIndex++;
       this.enterEditionRound();
@@ -1455,6 +1458,7 @@ const Engine = {
       const score = this.simulateScore(hs, as, 4);
       this.updateTableRow(zone.table, fixture.home, score.homeGoals, score.awayGoals);
       this.updateTableRow(zone.table, fixture.away, score.awayGoals, score.homeGoals);
+      this.recordRoundResult(fixture.home, fixture.away, score.homeGoals, score.awayGoals);
     });
   },
 
@@ -1476,13 +1480,26 @@ const Engine = {
       const awayTable = this.zoneTableOf(fixture.away);
       if (homeTable) this.updateTableRow(homeTable, fixture.home, score.homeGoals, score.awayGoals);
       if (awayTable) this.updateTableRow(awayTable, fixture.away, score.awayGoals, score.homeGoals);
+      this.recordRoundResult(fixture.home, fixture.away, score.homeGoals, score.awayGoals);
     });
   },
 
   // Todos los partidos de una fecha: los de cada zona más los interzonales.
+  // Los resultados de la fecha se simulaban y se perdían: solo quedaba su
+  // efecto en la tabla. Ahora además se anotan en season.lastRoundResults,
+  // que es de donde el portal de noticias saca las goleadas, los batacazos y
+  // los clásicos (ver Noticias.trasLaFecha). Se pisa en cada fecha nueva: es
+  // la foto de la última jugada, no un historial.
   simulateWholeRound(roundIndex, excludeMatch) {
+    this.state.season.lastRoundResults = [];
     Object.keys(this.state.season.zones).forEach((k) => this.simulateZoneRound(k, roundIndex, excludeMatch));
     this.simulateInterzonalRound(roundIndex, excludeMatch);
+  },
+
+  recordRoundResult(home, away, hg, ag) {
+    const season = this.state.season;
+    if (!Array.isArray(season.lastRoundResults)) season.lastRoundResults = [];
+    season.lastRoundResults.push({ home, away, hg, ag });
   },
 
   // El partido del usuario en una fecha puede estar en el fixture de su zona
@@ -1616,6 +1633,7 @@ const Engine = {
     // Las novedades físicas salen junto con el resultado, que es cuando el
     // usuario se entera de todo lo que pasó en el partido.
     s.lastAvailabilityNotes = this.updateAvailability();
+    Noticias.trasElParteMedico(this, s.lastAvailabilityNotes);
     s.screen = 'match-result';
     this.save();
   },
@@ -1745,6 +1763,8 @@ const Engine = {
       if (awayTable) this.updateTableRow(awayTable, m.away, m.awayGoals, m.homeGoals);
       s.log.unshift(`Liga: ${clubName(m.home)} ${m.homeGoals}-${m.awayGoals} ${clubName(m.away)}`);
       this.simulateWholeRound(s.season.roundIndex, m);
+      this.recordRoundResult(m.home, m.away, m.homeGoals, m.awayGoals);
+      Noticias.trasLaFecha(this);
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
@@ -2096,6 +2116,7 @@ const Engine = {
       contractYears: 3,
     });
     s.market.splice(marketIndex, 1);
+    Noticias.trasUnaOperacion(this, 'compra', offer, offer.price);
     this.repairStartingSlots();
     this.save();
     return true;
@@ -2111,8 +2132,10 @@ const Engine = {
     const s = this.state;
     if (s.squad.length <= MIN_SQUAD) return false;
     const player = s.squad[squadIndex];
-    s.budget += this.sellValue(player);
+    const monto = this.sellValue(player);
+    s.budget += monto;
     s.squad.splice(squadIndex, 1);
+    Noticias.trasUnaOperacion(this, 'venta', player, monto);
     this.repairStartingSlots();
     this.save();
     return true;
@@ -2297,6 +2320,7 @@ const Engine = {
     // lastSeasonSummary, que se limpia): son los que alimentan la pestaña
     // "Copas" del panel durante todo el año siguiente.
     s.ultimasCopas = copasDelAnio;
+    Noticias.trasLasCopas(this, copasDelAnio);
     s.copaQualification = qualification;
 
     const userRelegated = relegated.includes(s.clubId);

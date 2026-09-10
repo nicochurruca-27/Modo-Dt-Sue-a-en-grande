@@ -88,6 +88,10 @@ function formatCalendarDate(dayCount) {
 function render() {
   const s = Engine.state;
   if (!s) return;
+  // El carrusel de noticias es lo único del juego que usa un temporizador.
+  // Como render() rehace todo el HTML de cero, hay que apagarlo acá o el
+  // temporizador viejo seguiría corriendo contra nodos que ya no existen.
+  detenerCarruselNoticias();
   if (s.screen === 'dt-create') renderDTCreate();
   else if (s.screen === 'club-select') renderClubSelect();
   else if (s.screen === 'presentation') renderPresentation();
@@ -708,9 +712,14 @@ function competitionLabel() {
 function header() {
   const s = Engine.state;
   const club = Engine.getClub(s.clubId);
-  const zoneKey = Engine.myZoneKey();
-  const table = Engine.sortTable(s.season.zones[zoneKey].table);
-  const pos = table.findIndex((r) => r.id === s.clubId) + 1;
+  // Entre una temporada y la otra la tabla no existe: startNewSeason() arma
+  // el season nuevo con zones vacío y recién después se juegan las fechas,
+  // así que las pantallas de pretemporada (renovación de contrato y mercado
+  // de pases) pasaban por acá sin tabla y rompían todo el render. Cuando no
+  // hay tabla, simplemente no se muestra la posición.
+  const zona = s.season.zones[Engine.myZoneKey()];
+  const table = zona ? Engine.sortTable(zona.table) : null;
+  const pos = table ? table.findIndex((r) => r.id === s.clubId) + 1 : 0;
   const divisionName = club.division === 'D1' ? 'Primera División' : 'Primera Nacional';
   const dt = s.dt;
   const dtNation = dt && NATIONS.find((n) => n.code === dt.nation);
@@ -722,10 +731,156 @@ function header() {
       ${dtLine}
       ${objectiveLine}
       <div class="muted">${competitionLabel()}</div>
-      <div class="muted">Presupuesto: ${money(s.budget)} · Posición en zona: ${pos}°/${table.length} · Ánimo: ${s.morale}</div>
+      <div class="muted">Presupuesto: ${money(s.budget)}${table ? ` · Posición en zona: ${pos}°/${table.length}` : ''} · Ánimo: ${s.morale}</div>
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
     </div>
   `;
+}
+
+// ---------- Portal de noticias ----------
+//
+// El feed se alimenta solo desde js/noticias.js, que a su vez se alimenta de
+// lo que pasa de verdad en la partida. Acá solo se dibuja.
+//
+// Hay dos formas de recorrerlo, como se pidió: pestañas por categoría (que
+// filtran la lista) y un titular grande que va rotando solo entre las
+// noticias destacadas, estilo portada de diario deportivo.
+
+let noticiaFiltro = 'todas'; // 'todas' o una clave de NOTICIA_CATEGORIAS
+let noticiaCarruselTimer = null;
+let noticiaCarruselIndex = 0;
+
+function detenerCarruselNoticias() {
+  if (noticiaCarruselTimer) {
+    clearInterval(noticiaCarruselTimer);
+    noticiaCarruselTimer = null;
+  }
+}
+
+function noticiasVisibles() {
+  const lista = Engine.state.noticias || [];
+  if (noticiaFiltro === 'todas') return lista;
+  return lista.filter((n) => n.cat === noticiaFiltro);
+}
+
+function noticiaPill(cat) {
+  const c = NOTICIA_CATEGORIAS[cat] || { label: 'Noticia', color: '#94a3b8' };
+  return `<span class="noticia-pill" style="background:${c.color}1f;color:${c.color};border-color:${c.color}55;">${c.label}</span>`;
+}
+
+// El escudo solo se puede mostrar si la noticia habla de un club argentino
+// del juego. Las de afuera (ligas extranjeras) no tienen escudo cargado, así
+// que sencillamente no lo muestran.
+function noticiaEscudo(clubId, size) {
+  if (!clubId) return '';
+  const club = Engine.state.clubs.find((c) => c.id === clubId);
+  return club ? clubCrest(club, size) : '';
+}
+
+function noticiaHeroHtml(n) {
+  if (!n) return '';
+  return `
+    ${noticiaEscudo(n.clubId, 40)}
+    <div class="noticia-hero-texto">
+      <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia)}</span></div>
+      <h3>${n.titular}</h3>
+      <p class="muted">${n.bajada}</p>
+    </div>
+  `;
+}
+
+function noticiaItemHtml(n) {
+  return `
+    <li class="noticia-item">
+      ${noticiaEscudo(n.clubId, 26)}
+      <div class="noticia-item-texto">
+        <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia)}</span></div>
+        <strong>${n.titular}</strong>
+        <p class="muted">${n.bajada}</p>
+      </div>
+    </li>
+  `;
+}
+
+function noticiasHtml() {
+  const s = Engine.state;
+  const todas = s.noticias || [];
+
+  if (!todas.length) {
+    return `
+      <div class="card noticias-card">
+        <div class="noticias-cabecera"><h3>Noticias</h3><span class="muted">Portal deportivo</span></div>
+        <p class="muted">Todavía no pasó nada para contar. Avanzá los días y el diario se va a ir llenando solo.</p>
+      </div>
+    `;
+  }
+
+  // Solo se ofrecen las pestañas que tienen algo adentro, así no quedan
+  // filtros que llevan a una lista vacía. Y si el filtro elegido se quedó
+  // sin noticias (pasa al cambiar de temporada, cuando el feed se renueva),
+  // se vuelve solo a "Todas" en vez de dejar la lista en blanco.
+  const conNoticias = NOTICIA_ORDEN_CATEGORIAS.filter((cat) => todas.some((n) => n.cat === cat));
+  if (noticiaFiltro !== 'todas' && !conNoticias.includes(noticiaFiltro)) noticiaFiltro = 'todas';
+  const tabs = ['todas', ...conNoticias].map((cat) => {
+    const label = cat === 'todas' ? 'Todas' : NOTICIA_CATEGORIAS[cat].label;
+    return `<button class="noticia-tab ${cat === noticiaFiltro ? 'active' : ''}" data-noticia-cat="${cat}">${label}</button>`;
+  }).join('');
+
+  const visibles = noticiasVisibles();
+  const destacadas = visibles.filter((n) => n.destacada).slice(0, 5);
+  const hero = destacadas.length ? destacadas[noticiaCarruselIndex % destacadas.length] : visibles[0];
+  // De la lista de abajo se sacan TODAS las que entran en el carrusel, no
+  // solo la que se está mostrando: el carrusel cambia el titular sin rehacer
+  // la lista, así que si se filtrara únicamente la actual, al girar la
+  // noticia del titular aparecería repetida abajo.
+  const enElCarrusel = new Set(destacadas.map((n) => n.id));
+  if (hero) enElCarrusel.add(hero.id);
+  const resto = visibles.filter((n) => !enElCarrusel.has(n.id)).slice(0, 12);
+
+  const puntos = destacadas.length > 1
+    ? `<div class="noticia-puntos">${destacadas.map((_, i) => `<span class="noticia-punto ${i === noticiaCarruselIndex % destacadas.length ? 'active' : ''}"></span>`).join('')}</div>`
+    : '';
+
+  return `
+    <div class="card noticias-card">
+      <div class="noticias-cabecera"><h3>Noticias</h3><span class="muted">Portal deportivo</span></div>
+      <div class="noticia-tabs">${tabs}</div>
+      <div class="noticia-hero" id="noticia-hero">${noticiaHeroHtml(hero)}</div>
+      ${puntos}
+      <ul class="noticia-lista">${resto.map(noticiaItemHtml).join('')}</ul>
+    </div>
+  `;
+}
+
+// Se llama después de insertar el HTML: engancha las pestañas y arranca la
+// rotación del titular. La rotación toca solo el nodo del titular (no vuelve
+// a llamar a render()) para no interrumpir lo que el usuario esté haciendo.
+function wireNoticias() {
+  app.querySelectorAll('[data-noticia-cat]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      noticiaFiltro = btn.dataset.noticiaCat;
+      noticiaCarruselIndex = 0;
+      render();
+    });
+  });
+
+  const hero = document.getElementById('noticia-hero');
+  if (!hero) return;
+  const destacadas = noticiasVisibles().filter((n) => n.destacada).slice(0, 5);
+  if (destacadas.length < 2) return;
+
+  detenerCarruselNoticias();
+  noticiaCarruselTimer = setInterval(() => {
+    const nodo = document.getElementById('noticia-hero');
+    if (!nodo) { detenerCarruselNoticias(); return; }
+    noticiaCarruselIndex = (noticiaCarruselIndex + 1) % destacadas.length;
+    nodo.innerHTML = noticiaHeroHtml(destacadas[noticiaCarruselIndex]);
+    nodo.classList.remove('noticia-hero-entra');
+    void nodo.offsetWidth; // reinicia la animación de entrada
+    nodo.classList.add('noticia-hero-entra');
+    const puntos = app.querySelectorAll('.noticia-punto');
+    puntos.forEach((pt, i) => pt.classList.toggle('active', i === noticiaCarruselIndex));
+  }, 5000);
 }
 
 function renderCalendar() {
@@ -745,10 +900,12 @@ function renderCalendar() {
           ${cal.message.options.map((opt, i) => `<button class="option-btn" data-i="${i}">${opt.label}</button>`).join('')}
         </div>
       </div>
+      ${noticiasHtml()}
     `;
     app.querySelectorAll('#calendar-message-options .option-btn').forEach((btn) => {
       btn.addEventListener('click', () => { Engine.answerCalendarMessage(Number(btn.dataset.i)); render(); });
     });
+    wireNoticias();
     return;
   }
 
@@ -759,12 +916,14 @@ function renderCalendar() {
       <p class="muted">${s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.'}</p>
       <button class="option-btn" id="continue-btn">Avanzar</button>
     </div>
+    ${noticiasHtml()}
   `;
   document.getElementById('continue-btn').addEventListener('click', () => {
     s.lastDecisionNote = null;
     Engine.advanceCalendarDay();
     render();
   });
+  wireNoticias();
 }
 
 function renderPreMatch() {
