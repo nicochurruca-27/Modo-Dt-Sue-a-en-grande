@@ -264,13 +264,25 @@ function playerMarkerSvg(p, club, x, y, selected) {
 // Arma el <svg> completo: calcula el ancho según la fila con más jugadores
 // (nunca se achica un jugador para que "entre" — es la cancha la que mide
 // lo que haga falta) y centra cada fila dentro de ese ancho.
+// Ancho relativo (0-1) de filas puntuales que quedaban mal con el reparto
+// proporcional a la grilla completa — hoy solo la 4-2-2-2 (doble 5 muy
+// junto y central, enganches abiertos pero sin llegar al palo, delanteros
+// a un ancho intermedio), tal como se ve en un esquema táctico real. Toda
+// combinación (fila, cantidad) que no está acá sigue el reparto proporcional
+// de siempre, así ninguna otra formación ya revisada cambia.
+const ROW_WIDTH_FRACTION = {
+  del: { 2: 0.55 },
+  off: { 2: 0.78 },
+  med: { 2: 0.42 },
+};
+
 function buildPitchSvg(xi, club) {
   const rows = [
-    { players: xi.del },
-    ...(xi.off.length ? [{ players: xi.off }] : []),
-    { players: xi.med },
-    { players: xi.def },
-    { players: xi.gk },
+    { type: 'del', players: xi.del },
+    ...(xi.off.length ? [{ type: 'off', players: xi.off }] : []),
+    { type: 'med', players: xi.med },
+    { type: 'def', players: xi.def },
+    { type: 'gk', players: xi.gk },
   ];
   const maxCols = Math.max(...rows.map((r) => r.players.length), 1);
   const svgWidth = 2 * PITCH_MARGIN_X + maxCols * PITCH_JERSEY_W + Math.max(0, maxCols - 1) * PITCH_COL_GAP;
@@ -297,8 +309,15 @@ function buildPitchSvg(xi, club) {
   rows.forEach((row, i) => {
     const count = row.players.length;
     const y = PITCH_MARGIN_Y + i * PITCH_ROW_H;
+    // Filas que ya usan toda la grilla (como la defensa) no se tocan: la
+    // fracción da 1, o sea el mismo cálculo de siempre. Solo las (fila,
+    // cantidad) puntuales de ROW_WIDTH_FRACTION angostan y centran su
+    // propio tramo dentro de esa misma grilla.
+    const fraction = count === maxCols ? 1 : ROW_WIDTH_FRACTION[row.type]?.[count] ?? 1;
+    const span = fraction * (maxCols - 1);
+    const spanOffset = (maxCols - 1 - span) / 2;
     row.players.forEach((p, j) => {
-      const virtualIndex = count === 1 ? (maxCols - 1) / 2 : (j * (maxCols - 1)) / (count - 1);
+      const virtualIndex = count === 1 ? (maxCols - 1) / 2 : spanOffset + (j * span) / (count - 1);
       const x = gridStartX + virtualIndex * gridStep;
       playersMarkup += playerMarkerSvg(p, club, x, y, p.id === selectedPlayerId);
     });
