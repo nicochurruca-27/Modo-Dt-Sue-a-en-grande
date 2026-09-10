@@ -90,11 +90,10 @@ function render() {
 // Los paneles laterales no existen todavía en la pantalla de elegir club
 // (no hay temporada armada). Se limpian ahí y se dibujan en cualquier otra.
 //
-// El panel tiene 3 vistas que se recorren con flechas: tu zona, la otra zona
-// de tu misma división (las dos están siempre simuladas en paralelo), y un
-// resumen de la última clasificación a copas internacionales (Libertadores /
-// Sudamericana todavía no se juegan partido a partido, así que no hay una
-// "tabla" en vivo — se muestra el resultado de la última vez que se definió).
+// El panel de tablas tiene varias vistas que se recorren con flechas: tu
+// zona, la otra zona de tu misma división (las dos están siempre simuladas en
+// paralelo), la Tabla Anual (solo en Primera) y las copas internacionales.
+//
 // ---------- Colores de las tablas ----------
 //
 // Cada fila puede llevar una franja de color a la izquierda según a qué le
@@ -159,6 +158,25 @@ function anualTableBody() {
   `;
 }
 
+// Resultado de la Libertadores y la Sudamericana que se jugaron este año
+// (con los clasificados de la temporada anterior). La primera temporada de
+// una carrera no tiene copas todavía.
+function copasResultHtml(copas) {
+  if (!copas || !copas.length) {
+    return '<p class="muted">Las copas internacionales se juegan a partir del año que viene, con los clasificados de esta temporada.</p>';
+  }
+  return copas.map((c) => {
+    let tuyo = '';
+    if (c.userWon) tuyo = '<div class="me-line">¡La ganaste vos!</div>';
+    else if (c.userStage) tuyo = `<div class="me-line">Tu club llegó hasta ${c.userStage}.</div>`;
+    return `
+      <h4>Copa ${c.copa}</h4>
+      <p>Campeón: <strong>${c.championName}</strong>${c.championPais ? ` <span class="muted">(${c.championPais})</span>` : ''}${c.runnerUpName ? `<br><span class="muted">Finalista: ${c.runnerUpName}</span>` : ''}</p>
+      ${tuyo}
+    `;
+  }).join('');
+}
+
 function renderTablePanel() {
   const s = Engine.state;
   if (!s || !s.season) { tablePanel.innerHTML = ''; return; }
@@ -185,16 +203,22 @@ function renderTablePanel() {
   if (tablePanelTab === 'anual') {
     body = anualTableBody();
   } else if (tablePanelTab === 'copas') {
-    const sum = s.lastSeasonSummary;
-    if (sum && sum.qualification && sum.qualification.length) {
-      body = `
-        <p class="muted">Clasificación definida a fin de la temporada anterior (Libertadores/Sudamericana no se juegan partido a partido todavía):</p>
-        <ul>
-          ${sum.qualification.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
-        </ul>
-      `;
+    // Estos dos datos sobreviven al cambio de temporada, así que el panel
+    // muestra todo el año quiénes están jugando las copas y cómo salieron las
+    // del año pasado.
+    const jugando = s.copaQualification || [];
+    if (!jugando.length) {
+      body = '<p class="muted">Todavía no se definió ninguna clasificación a copas internacionales: se sabe recién a fin de temporada.</p>';
     } else {
-      body = '<p class="muted">Todavía no se definió ninguna clasificación a copas internacionales (se sabe recién a fin de temporada).</p>';
+      body = `
+        <h4>Clasificados argentinos</h4>
+        <p class="muted">Los que están jugando las copas de este año:</p>
+        <ul>
+          ${jugando.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
+        </ul>
+        <h4>Cómo salieron las del año pasado</h4>
+        ${copasResultHtml(s.ultimasCopas)}
+      `;
     }
   } else {
     const zoneKey = `${s.season.myDivision}-${tablePanelTab === 'mine' ? myZoneLetter : otherZoneLetter}`;
@@ -1117,6 +1141,11 @@ function renderSeasonEnd() {
 
       <h3>Copa Argentina</h3>
       <p>${copaText}</p>
+
+      ${sum.copasInternacionales && sum.copasInternacionales.length ? `
+        <h3>Copas internacionales</h3>
+        ${copasResultHtml(sum.copasInternacionales)}
+      ` : ''}
 
       ${sum.qualification.length ? `
         <h3>Clasificación a copas internacionales</h3>

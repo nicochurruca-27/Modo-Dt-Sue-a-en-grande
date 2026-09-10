@@ -79,6 +79,15 @@ abrir seguís donde quedaste.
   un campeón real al final, lo ganes vos o no.
 - **Fechas FIFA**: pausan la liga; tus jugadores mejor valorados pueden ser
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
+- **Libertadores y Sudamericana**: se juegan de verdad todos los años (fase
+  previa, 8 grupos de los que pasan dos, y eliminatorias hasta la final), con
+  los clasificados argentinos que salieron de tu temporada anterior más los
+  clubes del resto del continente, cada uno con su nivel (ver
+  `js/internacional.js`). El campeón de cada copa y hasta dónde llegó tu club
+  quedan en la pestaña "Copas" del panel. La primera temporada de una carrera
+  todavía no tiene copas: se juegan desde el año siguiente. Es una versión
+  simplificada: las llaves son a partido único y los grupos se sortean sin
+  bombos por país.
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
   Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
   Copa Argentina, y los 3 mejores de la Tabla Anual que no hayan clasificado

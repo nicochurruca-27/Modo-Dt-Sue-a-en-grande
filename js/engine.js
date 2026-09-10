@@ -44,6 +44,16 @@ const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su �
 const TOTAL_ROUNDS = { D1: 15, D2: 17 };
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];
+// Cómo se llama cada instancia de una copa internacional según cuántos
+// equipos quedan vivos.
+const COPA_STAGE_LABELS = {
+  2: 'la final',
+  4: 'las semifinales',
+  8: 'los cuartos de final',
+  16: 'los octavos de final',
+  32: 'los dieciseisavos de final',
+};
+
 const BRACKET_KIND_LABELS = {
   apertura: 'Playoffs del Apertura',
   clausura: 'Playoffs del Clausura',
@@ -665,6 +675,131 @@ const Engine = {
       a[1], b[6], b[2], a[5], // 2ºA-7ºB / 3ºB-6ºA  -> C3
     ];
     return bracket.map((r) => ({ id: r.id, seed: seedByClub[r.id] }));
+  },
+
+  // ---------- Copas internacionales (Libertadores y Sudamericana) ----------
+  //
+  // Se juegan enteras: fase previa, fase de grupos y eliminatorias hasta el
+  // campeón. Los cupos argentinos son los que se ganaron en el juego la
+  // temporada anterior (así que cambian según cómo te vaya); el resto del
+  // continente sale de CLUBES_INTERNACIONALES (internacional.js).
+  //
+  // Es una versión simplificada del formato real: las llaves son a partido
+  // único en vez de ida y vuelta, los grupos se sortean sin bombos por país,
+  // y no está el repechaje que manda equipos de una copa a la otra. Alcanza
+  // para que cada temporada tenga un campeón creíble y para saber hasta dónde
+  // llegó tu club.
+
+  shuffled(list) {
+    const arr = [...list];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  },
+
+  copaEntrants(copa, qualification) {
+    const argentinos = qualification.filter((q) => q.comp === copa).map((q) => {
+      const club = this.getClub(q.clubId);
+      return {
+        id: q.clubId,
+        nombre: club.name,
+        pais: 'Argentina',
+        nivel: club.reputation,
+        fase: q.stage === 'Fase previa' ? 'previa' : 'grupos',
+      };
+    });
+    const resto = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .filter((c) => c.copa === copa)
+      .map((c) => ({ id: c.id, nombre: c.nombre, pais: c.pais, nivel: c.nivel, fase: c.fase }));
+    return argentinos.concat(resto);
+  },
+
+  // Los clubes internacionales no están en s.clubs (no se puede dirigir a
+  // ninguno), así que su fuerza sale de su `nivel` con la misma fórmula que
+  // usa clubStrength con la reputación de un club argentino.
+  copaStrength(entrant) {
+    if (entrant.id === this.state.clubId) return this.squadStrength();
+    return 44 + entrant.nivel * 6 + (Math.random() * 6 - 3);
+  },
+
+  // Una llave de copa pesa más la diferencia de nivel que un partido de liga:
+  // si no, en un torneo de eliminación directa el azar termina coronando
+  // campeón a cualquiera y los grandes del continente no se notan.
+  copaTieWinner(idA, idB, byId) {
+    if (!idA) return idB;
+    if (!idB) return idA;
+    const sa = this.copaStrength(byId[idA]);
+    const sb = this.copaStrength(byId[idB]);
+    const prob = Math.max(0.12, Math.min(0.88, 0.5 + (sa - sb) / 70));
+    return Math.random() < prob ? idA : idB;
+  },
+
+  simulateCopa(copa, qualification) {
+    const entrants = this.copaEntrants(copa, qualification);
+    if (entrants.length < 4) return null;
+    const byId = Object.fromEntries(entrants.map((e) => [e.id, e]));
+    // Hasta dónde llegó cada club: se pisa en cada instancia que juega, así
+    // que al final queda la más lejana.
+    const reached = {};
+    const mark = (ids, etapa) => ids.forEach((id) => { if (id) reached[id] = etapa; });
+
+    const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
+    mark(previa, 'la fase previa');
+    const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id);
+    for (let i = 0; i < previa.length; i += 2) {
+      enGrupos.push(this.copaTieWinner(previa[i], previa[i + 1], byId));
+    }
+
+    // 8 grupos como en las dos copas reales: de cada uno pasan 2, así los
+    // octavos arrancan con 16 y las llaves cierran justo hasta la final.
+    mark(enGrupos, 'la fase de grupos');
+    const sorteo = this.shuffled(enGrupos);
+    const cantGrupos = Math.max(1, Math.min(8, Math.floor(sorteo.length / 2)));
+    const grupos = Array.from({ length: cantGrupos }, () => []);
+    sorteo.forEach((id, i) => grupos[i % cantGrupos].push(id));
+
+    let clasificados = [];
+    grupos.forEach((grupo) => {
+      const table = Object.fromEntries(grupo.map((id) => [id, this.emptyTableRow()]));
+      for (let i = 0; i < grupo.length; i++) {
+        for (let j = i + 1; j < grupo.length; j++) {
+          const score = this.simulateScore(this.copaStrength(byId[grupo[i]]), this.copaStrength(byId[grupo[j]]), 4);
+          this.updateTableRow(table, grupo[i], score.homeGoals, score.awayGoals);
+          this.updateTableRow(table, grupo[j], score.awayGoals, score.homeGoals);
+        }
+      }
+      const orden = Object.entries(table)
+        .map(([id, row]) => ({ id, ...row }))
+        .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      clasificados = clasificados.concat(orden.slice(0, 2).map((r) => r.id));
+    });
+
+    let alive = this.shuffled(clasificados);
+    let runnerUp = null;
+    while (alive.length > 1) {
+      if (alive.length % 2) alive.push(null); // si quedó impar, uno pasa de largo
+      mark(alive, COPA_STAGE_LABELS[alive.length] || 'las eliminatorias');
+      const ganadores = [];
+      for (let i = 0; i < alive.length; i += 2) {
+        const ganador = this.copaTieWinner(alive[i], alive[i + 1], byId);
+        if (alive.length === 2) runnerUp = ganador === alive[i] ? alive[i + 1] : alive[i];
+        ganadores.push(ganador);
+      }
+      alive = ganadores;
+    }
+
+    const champion = alive[0] || null;
+    if (champion) reached[champion] = 'el título';
+    return {
+      copa,
+      championName: champion ? byId[champion].nombre : null,
+      championPais: champion ? byId[champion].pais : null,
+      runnerUpName: runnerUp && byId[runnerUp] ? byId[runnerUp].nombre : null,
+      userWon: champion === this.state.clubId,
+      userStage: reached[this.state.clubId] || null,
+    };
   },
 
   // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
@@ -1692,7 +1827,20 @@ const Engine = {
     this.rebalanceZones('D1', 15);
     this.rebalanceZones('D2', 18);
 
+    // Las copas de ESTE año se juegan con los clasificados que salieron de la
+    // temporada anterior (como en la realidad), así que la primera temporada
+    // de una carrera todavía no tiene copas: se juegan recién al año
+    // siguiente, con los cupos que se ganen ahora.
+    const copasDelAnio = s.copaQualification && s.copaQualification.length
+      ? ['Libertadores', 'Sudamericana'].map((copa) => this.simulateCopa(copa, s.copaQualification)).filter(Boolean)
+      : [];
+
     const qualification = this.assignQualification(d1Data);
+    // Estos dos sobreviven al cambio de temporada (a diferencia de
+    // lastSeasonSummary, que se limpia): son los que alimentan la pestaña
+    // "Copas" del panel durante todo el año siguiente.
+    s.ultimasCopas = copasDelAnio;
+    s.copaQualification = qualification;
 
     const userRelegated = relegated.includes(s.clubId);
     const userPromoted = promoted.includes(s.clubId);
@@ -1732,6 +1880,7 @@ const Engine = {
       userPromotedReducido: d2Data.promoted[1] === s.clubId,
       copaChampionName: s.copaBracket.champion ? this.getClub(s.copaBracket.champion).name : null,
       userWonCopa: s.copaBracket.champion === s.clubId,
+      copasInternacionales: copasDelAnio,
       qualification,
       relegated: relegated.map((id) => this.getClub(id).name),
       promoted: promoted.map((id) => this.getClub(id).name),
