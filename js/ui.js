@@ -993,7 +993,7 @@ function renderContractRenewal() {
   const player = s.squad.find((p) => p.id === playerId);
   const renewCost = Math.round(player.rating * 8000);
   const soleAtPosition = s.squad.filter((p) => p.pos === player.pos).length <= 1;
-  const canRelease = s.squad.length > 12 && !soleAtPosition;
+  const canRelease = s.squad.length > MIN_SQUAD && !soleAtPosition;
 
   app.innerHTML = `
     ${header()}
@@ -1022,27 +1022,34 @@ function renderTransfer() {
     ${header()}
     <div class="card">
       <h2>${windowLabel}</h2>
-      <p class="muted">Podés comprar refuerzos si el presupuesto alcanza, y vender jugadores del plantel.</p>
+      <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tenés que vender.</p>
       <h3>Ofertas disponibles</h3>
       <div class="options" id="market-list">
-        ${s.market.map((p, i) => `
+        ${s.market.map((p, i) => {
+          const caro = s.budget < p.price;
+          const lleno = s.squad.length >= MAX_SQUAD;
+          return `
           <div class="pick-row">
-            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — ${money(p.price)}</span>
-            <button class="option-btn small" data-i="${i}" ${s.budget < p.price ? 'disabled' : ''}>Comprar</button>
+            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — <strong>${money(p.price)}</strong>${caro ? ' <span class="muted">(no te alcanza)</span>' : ''}</span>
+            <button class="option-btn small" data-i="${i}" ${caro || lleno ? 'disabled' : ''}>Comprar</button>
           </div>
-        `).join('') || '<p class="muted">No quedan ofertas esta ronda.</p>'}
+        `;
+        }).join('') || '<p class="muted">No quedan ofertas esta ronda.</p>'}
       </div>
-      <h3>Tu plantel</h3>
-      <div class="table-wrap">
-      <div class="options" id="squad-list">
-        ${s.squad.map((p, i) => `
-          <div class="pick-row">
-            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — contrato hasta fin de ${p.contractYears > 1 ? `${p.contractYears} temporadas` : '1 temporada'}</span>
-            <button class="option-btn small danger" data-i="${i}">Vender</button>
+      <details class="collapsible">
+        <summary>Vender jugadores de tu plantel (${s.squad.length})</summary>
+        <div class="collapsible-body">
+          ${s.squad.length <= MIN_SQUAD ? `<p class="muted">No podés vender más: el plantel está en el mínimo de ${MIN_SQUAD} jugadores.</p>` : ''}
+          <div class="options" id="squad-list">
+            ${[...s.squad].map((p, i) => ({ p, i })).sort((a, b) => b.p.rating - a.p.rating).map(({ p, i }) => `
+              <div class="pick-row">
+                <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — contrato hasta fin de ${p.contractYears > 1 ? `${p.contractYears} temporadas` : '1 temporada'}</span>
+                <button class="option-btn small danger" data-i="${i}" ${s.squad.length <= MIN_SQUAD ? 'disabled' : ''}>Vender por ${money(Engine.sellValue(p))}</button>
+              </div>
+            `).join('')}
           </div>
-        `).join('')}
-      </div>
-      </div>
+        </div>
+      </details>
       <button class="option-btn" id="continue-btn">Continuar temporada</button>
     </div>
   `;
@@ -1147,9 +1154,9 @@ function renderSeasonEnd() {
     .map((c) => `En la Copa ${c.copa} llegaste hasta ${c.userStage}.`);
 
   const bloque = (titulo, contenido) => `
-    <details class="season-block">
+    <details class="collapsible">
       <summary>${titulo}</summary>
-      <div class="season-block-body">${contenido}</div>
+      <div class="collapsible-body">${contenido}</div>
     </details>
   `;
 

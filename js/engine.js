@@ -42,6 +42,11 @@ const COPA_ROUNDS = [2, 4, 7, 10, 13];
 const COPA_STAGE_NAMES = ['Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su único torneo
 const TOTAL_ROUNDS = { D1: 15, D2: 17 };
+// Límites del plantel: con el máximo lleno hay que vender para poder
+// comprar, y con el mínimo no se puede vender más (si no te quedás sin
+// equipo).
+const MAX_SQUAD = 30;
+const MIN_SQUAD = 14;
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];
 // Cómo se llama cada instancia de una copa internacional según cuántos
@@ -1821,7 +1826,7 @@ const Engine = {
     // posición (por ejemplo, el último arquero: dejarlo ir rompería
     // cualquier pantalla que necesite un arquero, como los penales).
     const soleAtPosition = player && s.squad.filter((p) => p.pos === player.pos).length <= 1;
-    if (player && (renew || s.squad.length <= 12 || soleAtPosition)) {
+    if (player && (renew || s.squad.length <= MIN_SQUAD || soleAtPosition)) {
       const cost = Math.round(player.rating * 8000);
       s.budget -= cost;
       player.contractYears = 2 + Math.floor(Math.random() * 2);
@@ -1839,38 +1844,73 @@ const Engine = {
     this.save();
   },
 
+  // Cuánto vale un jugador. El precio DUPLICA cada 6 puntos de valoración:
+  // un 70 (titular de Primera) vale ~1,5 millones, un 82 (un crack como
+  // Almada) ronda los 6, y un 88 se va arriba de los 12. Antes era casi
+  // lineal (valoración × 15.000) y un crack costaba apenas un tercio más que
+  // uno del montón, así que con el presupuesto de River se compraban trece
+  // jugadores de 80 y el mercado no tenía ninguna tensión.
+  //
+  // La edad ajusta el valor: un pibe con proyección cuesta más caro que un
+  // veterano de la misma valoración, al que ya casi no le queda recorrido.
+  playerValue(rating, age) {
+    const base = 1500000 * Math.pow(2, (rating - 70) / 6);
+    let ageFactor = 1;
+    if (age <= 22) ageFactor = 1.3;
+    else if (age >= 33) ageFactor = 0.55;
+    else if (age >= 30) ageFactor = 0.8;
+    return Math.round(base * ageFactor);
+  },
+
   generateMarket() {
     const club = this.getClub(this.state.clubId);
-    return Array.from({ length: 3 }, (_, i) => {
+    return Array.from({ length: 5 }, (_, i) => {
       const pos = SQUAD_POSITIONS[Math.floor(Math.random() * SQUAD_POSITIONS.length)];
       const rating = Math.max(38, Math.min(92, Math.round(44 + club.reputation * 6 + (Math.random() * 20 - 6))));
-      const price = Math.round(rating * 15000 * (0.8 + Math.random() * 0.4));
       const age = Math.round(18 + Math.random() * 15);
+      const price = Math.round(this.playerValue(rating, age) * (0.85 + Math.random() * 0.3));
       const nation = this.rollNation();
       return { id: `market-${i}-${Date.now()}`, name: this.randomPlayerName(nation), pos, rating, price, age, nation };
     });
   },
 
+  // Un refuerzo SUMA al plantel. Antes reemplazaba al peor jugador de esa
+  // posición, así que comprar nunca agrandaba el plantel y encima te borraba
+  // a alguien sin avisar. Si el plantel está lleno hay que vender primero,
+  // como en la realidad.
   buyPlayer(marketIndex) {
     const s = this.state;
     const offer = s.market[marketIndex];
     if (!offer || s.budget < offer.price) return false;
+    if (s.squad.length >= MAX_SQUAD) return false;
     s.budget -= offer.price;
-    const samePos = s.squad.filter((p) => p.pos === offer.pos);
-    const target = (samePos.length ? samePos : s.squad).sort((a, b) => a.rating - b.rating)[0];
-    const idx = s.squad.findIndex((p) => p.id === target.id);
-    s.squad[idx] = { id: offer.id, name: offer.name, pos: offer.pos, rating: offer.rating, age: offer.age, nation: offer.nation, contractYears: 3 };
+    s.squad.push({
+      id: offer.id,
+      name: offer.name,
+      pos: offer.pos,
+      rating: offer.rating,
+      potential: this.computePotential(offer.rating, offer.age),
+      age: offer.age,
+      nation: offer.nation,
+      contractYears: 3,
+    });
     s.market.splice(marketIndex, 1);
     this.repairStartingSlots();
     this.save();
     return true;
   },
 
+  // Lo que te pagan por un jugador: un poco menos de lo que vale en el
+  // mercado, que es lo que pasa cuando el que vende es el apurado.
+  sellValue(player) {
+    return Math.round(this.playerValue(player.rating, player.age) * 0.75);
+  },
+
   sellPlayer(squadIndex) {
     const s = this.state;
-    if (s.squad.length <= 12) return false;
+    if (s.squad.length <= MIN_SQUAD) return false;
     const player = s.squad[squadIndex];
-    s.budget += Math.round(player.rating * 15000 * 0.7);
+    s.budget += this.sellValue(player);
     s.squad.splice(squadIndex, 1);
     this.repairStartingSlots();
     this.save();

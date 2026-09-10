@@ -124,7 +124,15 @@ abrir seguís donde quedaste.
   Clausura; en la Nacional, una ventana a mitad de su único torneo. Justo
   antes de abrir el mercado, si algún jugador de tu plantel tiene el
   contrato por vencer a fin de esa temporada, te avisa para que decidas
-  renovarlo (con costo) o dejarlo ir a fin de año.
+  renovarlo (con costo) o dejarlo ir a fin de año. Un refuerzo suma al
+  plantel (máximo 30 jugadores; con el plantel lleno hay que vender primero,
+  y no se puede bajar de 14).
+- **Cuánto vale un jugador**: el precio duplica cada 6 puntos de valoración,
+  así que un titular de Primera (70) ronda el millón y medio, un crack (82)
+  se va a 6 millones y una estrella (88) a 12. La edad ajusta: un pibe con
+  proyección vale más caro que un veterano de la misma valoración. Con eso,
+  el presupuesto de River alcanza para un refuerzo de 90 o dos de 82, y un
+  club chico de la Nacional puede comprar un jugador de 62.
 - **Valoración de jugadores**: cada jugador tiene una valoración (0-100) que
   puede subir o bajar con el tiempo por edad (los jóvenes mejoran, los
   grandes bajan), por rendimiento en cancha y por tus decisiones de

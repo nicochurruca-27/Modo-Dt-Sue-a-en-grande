@@ -349,9 +349,8 @@ h1, h2, h3 {
 .injury-notes h3 { margin-top: 0; }
 .injury-notes p { margin: 6px 0; }
 
-/* Fin de temporada: arriba el resumen de lo que pasó, y el detalle en
-   secciones que se abren solo si querés verlas — si no, la pantalla queda
-   larguísima para scrollear en el celular. */
+/* Secciones que se abren solo si las querés ver: el detalle no se come
+   la pantalla del celular. Las usan el fin de temporada y el mercado. */
 .season-summary {
   border: 1px solid #334155;
   border-radius: 10px;
@@ -385,14 +384,14 @@ h1, h2, h3 {
   font-size: 0.85em;
 }
 
-.season-block {
+.collapsible {
   border: 1px solid #334155;
   border-radius: 10px;
   margin-bottom: 8px;
   background: #111827;
 }
 
-.season-block summary {
+.collapsible summary {
   padding: 11px 12px;
   cursor: pointer;
   font-weight: 600;
@@ -401,22 +400,22 @@ h1, h2, h3 {
 
 /* La flechita propia, porque el marcador por defecto cambia de navegador
    en navegador. */
-.season-block summary::-webkit-details-marker { display: none; }
+.collapsible summary::-webkit-details-marker { display: none; }
 
-.season-block summary::before {
+.collapsible summary::before {
   content: '▸';
   display: inline-block;
   width: 1em;
   color: var(--muted);
 }
 
-.season-block[open] summary::before { content: '▾'; }
+.collapsible[open] summary::before { content: '▾'; }
 
-.season-block-body {
+.collapsible-body {
   padding: 0 12px 12px;
 }
 
-.season-block-body > *:first-child { margin-top: 0; }
+.collapsible-body > *:first-child { margin-top: 0; }
 
 .table-legend {
   list-style: none;
