@@ -79,11 +79,18 @@ abrir seguís donde quedaste.
   un campeón real al final, lo ganes vos o no.
 - **Fechas FIFA**: pausan la liga; tus jugadores mejor valorados pueden ser
   convocados a su selección, con riesgo de lesión o de sumar experiencia.
+- **Resultados de los partidos**: la diferencia de nivel entre dos equipos
+  define sobre todo quién gana, no por cuánto. Un grande de local contra un
+  chico gana cerca del 70% de las veces, pero 2-0 o 1-0: las goleadas
+  grandes son raras (3% de los partidos) y ningún equipo pasa de 6 goles.
 - **Libertadores y Sudamericana**: se juegan de verdad todos los años (fase
   previa, 8 grupos de los que pasan dos, y eliminatorias hasta la final), con
   los clasificados argentinos que salieron de tu temporada anterior más los
   clubes del resto del continente, cada uno con su nivel (ver
-  `js/internacional.js`). El campeón de cada copa y hasta dónde llegó tu club
+  `js/internacional.js`). Las plazas de cada país se reparten de nuevo cada
+  temporada según el nivel de cada club más una buena dosis de azar, así que
+  no clasifican siempre los mismos: los grandes van casi todos los años y los
+  chicos se cuelan de vez en cuando. El campeón de cada copa y hasta dónde llegó tu club
   quedan en la pestaña "Copas" del panel. La primera temporada de una carrera
   todavía no tiene copas: se juegan desde el año siguiente. Es una versión
   simplificada: las llaves son a partido único y los grupos se sortean sin

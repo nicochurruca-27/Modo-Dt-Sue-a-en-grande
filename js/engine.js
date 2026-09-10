@@ -564,11 +564,29 @@ const Engine = {
     return k - 1;
   },
 
+  // Un equipo no mete más de 6 goles en un partido: la cola larga de la
+  // Poisson daba resultados que en el fútbol real no pasan (10 a 0). Se
+  // vuelve a tirar en vez de recortar, para no amontonar probabilidad justo
+  // en el 6; con los lambdas de abajo esto casi nunca se activa.
+  sampleGoals(lambda) {
+    for (let i = 0; i < 8; i++) {
+      const goals = this.samplePoisson(lambda);
+      if (goals <= 6) return goals;
+    }
+    return 6;
+  },
+
+  // La diferencia de nivel entre dos equipos define sobre todo QUIÉN gana,
+  // no por cuánto: un grande contra un chico gana muy seguido, pero 2-0 o
+  // 1-0, no 6-0. Por eso la diferencia de fuerza entra dividida (pesa poco
+  // en la cantidad de goles) y los dos lambdas tienen piso y techo cortitos
+  // — el favorito no pasa de ~2,1 goles esperados y el más débil nunca baja
+  // de ~0,65, así que siempre puede descontar o dar el golpe.
   simulateScore(homeStrength, awayStrength, homeAdvantage) {
     const diff = homeStrength - awayStrength;
-    const lambdaHome = Math.max(0.2, Math.min(4.5, 1.35 + diff / 12 + homeAdvantage / 10));
-    const lambdaAway = Math.max(0.15, Math.min(4, 1.05 - diff / 12));
-    return { homeGoals: this.samplePoisson(lambdaHome), awayGoals: this.samplePoisson(lambdaAway) };
+    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16));
+    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
+    return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
   },
 
   updateTableRow(table, id, gf, ga) {
@@ -699,7 +717,38 @@ const Engine = {
     return arr;
   },
 
-  copaEntrants(copa, qualification) {
+  // Cada país del resto del continente reparte sus plazas de nuevo todos los
+  // años. Las plazas en sí no cambian (las mismas que trae internacional.js:
+  // tantas a la Libertadores, tantas por fase previa, tantas a la
+  // Sudamericana), pero quién ocupa cada una se define por la campaña de ese
+  // año: el nivel del club pesa, pero con bastante azar encima. Así Peñarol
+  // suele ir a la Libertadores y a veces cae en la Sudamericana, y no
+  // clasifican siempre exactamente los mismos.
+  //
+  // El valor de una plaza ordena de mejor a peor: entrar directo a los grupos
+  // de la Libertadores es lo máximo, después su fase previa, después la
+  // Sudamericana.
+  sortearCuposInternacionales() {
+    const valorPlaza = (p) => (p.copa === 'Libertadores' ? (p.fase === 'grupos' ? 3 : 2) : 1);
+    const porPais = {};
+    (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .forEach((c) => { (porPais[c.pais] = porPais[c.pais] || []).push(c); });
+
+    const sorteados = [];
+    Object.values(porPais).forEach((clubes) => {
+      const plazas = clubes.map((c) => ({ copa: c.copa, fase: c.fase }))
+        .sort((a, b) => valorPlaza(b) - valorPlaza(a));
+      const ranking = clubes
+        .map((c) => ({ club: c, campania: c.nivel + Math.random() * 3.5 }))
+        .sort((a, b) => b.campania - a.campania);
+      ranking.forEach((r, i) => {
+        sorteados.push({ id: r.club.id, nombre: r.club.nombre, pais: r.club.pais, nivel: r.club.nivel, ...plazas[i] });
+      });
+    });
+    return sorteados;
+  },
+
+  copaEntrants(copa, qualification, internacionales) {
     const argentinos = qualification.filter((q) => q.comp === copa).map((q) => {
       const club = this.getClub(q.clubId);
       return {
@@ -710,7 +759,7 @@ const Engine = {
         fase: q.stage === 'Fase previa' ? 'previa' : 'grupos',
       };
     });
-    const resto = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+    const resto = (internacionales || this.sortearCuposInternacionales())
       .filter((c) => c.copa === copa)
       .map((c) => ({ id: c.id, nombre: c.nombre, pais: c.pais, nivel: c.nivel, fase: c.fase }));
     return argentinos.concat(resto);
@@ -736,8 +785,18 @@ const Engine = {
     return Math.random() < prob ? idA : idB;
   },
 
-  simulateCopa(copa, qualification) {
-    const entrants = this.copaEntrants(copa, qualification);
+  // Las dos copas de un mismo año se juegan con UN solo sorteo de cupos: si
+  // no, un club del resto del continente podría terminar jugando las dos.
+  simulateCopasDelAnio(qualification) {
+    if (!qualification || !qualification.length) return [];
+    const internacionales = this.sortearCuposInternacionales();
+    return ['Libertadores', 'Sudamericana']
+      .map((copa) => this.simulateCopa(copa, qualification, internacionales))
+      .filter(Boolean);
+  },
+
+  simulateCopa(copa, qualification, internacionales) {
+    const entrants = this.copaEntrants(copa, qualification, internacionales);
     if (entrants.length < 4) return null;
     const byId = Object.fromEntries(entrants.map((e) => [e.id, e]));
     // Hasta dónde llegó cada club: se pisa en cada instancia que juega, así
@@ -1831,9 +1890,7 @@ const Engine = {
     // temporada anterior (como en la realidad), así que la primera temporada
     // de una carrera todavía no tiene copas: se juegan recién al año
     // siguiente, con los cupos que se ganen ahora.
-    const copasDelAnio = s.copaQualification && s.copaQualification.length
-      ? ['Libertadores', 'Sudamericana'].map((copa) => this.simulateCopa(copa, s.copaQualification)).filter(Boolean)
-      : [];
+    const copasDelAnio = this.simulateCopasDelAnio(s.copaQualification);
 
     const qualification = this.assignQualification(d1Data);
     // Estos dos sobreviven al cambio de temporada (a diferencia de

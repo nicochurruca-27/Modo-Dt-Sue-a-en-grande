@@ -320,6 +320,75 @@ h1, h2, h3 {
 .table tr.zone-suda td:first-child { border-left-color: #22d3ee; }
 .table tr.zone-desc td:first-child { border-left-color: #ef4444; }
 
+/* Fin de temporada: arriba el resumen de lo que pasó, y el detalle en
+   secciones que se abren solo si querés verlas — si no, la pantalla queda
+   larguísima para scrollear en el celular. */
+.season-summary {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: #111827;
+}
+
+.season-summary p { margin: 6px 0; }
+
+.season-movement {
+  font-weight: 600;
+}
+
+.trophy-list {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trophy-list li {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #422006;
+  border: 1px solid #eab308;
+  color: #fde047;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+.season-block {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: #111827;
+}
+
+.season-block summary {
+  padding: 11px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+/* La flechita propia, porque el marcador por defecto cambia de navegador
+   en navegador. */
+.season-block summary::-webkit-details-marker { display: none; }
+
+.season-block summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+}
+
+.season-block[open] summary::before { content: '▾'; }
+
+.season-block-body {
+  padding: 0 12px 12px;
+}
+
+.season-block-body > *:first-child { margin-top: 0; }
+
 .table-legend {
   list-style: none;
   margin: 10px 0 0;

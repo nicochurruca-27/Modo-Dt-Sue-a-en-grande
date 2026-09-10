@@ -1116,49 +1116,76 @@ function renderSeasonEnd() {
       ? '¡Lograste el ascenso a Primera División!'
       : `Seguís en ${sum.isD1 ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
 
+  // Lo que ganaste este año, para la vitrina de arriba de todo.
+  const trofeos = [];
+  if (sum.userWasAperturaChampion) trofeos.push('Campeón del Apertura');
+  if (sum.userWasClausuraChampion) trofeos.push('Campeón del Clausura');
+  if (sum.userWonCopa) trofeos.push('Campeón de la Copa Argentina');
+  (sum.copasInternacionales || []).forEach((c) => { if (c.userWon) trofeos.push(`Campeón de la Copa ${c.copa}`); });
+  if (sum.userPromotedDirect || sum.userPromotedReducido) trofeos.push('Ascenso a Primera División');
+
+  // Si no la ganaste pero jugaste una copa internacional, igual va arriba:
+  // es de las cosas que más te interesa saber apenas termina el año.
+  const copasDeTuClub = (sum.copasInternacionales || [])
+    .filter((c) => !c.userWon && c.userStage)
+    .map((c) => `En la Copa ${c.copa} llegaste hasta ${c.userStage}.`);
+
+  const bloque = (titulo, contenido) => `
+    <details class="season-block">
+      <summary>${titulo}</summary>
+      <div class="season-block-body">${contenido}</div>
+    </details>
+  `;
+
   app.innerHTML = `
     <div class="card">
       <h1>Fin de temporada — Año ${s.season.year}</h1>
-      <p>Terminaste ${pos}° en tu zona (${sum.myZoneTable[pos - 1].pts} puntos en el año).</p>
-      <h3>Tabla de tu zona (temporada completa)</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
-          <tbody>
-            ${sum.myZoneTable.map((r, i) => `
-              <tr class="${r.id === s.clubId ? 'me' : ''}">
-                <td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td><td>${r.gf}</td><td>${r.ga}</td><td>${r.pts}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+
+      <div class="season-summary">
+        <p>Terminaste <strong>${pos}°</strong> en tu zona con ${sum.myZoneTable[pos - 1].pts} puntos.</p>
+        ${trofeos.length
+          ? `<ul class="trophy-list">${trofeos.map((t) => `<li>${t}</li>`).join('')}</ul>`
+          : '<p class="muted">Este año se terminó sin títulos.</p>'}
+        ${copasDeTuClub.map((t) => `<p class="muted">${t}</p>`).join('')}
+        <p class="season-movement">${movementText}</p>
+        <p class="muted">${sum.economyNote}</p>
       </div>
 
-      <h3>Torneos de Primera División</h3>
-      <p>${torneosText}</p>
+      ${bloque('Tabla de tu zona', `
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
+            <tbody>
+              ${sum.myZoneTable.map((r, i) => `
+                <tr class="${r.id === s.clubId ? 'me' : ''}">
+                  <td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td><td>${r.gf}</td><td>${r.ga}</td><td>${r.pts}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `)}
 
-      ${!sum.isD1 ? `<h3>Ascenso a Primera División</h3><p>${ascensoText}</p>` : ''}
+      ${bloque('Campeones del año', `
+        <p>${torneosText}</p>
+        <p>${copaText}</p>
+        ${!sum.isD1 ? `<p>${ascensoText}</p>` : ''}
+      `)}
 
-      <h3>Copa Argentina</h3>
-      <p>${copaText}</p>
+      ${sum.copasInternacionales && sum.copasInternacionales.length
+        ? bloque('Copas internacionales', copasResultHtml(sum.copasInternacionales))
+        : ''}
 
-      ${sum.copasInternacionales && sum.copasInternacionales.length ? `
-        <h3>Copas internacionales</h3>
-        ${copasResultHtml(sum.copasInternacionales)}
-      ` : ''}
-
-      ${sum.qualification.length ? `
-        <h3>Clasificación a copas internacionales</h3>
+      ${sum.qualification.length ? bloque('Clasificados a las copas del año que viene', `
         <ul>
           ${sum.qualification.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
         </ul>
-      ` : ''}
+      `) : ''}
 
-      <h3>Ascensos y descensos de Primera División</h3>
-      <p><strong>${movementText}</strong></p>
-      <p class="muted">Descendieron (los dos últimos de la tabla anual): ${sum.relegated.join(', ')}.</p>
-      <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
-      <p class="muted">${sum.economyNote}</p>
+      ${bloque('Ascensos y descensos', `
+        <p class="muted">Descendieron (los dos últimos de la tabla anual): ${sum.relegated.join(', ')}.</p>
+        <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
+      `)}
 
       <button class="option-btn" id="continue-season-btn">Comenzar nueva temporada</button>
       <button class="option-btn danger" id="restart-btn">Empezar de cero con otro club</button>
