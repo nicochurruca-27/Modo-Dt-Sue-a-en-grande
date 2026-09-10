@@ -104,13 +104,32 @@ const CLUB_TEMPLATES = [
 // simplemente no traen ese campo. `mod` es un pequeño empujón a favor o en
 // contra según qué tan ofensiva o defensiva es la formación, que se suma a
 // la fuerza del equipo en cada partido.
+// `medShape` / `offShape` (opcional): en algunas formaciones, la línea de
+// mediocampo o de enganches no es "una sola banda pareja" — tiene formas
+// distintas según el casillero (ej. un doble 5 con dos volantes abiertos a
+// los costados, o un mediocampista central más adelantado que los otros
+// dos). Cada array lista, de izquierda a derecha, la posición detallada
+// (`posDetail`, ver players.js) que se espera en ese casillero puntual.
+// Se usa en Engine.applyShapeRefinement: si el jugador que pusiste ahí no
+// tiene exactamente esa posición (ni como alternativa), un casillero que
+// daría verde por las reglas generales baja a amarillo. Todavía no está
+// cargado para las 17 formaciones — se va completando de a una,
+// analizándolas con cuidado en vez de adivinar todas de una.
 const FORMATIONS = [
   // Defensivas
-  { id: '541', name: '5-4-1', def: 5, med: 4, del: 1, style: 'Defensiva', mod: -3 },
+  {
+    id: '541', name: '5-4-1', def: 5, med: 4, del: 1, style: 'Defensiva', mod: -3,
+    // MI - MC - MC - MD
+    medShape: ['volante por izquierda', 'mediocampista mixto', 'mediocampista mixto', 'volante por derecha'],
+  },
   { id: '532', name: '5-3-2', def: 5, med: 3, del: 2, style: 'Defensiva', mod: -2 },
   { id: '523', name: '5-2-3', def: 5, med: 2, del: 3, style: 'Defensiva', mod: -1 },
   { id: '5212', name: '5-2-1-2', def: 5, med: 2, off: 1, del: 2, style: 'Defensiva', mod: -2 },
-  { id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1 },
+  {
+    id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1,
+    // MI - MC - MCD (contención, el más retrasado) - MC - MD
+    medShape: ['volante por izquierda', 'mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto', 'volante por derecha'],
+  },
   // Equilibradas
   { id: '442', name: '4-4-2', def: 4, med: 4, del: 2, style: 'Equilibrada', mod: 0 },
   { id: '433', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Equilibrada', mod: 1 },
@@ -118,13 +137,25 @@ const FORMATIONS = [
   { id: '3412', name: '3-4-1-2', def: 3, med: 4, off: 1, del: 2, style: 'Equilibrada', mod: 1 },
   // Ofensivas
   { id: '424', name: '4-2-4', def: 4, med: 2, del: 4, style: 'Ofensiva', mod: 4 },
-  { id: '433o', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 3 },
+  {
+    id: '433o', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 3,
+    // MC - MCO (el más adelantado, el "10" del medio) - MC
+    medShape: ['mediocampista mixto', 'mediocampista ofensivo', 'mediocampista mixto'],
+  },
   { id: '343', name: '3-4-3', def: 3, med: 4, del: 3, style: 'Ofensiva', mod: 3 },
   { id: '4231', name: '4-2-3-1', def: 4, med: 2, off: 3, del: 1, style: 'Ofensiva', mod: 2 },
   { id: '352', name: '3-5-2', def: 3, med: 5, del: 2, style: 'Ofensiva', mod: 2 },
-  { id: '4141', name: '4-1-4-1', def: 4, med: 1, off: 4, del: 1, style: 'Ofensiva', mod: 3 },
+  {
+    id: '4141', name: '4-1-4-1', def: 4, med: 1, off: 4, del: 1, style: 'Ofensiva', mod: 3,
+    // Línea de enganches: MI - MCO - MCO - MD
+    offShape: ['volante por izquierda', 'mediocampista ofensivo', 'mediocampista ofensivo', 'volante por derecha'],
+  },
   { id: '4222', name: '4-2-2-2', def: 4, med: 2, off: 2, del: 2, style: 'Ofensiva', mod: 4 },
-  { id: '325', name: '3-2-5', def: 3, med: 2, off: 4, del: 1, style: 'Ofensiva', mod: 5 },
+  {
+    id: '325', name: '3-2-5', def: 3, med: 2, off: 4, del: 1, style: 'Ofensiva', mod: 5,
+    // Línea de enganches/extremos, más adelantada que en la 4-1-4-1: EI - MCO - MCO - ED
+    offShape: ['extremo izquierdo', 'mediocampista ofensivo', 'mediocampista ofensivo', 'extremo derecho'],
+  },
 ];
 
 // Distribución de nacionalidades de los jugadores generados. La liga es

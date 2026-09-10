@@ -278,14 +278,28 @@ function buildPitchSvg(xi, club) {
   const svgHeight = 2 * PITCH_MARGIN_Y + Math.max(0, rows.length - 1) * PITCH_ROW_H + rowContentH;
   const fieldInnerWidth = svgWidth - 2 * PITCH_MARGIN_X;
 
+  // Grilla de referencia: la misma que usa la fila más ancha (maxCols),
+  // empaquetada justa — es la que ya sabemos que entra siempre en el
+  // ancho del <svg>. Las filas con menos jugadores no se centran como un
+  // bloque aparte (eso las dejaba amontonadas y, encima, alineadas en
+  // columnas rígidas contra cualquier otra fila del mismo tamaño — ej. en
+  // 4-2-2-2 la línea de enganches quedaba pegada justo debajo de los dos
+  // delanteros, apilada). En cambio se reparten proporcionalmente sobre
+  // ESA MISMA grilla (el primero va al casillero 0, el último al
+  // maxCols-1, y los del medio interpolados) — así una dupla queda en las
+  // dos puntas del ancho disponible, como una formación real dibujada en
+  // una pizarra, y nunca se sale de los límites ya probados.
+  const maxRowWidth = maxCols * PITCH_JERSEY_W + Math.max(0, maxCols - 1) * PITCH_COL_GAP;
+  const gridStartX = PITCH_MARGIN_X + (fieldInnerWidth - maxRowWidth) / 2;
+  const gridStep = PITCH_JERSEY_W + PITCH_COL_GAP;
+
   let playersMarkup = '';
   rows.forEach((row, i) => {
     const count = row.players.length;
-    const rowWidth = count * PITCH_JERSEY_W + Math.max(0, count - 1) * PITCH_COL_GAP;
-    const rowStartX = PITCH_MARGIN_X + (fieldInnerWidth - rowWidth) / 2;
     const y = PITCH_MARGIN_Y + i * PITCH_ROW_H;
     row.players.forEach((p, j) => {
-      const x = rowStartX + j * (PITCH_JERSEY_W + PITCH_COL_GAP);
+      const virtualIndex = count === 1 ? (maxCols - 1) / 2 : (j * (maxCols - 1)) / (count - 1);
+      const x = gridStartX + virtualIndex * gridStep;
       playersMarkup += playerMarkerSvg(p, club, x, y, p.id === selectedPlayerId);
     });
   });

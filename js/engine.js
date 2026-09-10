@@ -376,6 +376,27 @@ const Engine = {
     return { color: 'green', mult: 1 }; // era amarillo
   },
 
+  // Cuando la formación define una "forma" explícita para el casillero
+  // (medShape/offShape, ver FORMATIONS en data.js) y el ajuste de base ya
+  // daba verde, se compara la posición detallada real del jugador (o sus
+  // alternativas) contra la que se espera en ESE casillero puntual — no
+  // alcanza con estar en la línea correcta, tiene que ser el tipo de
+  // mediocampista/enganche correcto (ej. un volante lateral en un casillero
+  // que pide un enganche central). Sin ese dato (posDetail no cargado, o la
+  // formación sin forma definida todavía) el comportamiento es el de
+  // siempre. Nunca empeora un amarillo/rojo ya existente, solo baja un
+  // verde que no corresponde.
+  applyShapeRefinement(player, slot, formation, slotIndex, fit) {
+    if (fit.color !== 'green' || slotIndex === undefined || !formation || !player.posDetail) return fit;
+    if (slot !== 'MED' && slot !== 'OFF') return fit;
+    const shape = slot === 'MED' ? formation.medShape : formation.offShape;
+    const expected = shape && shape[slotIndex];
+    if (!expected) return fit;
+    if (player.posDetail === expected) return fit;
+    if (player.altPosDetail && player.altPosDetail.includes(expected)) return fit;
+    return { color: 'yellow', mult: 0.85 };
+  },
+
   // slotIndex/slotCount (posición del casillero dentro de su línea, ver
   // getStartingXI) afinan el color cuando el jugador ya está en su posición
   // general correcta (DEF o DEL) pero del lado equivocado de la cancha —
@@ -384,6 +405,10 @@ const Engine = {
   // se aplica si tenemos el dato de posDetail del jugador; sin ese dato el
   // comportamiento es exactamente el de antes.
   positionFit(player, slot, formation, slotIndex, slotCount) {
+    return this.applyShapeRefinement(player, slot, formation, slotIndex, this.baseFit(player, slot, formation, slotIndex, slotCount));
+  },
+
+  baseFit(player, slot, formation, slotIndex, slotCount) {
     const playerPos = player.pos;
     if (playerPos === 'MED' && formation && formation.off && player.role) {
       if (slot === 'OFF') {

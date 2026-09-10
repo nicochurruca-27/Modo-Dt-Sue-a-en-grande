@@ -172,6 +172,17 @@ abrir seguís donde quedaste.
   se investiga puntualmente jugador por jugador, no algo que se cargue para
   todo un plantel de una.
 
+  El mediocampo y la línea de enganches tampoco son siempre "una sola banda
+  pareja": en formaciones puntuales, cada casillero espera un tipo de
+  mediocampista distinto (`medShape`/`offShape` en FORMATIONS, `js/data.js`
+  — ej. en la 4-1-4-1 la línea de enganches es volante izquierdo,
+  mediapunta, mediapunta, volante derecho; en la 4-3-3 ofensiva el
+  mediocampo es dos mixtos con uno más adelantado en el medio). Si el
+  jugador que pusiste ahí no es exactamente ese tipo (ni lo tiene como
+  posición alternativa), un casillero que daría verde por las reglas
+  generales baja a amarillo (`Engine.applyShapeRefinement`). Todavía no
+  está cargado para las 17 formaciones, se va completando de a una.
+
   La valoración de cada titular y su abreviatura de posición (LD, DFC, MCO,
   etc.) se muestran debajo del nombre en la cancha (y en la lista de
   suplentes) — sin sacar nada de lo que ya había.
@@ -185,6 +196,12 @@ abrir seguís donde quedaste.
   compatible posible: coordenadas numéricas fijas, como una imagen. Si el
   ancho que necesita la formación no entra en el panel, se desliza con el
   dedo (`.pitch-scroll`) — los jugadores nunca se achican para "entrar".
+  Cada línea se reparte proporcionalmente sobre la misma grilla que usa la
+  fila más ancha (en vez de centrarse como un bloque aparte): así una dupla
+  de mediocampistas queda en las dos puntas del ancho disponible en lugar
+  de apilada justo debajo de otra línea del mismo tamaño (por ejemplo los
+  dos enganches de una 4-2-2-2, que antes quedaban pegados en columna recta
+  contra los dos delanteros de arriba).
 
 ## Simplificaciones a propósito (para no volverlo inmanejable)
 
