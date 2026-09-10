@@ -85,7 +85,13 @@ body {
   }
 
   .layout { flex-direction: column; }
-  #app { max-width: 100%; margin: 0; }
+  /* El width: 100% es necesario, no decorativo: .layout usa
+     align-items: flex-start, así que apilado en columna cada panel se
+     achica al ancho de su contenido en vez de ocupar la pantalla. Los
+     paneles laterales ya lo tenían; a #app le faltaba, y por eso una
+     pantalla de contenido angosto (por ejemplo la del penal) quedaba
+     apretada contra la izquierda en vez de usar todo el ancho. */
+  #app { max-width: 100%; width: 100%; margin: 0; }
   .side-panel { flex: 1 1 auto; width: 100%; position: static; }
 
   .layout[data-view="app"] #table-panel,
@@ -186,6 +192,11 @@ h1, h2, h3 {
   color: var(--muted);
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+.nation-flag {
+  vertical-align: -0.12em;
+  border-radius: 1px;
 }
 
 .topbar-club {
@@ -588,27 +599,43 @@ h1, h2, h3 {
    truco viejo de padding-bottom en % para fijar la proporción del arco, y
    la pelota/arquero se mueven con left/top en % + transition, soportado
    hace muchísimos años y sin depender de flexbox/grid intrínseco. */
+/* El max-width va acá afuera y NO en .goal-wrap. El alto del arco sale de
+   padding-bottom en %, y ese % se mide contra el ancho del PADRE, no contra
+   el ancho propio: con el max-width puesto en .goal-wrap, en una pantalla
+   grande el padre medía ~600px, el padding daba ~360px de alto y el ancho
+   quedaba clavado en 360px => arco cuadrado. En el celular no se notaba
+   porque ahí el padre es angosto. Con el envoltorio, las dos medidas salen
+   del mismo ancho y la proporción se respeta en cualquier pantalla. */
+.goal-outer {
+  width: 100%;
+  max-width: 420px;
+  margin: 14px auto 0;
+}
+
+/* 50% de padding = proporción 2:1, parecido a un arco de verdad (7,32 x 2,44
+   son 3:1, pero en perspectiva desde el punto del penal se ve más alto).
+   El viewBox del <svg> tiene esta misma proporción, así que el marco entra
+   justo sin deformarse. */
 .goal-wrap {
   position: relative;
   width: 100%;
-  max-width: 360px;
-  margin: 14px auto 0;
-  padding-bottom: 60%;
+  padding-bottom: 50%;
   background: linear-gradient(#173a63, #0e2647);
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* La red va SOLO adentro de los palos (mismo recorte que el hueco del
-   arco en el <svg> de abajo: x 4%-96%, y 6.7%-93.3%). Antes la cuadrícula
-   era el fondo de todo .goal-wrap, así que "seguía" por fuera de los
-   palos en vez de cortarse justo ahí, como pasa en un arco de verdad. */
+/* La red va SOLO adentro de los palos: el borde interno del marco del <svg>
+   de abajo (trazo de 2 centrado en x=4 y en y=3, sobre un viewBox de 100x50)
+   cae en x 5%-95% y en y 8%-94%. Antes la cuadrícula era el fondo de todo
+   .goal-wrap, así que "seguía" por fuera de los palos en vez de cortarse
+   justo ahí, como pasa en un arco de verdad. */
 .goal-net {
   position: absolute;
-  left: 4%;
-  top: 6.7%;
-  width: 92%;
-  height: 86.6%;
+  left: 5%;
+  top: 8%;
+  width: 90%;
+  height: 86%;
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 10px);
@@ -640,8 +667,21 @@ h1, h2, h3 {
   transition: left 0.6s ease-out, top 0.6s ease-out;
 }
 
+/* El arquero se mide en % del arco y no en píxeles fijos: antes eran 34x40px
+   siempre, así que en la PC (arco más grande) quedaba diminuto al lado del
+   arco. Con el ancho en % crece y achica junto con el arquito. */
+.goal-keeper {
+  width: 20%;
+}
+
+.goal-keeper svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .goal-ball {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
 }
 

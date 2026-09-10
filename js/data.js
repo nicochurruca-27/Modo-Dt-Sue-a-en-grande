@@ -260,13 +260,16 @@ const FORMATIONS = [
 // argentina, así que la mayoría de los planteles son de ese país, con una
 // porción menor de jugadores de países vecinos (algo habitual en el fútbol
 // argentino real).
+// La bandera de cada país se dibuja en ui.js (ver NATION_FLAGS), no se
+// guarda acá como emoji: Windows no trae las banderas de países en su fuente
+// y las muestra como las dos letras del código.
 const NATIONS = [
-  { code: 'ARG', flag: '🇦🇷', name: 'Argentina', weight: 0.82 },
-  { code: 'URU', flag: '🇺🇾', name: 'Uruguay', weight: 0.05 },
-  { code: 'BRA', flag: '🇧🇷', name: 'Brasil', weight: 0.05 },
-  { code: 'PAR', flag: '🇵🇾', name: 'Paraguay', weight: 0.04 },
-  { code: 'COL', flag: '🇨🇴', name: 'Colombia', weight: 0.02 },
-  { code: 'CHI', flag: '🇨🇱', name: 'Chile', weight: 0.02 },
+  { code: 'ARG', name: 'Argentina', weight: 0.82 },
+  { code: 'URU', name: 'Uruguay', weight: 0.05 },
+  { code: 'BRA', name: 'Brasil', weight: 0.05 },
+  { code: 'PAR', name: 'Paraguay', weight: 0.04 },
+  { code: 'COL', name: 'Colombia', weight: 0.02 },
+  { code: 'CHI', name: 'Chile', weight: 0.02 },
 ];
 
 const NAMES_BY_NATION = {

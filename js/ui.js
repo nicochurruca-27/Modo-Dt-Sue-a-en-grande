@@ -46,6 +46,31 @@ function posDetailAbbrev(posDetail) {
   return POS_DETAIL_ABBREV[posDetail] || null;
 }
 
+// Banderas dibujadas a mano, en un viewBox de 30x20 (la proporción 3:2 de
+// una bandera de verdad). No se usan los emojis (🇦🇷): Windows no trae las
+// banderas de países en su fuente de emojis y las muestra como las dos
+// letras del código — en una PC, Argentina aparecía literalmente como "AR".
+// Dibujadas así se ven igual en cualquier sistema.
+//
+// Son versiones simplificadas: los soles de Argentina y Uruguay y el
+// emblema de Paraguay van como un círculo, porque a 12 píxeles de alto el
+// detalle no se distingue igual.
+const NATION_FLAGS = {
+  ARG: `<rect width="30" height="20" fill="#fff"/><rect width="30" height="6.7" fill="#74acdf"/><rect y="13.3" width="30" height="6.7" fill="#74acdf"/><circle cx="15" cy="10" r="2.4" fill="#f6b40e" stroke="#c77c00" stroke-width="0.3"/>`,
+  URU: `<rect width="30" height="20" fill="#fff"/><rect y="4.4" width="30" height="2.2" fill="#0038a8"/><rect y="8.9" width="30" height="2.2" fill="#0038a8"/><rect y="13.3" width="30" height="2.2" fill="#0038a8"/><rect y="17.8" width="30" height="2.2" fill="#0038a8"/><rect width="11" height="11" fill="#fff"/><circle cx="5.5" cy="5.5" r="2.6" fill="#f6b40e"/>`,
+  BRA: `<rect width="30" height="20" fill="#009739"/><polygon points="15,2.2 27.5,10 15,17.8 2.5,10" fill="#fedd00"/><circle cx="15" cy="10" r="3.6" fill="#012169"/>`,
+  PAR: `<rect width="30" height="6.7" fill="#d52b1e"/><rect y="6.7" width="30" height="6.6" fill="#fff"/><rect y="13.3" width="30" height="6.7" fill="#0038a8"/><circle cx="15" cy="10" r="2.2" fill="#fff" stroke="#d52b1e" stroke-width="0.5"/>`,
+  COL: `<rect width="30" height="10" fill="#fcd116"/><rect y="10" width="30" height="5" fill="#003893"/><rect y="15" width="30" height="5" fill="#ce1126"/>`,
+  CHI: `<rect width="30" height="10" fill="#fff"/><rect y="10" width="30" height="10" fill="#d52b1e"/><rect width="10" height="10" fill="#0039a6"/><polygon points="5,2 5.71,4.03 7.85,4.07 6.14,5.37 6.76,7.43 5,6.2 3.24,7.43 3.86,5.37 2.15,4.07 4.29,4.03" fill="#fff"/>`,
+};
+
+function nationFlag(code, height = 12) {
+  const shapes = NATION_FLAGS[code];
+  if (!shapes) return '';
+  const width = Math.round(height * 1.5);
+  return `<svg class="nation-flag" width="${width}" height="${height}" viewBox="0 0 30 20" role="img" aria-label="Bandera">${shapes}<rect width="30" height="20" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/></svg>`;
+}
+
 // Convierte el contador de días (s.calendar.dayCount, un simple entero
 // que sobrevive bien al save/load) en una fecha legible, sumando días
 // sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
@@ -579,7 +604,7 @@ function renderDTCreate() {
       <div class="club-grid">
         ${NATIONS.map((n) => `
           <button class="club-btn ${n.code === dtNationDraft ? 'active' : ''}" data-nation="${n.code}">
-            <strong>${n.flag} ${n.name}</strong>
+            <strong>${nationFlag(n.code, 14)} ${n.name}</strong>
           </button>
         `).join('')}
       </div>
@@ -689,7 +714,7 @@ function header() {
   const divisionName = club.division === 'D1' ? 'Primera División' : 'Primera Nacional';
   const dt = s.dt;
   const dtNation = dt && NATIONS.find((n) => n.code === dt.nation);
-  const dtLine = dt ? `<div class="muted">DT: ${dtNation ? dtNation.flag : ''} ${dt.name}</div>` : '';
+  const dtLine = dt ? `<div class="muted">DT: ${dtNation ? nationFlag(dtNation.code) : ''} ${dt.name}</div>` : '';
   const objectiveLine = s.objective ? `<div class="muted">Objetivo de la dirigencia: ${s.objective.text}</div>` : '';
   return `
     <div class="topbar">
@@ -774,7 +799,22 @@ function renderPreMatch() {
 function goalZoneCenter(zoneId) {
   const z = PENALTY_ZONES.find((p) => p.id === zoneId);
   const leftPct = 18 + z.col * 32; // 3 columnas: 18%, 50%, 82%
-  const topPct = z.row === 0 ? 28 : 68; // arriba / abajo dentro del arco
+  const topPct = z.row === 0 ? 28 : 72; // arriba / abajo dentro del arco
+  return { leftPct, topPct };
+}
+
+// El arquero no se para en el mismo punto que la pelota. El muñeco es alto
+// (ocupa casi la mitad del alto del arco), así que si lo centráramos en el
+// centro de la zona, en los tiros de abajo le quedarían los pies afuera del
+// arco. Estos valores lo dejan siempre apoyado adentro: KEEPER_REST es la
+// pose de espera, y en el tiro de abajo se queda a esa misma altura (se
+// tira para el costado, no para abajo).
+const KEEPER_REST_TOP = 60;
+
+function keeperSpot(zoneId) {
+  const z = PENALTY_ZONES.find((p) => p.id === zoneId);
+  const leftPct = 18 + z.col * 32;
+  const topPct = z.row === 0 ? 36 : KEEPER_REST_TOP;
   return { leftPct, topPct };
 }
 
@@ -786,7 +826,7 @@ function keeperIconSvg(shirt, trim) {
   const t = trim || '#0a0a0a';
   const shorts = trim || '#1e293b';
   return `
-    <svg viewBox="0 0 40 46" width="34" height="40">
+    <svg viewBox="0 0 40 46">
       <path d="M20 16 L7 5 M20 16 L33 5" stroke="${shirt}" stroke-width="5" fill="none" stroke-linecap="round" />
       <circle cx="7" cy="5" r="4" fill="#e8b48c" stroke="${t}" stroke-width="1" />
       <circle cx="33" cy="5" r="4" fill="#e8b48c" stroke="${t}" stroke-width="1" />
@@ -800,17 +840,31 @@ function keeperIconSvg(shirt, trim) {
   `;
 }
 
+// El arco va envuelto en .goal-outer porque el alto de .goal-wrap sale de un
+// padding-bottom en porcentaje, y ese porcentaje se calcula contra el ancho
+// del PADRE, no contra el ancho propio. Con el max-width puesto directamente
+// en .goal-wrap, en una pantalla grande el padre medía mucho más que el arco
+// y el alto se disparaba: el arco salía cuadrado en la PC (en el celular no
+// se notaba porque ahí el padre es angosto). Con el max-width en el envoltorio
+// las dos medidas salen del mismo ancho y la proporción se respeta siempre.
+//
+// El viewBox (100x50) tiene la misma proporción que el recuadro, así que el
+// marco no necesita deformarse para llenarlo: antes se estiraba con
+// preserveAspectRatio="none" y el travesaño terminaba mucho más grueso que
+// los palos, porque el trazo se estira junto con el dibujo.
 function goalWidgetHtml(keeperKit) {
   return `
-    <div class="goal-wrap" id="goal-wrap">
-      <div class="goal-net"></div>
-      <svg class="goal-frame" viewBox="0 0 100 60" preserveAspectRatio="none">
-        <polyline points="4,56 4,4 96,4 96,56" fill="none" stroke="#e2e8f0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
-      </svg>
-      ${PENALTY_ZONES.map((z) => `<div class="goal-zone" data-zone="${z.id}" style="left:${z.col * 33.33}%;top:${z.row * 50}%;"></div>`).join('')}
-      <div class="goal-keeper" id="goal-keeper" style="left:50%;top:48%;">${keeperIconSvg(keeperKit.shirt, keeperKit.trim)}</div>
-      <div class="goal-ball" id="goal-ball" style="left:50%;top:96%;">⚽</div>
-      <div class="goal-result-banner" id="goal-banner"></div>
+    <div class="goal-outer">
+      <div class="goal-wrap" id="goal-wrap">
+        <div class="goal-net"></div>
+        <svg class="goal-frame" viewBox="0 0 100 50">
+          <polyline points="4,47 4,3 96,3 96,47" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+        </svg>
+        ${PENALTY_ZONES.map((z) => `<div class="goal-zone" data-zone="${z.id}" style="left:${z.col * 33.33}%;top:${z.row * 50}%;"></div>`).join('')}
+        <div class="goal-keeper" id="goal-keeper" style="left:50%;top:60%;">${keeperIconSvg(keeperKit.shirt, keeperKit.trim)}</div>
+        <div class="goal-ball" id="goal-ball" style="left:50%;top:96%;">⚽</div>
+        <div class="goal-result-banner" id="goal-banner"></div>
+      </div>
     </div>
   `;
 }
@@ -839,7 +893,7 @@ function animatePenaltyResult(side) {
   const shotZone = side === 'user' ? pen.direction : pen.shooterZone;
   const keeperZone = side === 'user' ? pen.keeperZone : pen.direction;
   const ballTarget = goalZoneCenter(shotZone);
-  const keeperTarget = goalZoneCenter(keeperZone);
+  const keeperTarget = keeperSpot(keeperZone);
 
   ball.style.left = `${ballTarget.leftPct}%`;
   ball.style.top = `${ballTarget.topPct}%`;
@@ -1088,7 +1142,7 @@ function renderFifaBreak() {
         <h2>Fecha FIFA — Convocatorias</h2>
         <p>La liga se detiene. Estos jugadores tuyos fueron convocados a su selección:</p>
         <ul>
-          ${ev.callUps.map((p) => `<li>${NATIONS.find((n) => n.code === p.nation).flag} ${p.name} (${p.rating}) — ${Engine.nationName(p.nation)}</li>`).join('')}
+          ${ev.callUps.map((p) => `<li>${nationFlag(p.nation)} ${p.name} (${p.rating}) — ${Engine.nationName(p.nation)}</li>`).join('')}
         </ul>
         <p class="muted">¿Le pedís a la selección que le cuide los minutos para reducir el riesgo de lesión?</p>
         <div class="options">
