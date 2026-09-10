@@ -95,6 +95,68 @@ function render() {
 // resumen de la última clasificación a copas internacionales (Libertadores /
 // Sudamericana todavía no se juegan partido a partido, así que no hay una
 // "tabla" en vivo — se muestra el resultado de la última vez que se definió).
+// ---------- Colores de las tablas ----------
+//
+// Cada fila puede llevar una franja de color a la izquierda según a qué le
+// está jugando ese puesto, como en las tablas de Promiedos. Las reglas de
+// acá son las mismas que aplica el motor a fin de año (ver el comentario de
+// arriba de engine.js), no una aproximación.
+
+// Tabla de zona: clasifican los 8 primeros. En Primera van a los playoffs;
+// en la Nacional el 1º juega la Final por el ascenso y del 2º al 8º van al
+// Reducido.
+function zoneRowZone(index, isD1) {
+  if (index >= 8) return null;
+  if (isD1) return 'playoff';
+  return index === 0 ? 'champ' : 'playoff';
+}
+
+// Tabla Anual: 1º y 2º a la Libertadores, 3º a 8º a la Sudamericana, 9º al
+// repechaje de la Libertadores, y los dos últimos en zona de descenso. Los
+// campeones del Apertura, del Clausura y de la Copa Argentina entran por su
+// cuenta y corren la lista, así que estos son los cupos por tabla.
+function anualRowZone(index, total) {
+  if (index >= total - 2) return 'desc';
+  if (index <= 1) return 'lib';
+  if (index <= 7) return 'suda';
+  if (index === 8) return 'repechaje';
+  return null;
+}
+
+function tableRowHtml(row, index, zone) {
+  const s = Engine.state;
+  const classes = [row.id === s.clubId ? 'me' : '', zone ? `zone-${zone}` : ''].filter(Boolean).join(' ');
+  return `<tr class="${classes}"><td>${index + 1}</td><td><span class="table-club">${clubCrest(row, 18)}${row.name}</span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
+}
+
+function tableLegend(items) {
+  return `<ul class="table-legend">${items.map((it) => `<li><span class="legend-dot zone-${it.zone}"></span>${it.text}</li>`).join('')}</ul>`;
+}
+
+function anualTableBody() {
+  const table = Engine.tablaAnualRows();
+  if (!table || !table.length) {
+    return '<p class="muted">La Tabla Anual arranca cuando empieza la primera fecha del Apertura.</p>';
+  }
+  return `
+    <p class="muted">Suma la fase de zonas del Apertura y la del Clausura. Los playoffs no suman puntos.</p>
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+        <tbody>
+          ${table.map((r, i) => tableRowHtml(r, i, anualRowZone(i, table.length))).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${tableLegend([
+      { zone: 'lib', text: 'Copa Libertadores' },
+      { zone: 'repechaje', text: 'Repechaje de la Libertadores' },
+      { zone: 'suda', text: 'Copa Sudamericana' },
+      { zone: 'desc', text: 'Zona de descenso: baja el último, y el segundo descenso sale del peor promedio' },
+    ])}
+  `;
+}
+
 function renderTablePanel() {
   const s = Engine.state;
   if (!s || !s.season) { tablePanel.innerHTML = ''; return; }
@@ -105,14 +167,22 @@ function renderTablePanel() {
   const tabs = [
     { id: 'mine', label: `Zona ${myZoneLetter}` },
     { id: 'other', label: `Zona ${otherZoneLetter}` },
+    // La Tabla Anual solo existe en Primera: la Nacional juega un torneo
+    // anual único, así que su tabla de zona ya es la del año.
+    ...(s.season.myDivision === 'D1' ? [{ id: 'anual', label: 'Anual' }] : []),
     { id: 'copas', label: 'Copas' },
   ];
+  // Si la pestaña guardada ya no existe (pasa al descender a la Nacional,
+  // que no tiene Tabla Anual), se vuelve a la primera.
+  if (!tabs.some((t) => t.id === tablePanelTab)) tablePanelTab = tabs[0].id;
   const activeIndex = tabs.findIndex((t) => t.id === tablePanelTab);
   const prevTab = tabs[(activeIndex - 1 + tabs.length) % tabs.length];
   const nextTab = tabs[(activeIndex + 1) % tabs.length];
 
   let body;
-  if (tablePanelTab === 'copas') {
+  if (tablePanelTab === 'anual') {
+    body = anualTableBody();
+  } else if (tablePanelTab === 'copas') {
     const sum = s.lastSeasonSummary;
     if (sum && sum.qualification && sum.qualification.length) {
       body = `
@@ -128,19 +198,28 @@ function renderTablePanel() {
     const zoneKey = `${s.season.myDivision}-${tablePanelTab === 'mine' ? myZoneLetter : otherZoneLetter}`;
     const zoneData = s.season.zones[zoneKey];
     const table = zoneData ? Engine.sortTable(zoneData.table) : [];
+    const isD1 = s.season.myDivision === 'D1';
     body = `
       <div class="table-wrap">
         <table class="table compact">
           <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
           <tbody>
-            ${table.map((r, i) => `<tr class="${r.id === s.clubId ? 'me' : ''}"><td>${i + 1}</td><td><span class="table-club">${clubCrest(r, 18)}${r.name}</span></td><td>${r.played}</td><td>${r.pts}</td></tr>`).join('')}
+            ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1))).join('')}
           </tbody>
         </table>
       </div>
+      ${tableLegend(isD1
+        ? [{ zone: 'playoff', text: 'Clasifica a los playoffs (octavos de final)' }]
+        : [
+          { zone: 'champ', text: 'Juega la Final por el ascenso' },
+          { zone: 'playoff', text: 'Clasifica al Torneo Reducido' },
+        ])}
     `;
   }
 
-  const heading = tablePanelTab === 'copas' ? 'Copas' : `Tabla — ${tabs[activeIndex].label}`;
+  const heading = tablePanelTab === 'copas' ? 'Copas'
+    : tablePanelTab === 'anual' ? 'Tabla Anual'
+    : `Tabla — ${tabs[activeIndex].label}`;
   tablePanel.innerHTML = `
     <div class="card side-card">
       <div class="panel-tab-switch">

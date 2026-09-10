@@ -52,14 +52,19 @@ abrir seguís donde quedaste.
   coincidir — por ejemplo San Lorenzo tiene un plantel de nivel medio pero un
   presupuesto bajo por su crisis institucional, mientras que Boca y River
   manejan presupuestos muy por encima del resto.
-- **Sin escudos por ahora**: se muestra solo el nombre de cada club. Se
-  descartó generar escudos propios a pedido tuyo — cuando quieras sumar los
-  oficiales, es cuestión de agregar las imágenes y un par de líneas en
-  `ui.js` para mostrarlas.
+- **Escudos**: los 30 clubes de Primera tienen su escudo real, embebido en
+  `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
+  la Nacional todavía no están: esos clubes se muestran con un escudo
+  genérico con sus iniciales.
 - **Apertura y Clausura**: en Primera se juegan dos torneos por año, cada uno
-  con fase de zonas a una rueda y playoffs de octavos a la final (16 mejores
-  de la tabla combinada de esa edición), con una ventana de pases entre
-  ambos. La Nacional juega un solo torneo anual a una rueda.
+  con fase de zonas a una rueda y playoffs de octavos a la final (clasifican
+  los 8 primeros de cada zona, cruzados entre zonas: 1ºA-8ºB, 2ºA-7ºB, y
+  así), con una ventana de pases entre ambos. La Nacional juega un solo
+  torneo anual a una rueda.
+- **Tabla Anual**: pestaña propia en el panel de tablas de Primera. Suma la
+  fase de zonas del Apertura y la del Clausura (los playoffs no suman
+  puntos) y se va actualizando fecha a fecha. Marca con colores los puestos
+  de Libertadores, Sudamericana y descenso.
 - **Copa Argentina**: al arrancar el año se sortea un cuadro de 32 (los 30
   clubes de Primera + 2 de la Nacional, garantizando que tu club esté
   adentro) y se juega en paralelo al Apertura (o al único torneo de la

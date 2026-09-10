@@ -305,6 +305,53 @@ h1, h2, h3 {
   font-weight: 600;
 }
 
+/* Franja de color a la izquierda del puesto, como en las tablas de
+   Promiedos: dice a qué está jugando ese lugar (ver zoneRowZone /
+   anualRowZone en ui.js). Va como border-left de la primera celda para no
+   pisar el fondo de la fila del club propio. */
+.table tr[class*="zone-"] td:first-child {
+  border-left: 4px solid transparent;
+}
+
+.table tr.zone-champ td:first-child { border-left-color: #22c55e; }
+.table tr.zone-lib td:first-child { border-left-color: #eab308; }
+.table tr.zone-repechaje td:first-child { border-left-color: #a1731a; }
+.table tr.zone-playoff td:first-child,
+.table tr.zone-suda td:first-child { border-left-color: #22d3ee; }
+.table tr.zone-desc td:first-child { border-left-color: #ef4444; }
+
+.table-legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.table-legend li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+
+.legend-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.legend-dot.zone-champ { background: #22c55e; }
+.legend-dot.zone-lib { background: #eab308; }
+.legend-dot.zone-repechaje { background: #a1731a; }
+.legend-dot.zone-playoff,
+.legend-dot.zone-suda { background: #22d3ee; }
+.legend-dot.zone-desc { background: #ef4444; }
+
 .table-wrap {
   overflow-x: auto;
 }

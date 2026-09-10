@@ -6,8 +6,9 @@
 // algunas simplificaciones documentadas en el README):
 // - Primera División: 30 clubes en 2 zonas de 15. Se juegan DOS torneos por
 //   año —Apertura y Clausura—, cada uno con fase de zonas a una rueda y
-//   playoffs de octavos a la final (16 mejores de la tabla combinada de esa
-//   edición). Entre ambos torneos hay una ventana de pases.
+//   playoffs de octavos a la final: clasifican los 8 primeros de cada zona,
+//   cruzados entre zonas (1ºA-8ºB, 2ºA-7ºB, y así). Entre ambos torneos hay
+//   una ventana de pases.
 // - Primera Nacional: 36 clubes en 2 zonas de 18, un solo torneo anual a una
 //   rueda. Ascienden 2: el ganador de una Final directa entre los líderes de
 //   cada zona, y el ganador de un Torneo Reducido (2º a 8º de cada zona +
@@ -586,15 +587,55 @@ const Engine = {
     });
   },
 
-  combineEditionTables(apertura, clausura) {
-    const allRows = apertura.zoneATable.concat(apertura.zoneBTable, clausura.zoneATable, clausura.zoneBTable);
+  // Suma varias tablas ya ordenadas (cada una es un array de filas) en una
+  // sola, sumando los números de cada club y reordenando el resultado.
+  mergeTableRows(tables) {
     const byId = {};
-    allRows.forEach((r) => {
+    tables.forEach((rows) => rows.forEach((r) => {
       if (!byId[r.id]) byId[r.id] = { id: r.id, name: r.name, played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, pts: 0 };
       const acc = byId[r.id];
       acc.played += r.played; acc.win += r.win; acc.draw += r.draw; acc.loss += r.loss; acc.gf += r.gf; acc.ga += r.ga; acc.pts += r.pts;
-    });
+    }));
     return Object.values(byId).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+  },
+
+  combineEditionTables(apertura, clausura) {
+    return this.mergeTableRows([apertura.zoneATable, apertura.zoneBTable, clausura.zoneATable, clausura.zoneBTable]);
+  },
+
+  // Tabla Anual como se ve DURANTE el año: la fase de zonas de las ediciones
+  // que ya terminaron más la que se esté jugando ahora. Solo cuenta la fase
+  // de zonas — los playoffs de cada edición no suman puntos, igual que en la
+  // tabla anual real.
+  //
+  // Al terminar la fase de zonas de una edición sus tablas quedan guardadas
+  // en season.myD1[edición]; hasta que arranque la edición siguiente,
+  // season.zones sigue teniendo esas mismas tablas, así que las de "ahora"
+  // se suman solo mientras la edición en curso no esté guardada todavía (si
+  // no, se contaría dos veces).
+  tablaAnualRows() {
+    const season = this.state && this.state.season;
+    if (!season || season.myDivision !== 'D1' || !season.myD1) return null;
+    const tables = [];
+    ['apertura', 'clausura'].forEach((edition) => {
+      const done = season.myD1[edition];
+      if (done) tables.push(done.zoneATable, done.zoneBTable);
+    });
+    if (season.edition && !season.myD1[season.edition]) {
+      Object.values(season.zones).forEach((z) => tables.push(this.sortTable(z.table)));
+    }
+    return this.mergeTableRows(tables);
+  },
+
+  // Siembra de los playoffs de Primera: los 8 primeros de cada zona, cruzados
+  // A contra B (1ºA-8ºB, 2ºA-7ºB, ...). El orden del array es el que después
+  // usa pairStage (que enfrenta al primero con el último), así que esta
+  // intercalación es la que arma esos cruces.
+  playoffSeedsFromZones(zoneATable, zoneBTable) {
+    const a = zoneATable.slice(0, 8);
+    const b = zoneBTable.slice(0, 8);
+    const order = [...a.slice(0, 4), ...b.slice(0, 4), ...a.slice(4, 8), ...b.slice(4, 8)];
+    return order.map((r, i) => ({ id: r.id, seed: i + 1 }));
   },
 
   // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
@@ -623,8 +664,7 @@ const Engine = {
 
     const runEdition = () => {
       const { zoneATable, zoneBTable } = runZoneStage();
-      const combined = zoneATable.concat(zoneBTable).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-      const seeds = combined.slice(0, 16).map((r, i) => ({ id: r.id, seed: i + 1 }));
+      const seeds = this.playoffSeedsFromZones(zoneATable, zoneBTable);
       const { champion, runnerUp } = this.simulateSeedsToChampion(seeds);
       return { zoneATable, zoneBTable, champion, runnerUp };
     };
@@ -1168,8 +1208,7 @@ const Engine = {
     const zoneBTable = this.sortTable(zoneB.table);
 
     if (season.myDivision === 'D1') {
-      const combined = zoneATable.concat(zoneBTable).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-      const seeds = combined.slice(0, 16).map((r, i) => ({ id: r.id, seed: i + 1 }));
+      const seeds = this.playoffSeedsFromZones(zoneATable, zoneBTable);
       season.myD1[season.edition] = { zoneATable, zoneBTable, champion: null, runnerUp: null };
       this.startBracket(season.edition, seeds, PLAYOFF_STAGES);
     } else {
