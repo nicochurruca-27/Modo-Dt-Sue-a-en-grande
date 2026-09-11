@@ -557,6 +557,17 @@ function handlePlayerTap(id) {
   render();
 }
 
+// Quiénes están juntando amarillas. A la quinta se pierden un partido, así
+// que desde la tercera conviene verlo para decidir si lo guardás una fecha.
+function alBordeDeLaSuspension(squad) {
+  const enRiesgo = (squad || [])
+    .filter((p) => (p.amarillas || 0) >= 3)
+    .sort((a, b) => b.amarillas - a.amarillas);
+  if (!enRiesgo.length) return '';
+  const lista = enRiesgo.map((p) => `${p.name} (${p.amarillas})`).join(', ');
+  return `<p class="muted amarillas-aviso">Amarillas acumuladas: ${lista}. A la quinta se pierde un partido.</p>`;
+}
+
 function renderSquadPanel() {
   const s = Engine.state;
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
@@ -584,6 +595,7 @@ function renderSquadPanel() {
       <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
+      ${alBordeDeLaSuspension(s.squad)}
       <h3>Suplentes</h3>
       <div class="bench-list">
         ${bench.map((p) => {

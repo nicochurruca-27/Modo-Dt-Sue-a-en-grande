@@ -1085,3 +1085,9 @@ h1, h2, h3 {
 /* La evolución del plantel usa el mismo recuadro que el parte médico, pero
    en verde: son novedades buenas (o el desgaste de los veteranos), no bajas. */
 .desarrollo-notes { border-left-color: var(--accent); }
+
+/* Aviso de amarillas acumuladas en el plantel: ámbar, como una tarjeta. */
+.amarillas-aviso {
+  border-left: 3px solid #f59e0b;
+  padding-left: 10px;
+}

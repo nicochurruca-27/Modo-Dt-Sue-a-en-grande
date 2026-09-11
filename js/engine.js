@@ -1796,12 +1796,22 @@ const Engine = {
     s.copaBracket = { alive: entrants.map((id, i) => ({ id, seed: i + 1 })), stageIndex: 0, champion: null, runnerUp: null };
   },
 
+  // Las amarillas que no llegaron a suspensión se borran al terminar cada
+  // torneo y también al pasar de la fase regular a los playoffs. Lo que NO se
+  // borra es una suspensión ya puesta: el que llegó a la quinta en la última
+  // fecha la cumple igual en el playoff, que es justo lo que dice el
+  // reglamento.
+  limpiarAmarillas() {
+    (this.state.squad || []).forEach((p) => { p.amarillas = 0; });
+  },
+
   startEdition(edition) {
     const s = this.state;
     const season = s.season;
     const club = this.getClub(s.clubId);
     season.edition = edition;
     season.roundIndex = 0;
+    this.limpiarAmarillas();
     season.fifaShown = [];
     season.copaShown = [];
 
@@ -2281,15 +2291,33 @@ const Engine = {
       avisos.push(`${p.name} se lesionó: ${tipo.detail.toLowerCase()}. Se pierde ${matches} ${matches === 1 ? 'partido' : 'partidos'}.`);
     }
 
-    // Suspensiones: una expulsión cada tantos partidos, o la quinta amarilla.
-    if (Math.random() < 0.12) {
+    // Amarillas. Se cuentan de verdad, una por una: a la quinta el jugador se
+    // pierde el próximo partido y el contador vuelve a cero. El contador es
+    // por torneo (ver limpiarAmarillas), así que lo que juntó en el Apertura
+    // no se arrastra al Clausura.
+    titulares.filter((p) => this.isAvailable(p)).forEach((p) => {
+      if (Math.random() > 0.16) return; // da algo menos de 2 amarillas por partido
+      p.amarillas = (p.amarillas || 0) + 1;
+      if (p.amarillas >= 5) {
+        p.amarillas = 0;
+        p.out = { reason: 'suspensión', detail: 'Acumulación de amarillas', matches: 1 };
+        avisos.push(`${p.name} llegó a la quinta amarilla: no puede jugar el próximo partido.`);
+      } else if (p.amarillas === 4) {
+        avisos.push(`${p.name} llegó a la cuarta amarilla: con una más se pierde un partido.`);
+      }
+    });
+
+    // Expulsiones. Las fechas de una roja directa las gradúa el Tribunal de
+    // Disciplina según la jugada, así que van de 1 a 4; la doble amarilla es
+    // siempre una sola fecha.
+    if (Math.random() < 0.07) {
       const disponibles = titulares.filter((p) => this.isAvailable(p));
       if (disponibles.length) {
         const p = sortear(disponibles);
-        const roja = Math.random() < 0.45;
-        const matches = roja ? 1 + Math.floor(Math.random() * 2) : 1;
-        p.out = { reason: 'suspensión', detail: roja ? 'Expulsado' : 'Acumulación de amarillas', matches };
-        avisos.push(`${p.name} ${roja ? 'se fue expulsado' : 'llegó a la quinta amarilla'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.`);
+        const dobleAmarilla = Math.random() < 0.5;
+        const matches = dobleAmarilla ? 1 : 1 + Math.floor(Math.random() * 4);
+        p.out = { reason: 'suspensión', detail: dobleAmarilla ? 'Doble amarilla' : 'Expulsado', matches };
+        avisos.push(`${p.name} ${dobleAmarilla ? 'se fue por doble amarilla' : 'se fue expulsado'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.`);
       }
     }
 
@@ -2530,6 +2558,8 @@ const Engine = {
 
   startBracket(kind, seeds, stageNames) {
     const s = this.state;
+    // Los playoffs arrancan con el contador de amarillas en cero.
+    if (kind === 'apertura' || kind === 'clausura') this.limpiarAmarillas();
     s.bracket = { kind, alive: seeds, stageIndex: 0, champion: null, runnerUp: null, stageNames };
     const userQualified = seeds.some((x) => x.id === s.clubId);
     if (!userQualified) {
