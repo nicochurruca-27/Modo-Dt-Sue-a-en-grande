@@ -32,9 +32,9 @@
 //
 // Datos investigados contrastando fuentes: todos los clubes que jugaron
 // alguna de las dos copas en los últimos 10 años, con el doble de clubes por
-// país que cupos tiene ese país. Brasil, Uruguay, Colombia y Chile ya están
-// con el detalle completo; los otros cinco países todavía tienen la lista
-// corta original, pendiente de la misma pasada.
+// país que cupos tiene ese país. Brasil, Uruguay, Colombia, Chile, Ecuador y
+// Paraguay ya están con el detalle completo; Perú, Bolivia y Venezuela
+// todavía tienen la lista corta original, pendiente de la misma pasada.
 const CLUBES_INTERNACIONALES = [
   // ---- Brasil ----
   { id: "flamengo", nombre: "Flamengo", nombreCompleto: "Clube de Regatas do Flamengo", pais: "Brasil", copa: "Libertadores", nivel: 5, grande: true, apodo: "Mengão", estadio: "Maracanã", colores: { primario: "#000000", secundario: "#FF0000" }, titulos: { libertadores: 4, sudamericana: 0 } },
@@ -63,15 +63,15 @@ const CLUBES_INTERNACIONALES = [
 
   // ---- Uruguay ----
   { id: "penarol", nombre: "Peñarol", nombreCompleto: "Club Atlético Peñarol", pais: "Uruguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Carbonero", estadio: "Campeón del Siglo", colores: { primario: "#000000", secundario: "#FFD700" }, titulos: { libertadores: 5, sudamericana: 0 } },
-  { id: "nacional-uru", nombre: "Nacional", nombreCompleto: "Club Nacional de Football", pais: "Uruguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Bolso", estadio: "Gran Parque Central", colores: { primario: "#FFFFFF", secundario: "#003DA5" }, titulos: { libertadores: 3, sudamericana: 0 } },
+  { id: "nacional-uru", nombre: "Nacional (Uru)", nombreCompleto: "Club Nacional de Football", pais: "Uruguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Bolso", estadio: "Gran Parque Central", colores: { primario: "#FFFFFF", secundario: "#003DA5" }, titulos: { libertadores: 3, sudamericana: 0 } },
   { id: "defensor-sporting", nombre: "Defensor Sporting", nombreCompleto: "Defensor Sporting Club", pais: "Uruguay", copa: "Libertadores", nivel: 3, apodo: "Violeta", estadio: "Luis Franzini", colores: { primario: "#612A7A", secundario: "#FFFFFF" } },
   { id: "danubio", nombre: "Danubio", nombreCompleto: "Danubio Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 3, apodo: "La Franja", estadio: "Jardines del Hipódromo", colores: { primario: "#000000", secundario: "#FFFFFF" } },
-  { id: "liverpool-uru", nombre: "Liverpool", nombreCompleto: "Liverpool Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 3, apodo: "Negriazules", estadio: "Belvedere", colores: { primario: "#000000", secundario: "#FFFFFF" } },
+  { id: "liverpool-uru", nombre: "Liverpool (Uru)", nombreCompleto: "Liverpool Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 3, apodo: "Negriazules", estadio: "Belvedere", colores: { primario: "#000000", secundario: "#FFFFFF" } },
   { id: "montevideo-wanderers", nombre: "Montevideo Wanderers", nombreCompleto: "Montevideo Wanderers Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 2, apodo: "Bohemios", estadio: "Parque Alfredo Víctor Viera", colores: { primario: "#000000", secundario: "#FFFFFF" } },
   { id: "plaza-colonia", nombre: "Plaza Colonia", nombreCompleto: "Club Plaza Colonia de Deportes", pais: "Uruguay", copa: "Libertadores", nivel: 2, apodo: "Patablanca", estadio: "Parque Prandi", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "boston-river", nombre: "Boston River", nombreCompleto: "Boston River", pais: "Uruguay", copa: "Libertadores", nivel: 2, apodo: "Sastre", estadio: "Estadio Campeones Olímpicos", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
   { id: "cerro-largo", nombre: "Cerro Largo", nombreCompleto: "Cerro Largo Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 2, apodo: "Arachanes", estadio: "Estadio Ubilla", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
-  { id: "river-plate-uru", nombre: "River Plate", nombreCompleto: "Club Atlético River Plate", pais: "Uruguay", copa: "Sudamericana", nivel: 2, apodo: "Darseneros", estadio: "Parque Federico Omar Saroldi", colores: { primario: "#FFFFFF", secundario: "#FF0000" } },
+  { id: "river-plate-uru", nombre: "River Plate (Uru)", nombreCompleto: "Club Atlético River Plate", pais: "Uruguay", copa: "Sudamericana", nivel: 2, apodo: "Darseneros", estadio: "Parque Federico Omar Saroldi", colores: { primario: "#FFFFFF", secundario: "#FF0000" } },
   { id: "rentistas", nombre: "Rentistas", nombreCompleto: "Club Atlético Rentistas", pais: "Uruguay", copa: "Libertadores", nivel: 1, apodo: "Bichos Colorados", estadio: "Complejo Rentistas", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
 
   // ---- Colombia ----
@@ -87,30 +87,36 @@ const CLUBES_INTERNACIONALES = [
 
   // ---- Chile ----
   { id: "colo-colo", nombre: "Colo-Colo", nombreCompleto: "Club Social y Deportivo Colo-Colo", pais: "Chile", copa: "Libertadores", nivel: 4, grande: true, apodo: "Cacique", estadio: "Monumental David Arellano", colores: { primario: "#FFFFFF", secundario: "#000000" }, titulos: { libertadores: 1, sudamericana: 0 } },
-  { id: "universidad-catolica", nombre: "Universidad Católica", nombreCompleto: "Club Deportivo Universidad Católica", pais: "Chile", copa: "Libertadores", nivel: 4, grande: true, apodo: "Cruzados", estadio: "Estadio Santa Laura", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "universidad-catolica", nombre: "Universidad Católica (Chi)", nombreCompleto: "Club Deportivo Universidad Católica", pais: "Chile", copa: "Libertadores", nivel: 4, grande: true, apodo: "Cruzados", estadio: "Estadio Santa Laura", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
   { id: "universidad-de-chile", nombre: "Universidad de Chile", nombreCompleto: "Club Universidad de Chile", pais: "Chile", copa: "Libertadores", nivel: 3, grande: true, apodo: "La U", estadio: "Estadio Nacional Julio Martínez Prádanos", colores: { primario: "#003DA5", secundario: "#FFFFFF" }, titulos: { libertadores: 0, sudamericana: 1 } },
   { id: "union-espanola", nombre: "Unión Española", nombreCompleto: "Club Unión Española", pais: "Chile", copa: "Libertadores", nivel: 3, apodo: "Hispanos", estadio: "Estadio Santa Laura", colores: { primario: "#FF0000", secundario: "#FFD700" } },
   { id: "palestino", nombre: "Palestino", nombreCompleto: "Club Deportivo Palestino", pais: "Chile", copa: "Sudamericana", nivel: 3, apodo: "Tricolor", estadio: "Municipal de La Cisterna", colores: { primario: "#008000", secundario: "#FF0000" } },
   { id: "huachipato", nombre: "Huachipato", nombreCompleto: "Club Deportivo Huachipato", pais: "Chile", copa: "Sudamericana", nivel: 3, apodo: "Acereros", estadio: "Huachipato-CAP Acero", colores: { primario: "#000000", secundario: "#FFFFFF" } },
-  { id: "everton-chi", nombre: "Everton", nombreCompleto: "Everton de Viña del Mar", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Ruleteros", estadio: "Sausalito", colores: { primario: "#003DA5", secundario: "#FFD700" } },
+  { id: "everton-chi", nombre: "Everton (Chi)", nombreCompleto: "Everton de Viña del Mar", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Ruleteros", estadio: "Sausalito", colores: { primario: "#003DA5", secundario: "#FFD700" } },
   { id: "audax-italiano", nombre: "Audax Italiano", nombreCompleto: "Audax Club Sportivo Italiano", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Itálicos", estadio: "Bicentenario de La Florida", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "cobreloa", nombre: "Cobreloa", nombreCompleto: "Club de Deportes Cobreloa", pais: "Chile", copa: "Libertadores", nivel: 2, apodo: "Zorros del Desierto", estadio: "Zorros del Desierto", colores: { primario: "#FF6600", secundario: "#FFFFFF" } },
 
   // ---- Ecuador ----
-  { id: "idv", nombre: "Independiente del Valle", pais: "Ecuador", copa: "Libertadores", nivel: 4 },
-  { id: "ldu", nombre: "Liga de Quito", pais: "Ecuador", copa: "Libertadores", nivel: 4, grande: true },
-  { id: "barcelonasc", nombre: "Barcelona SC", pais: "Ecuador", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "ucatolicaecu", nombre: "Universidad Católica (Ecu)", pais: "Ecuador", copa: "Libertadores", nivel: 2 },
-  { id: "macara", nombre: "Macará", pais: "Ecuador", copa: "Sudamericana", nivel: 2 },
-  { id: "cuenca", nombre: "Deportivo Cuenca", pais: "Ecuador", copa: "Sudamericana", nivel: 2 },
+  { id: "independiente-del-valle", nombre: "Independiente del Valle", nombreCompleto: "Club de Alto Rendimiento Especializado Independiente del Valle", pais: "Ecuador", copa: "Libertadores", nivel: 5, apodo: "Negriazules", estadio: "Banco Guayaquil", colores: { primario: "#000000", secundario: "#0066CC" }, titulos: { libertadores: 0, sudamericana: 2 } },
+  { id: "liga-de-quito", nombre: "Liga de Quito", nombreCompleto: "Liga Deportiva Universitaria de Quito", pais: "Ecuador", copa: "Libertadores", nivel: 4, grande: true, apodo: "Albos", estadio: "Rodrigo Paz Delgado", colores: { primario: "#FFFFFF", secundario: "#FF0000" }, titulos: { libertadores: 1, sudamericana: 1 } },
+  { id: "barcelona-sc", nombre: "Barcelona (Ecu)", nombreCompleto: "Barcelona Sporting Club", pais: "Ecuador", copa: "Libertadores", nivel: 3, grande: true, apodo: "Ídolo", estadio: "Monumental Banco Pichincha", colores: { primario: "#FFD700", secundario: "#000000" } },
+  { id: "emelec", nombre: "Emelec", nombreCompleto: "Club Sport Emelec", pais: "Ecuador", copa: "Libertadores", nivel: 3, grande: true, apodo: "Bombillo", estadio: "George Capwell", colores: { primario: "#0057B8", secundario: "#FFFFFF" } },
+  { id: "el-nacional", nombre: "El Nacional", nombreCompleto: "Club Deportivo El Nacional", pais: "Ecuador", copa: "Libertadores", nivel: 3, grande: true, apodo: "Militares", estadio: "Olímpico Atahualpa", colores: { primario: "#FF0000", secundario: "#000000" } },
+  { id: "deportivo-cuenca", nombre: "Deportivo Cuenca", nombreCompleto: "Club Deportivo Cuenca", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Morlacos", estadio: "Alejandro Serrano Aguilar", colores: { primario: "#FF0000", secundario: "#FFD700" } },
+  { id: "deportivo-quito", nombre: "Deportivo Quito", nombreCompleto: "Sociedad Deportivo Quito", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Azulgranas", estadio: "Olímpico Atahualpa", colores: { primario: "#003DA5", secundario: "#FF0000" } },
+  { id: "aucas", nombre: "Aucas", nombreCompleto: "Sociedad Deportiva Aucas", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Papá", estadio: "Gonzalo Pozo Ripalda", colores: { primario: "#FFD700", secundario: "#FF0000" } },
+  { id: "delfin", nombre: "Delfín", nombreCompleto: "Delfín Sporting Club", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Cetáceos", estadio: "Jocay", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
+  { id: "universidad-catolica-ecu", nombre: "Universidad Católica (Ecu)", nombreCompleto: "Club Deportivo Universidad Católica", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Trencito Azul", estadio: "Olímpico Atahualpa", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
 
   // ---- Paraguay ----
-  { id: "cerroporteno", nombre: "Cerro Porteño", pais: "Paraguay", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "libertad", nombre: "Libertad", pais: "Paraguay", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "guarani", nombre: "Guaraní", pais: "Paraguay", copa: "Libertadores", nivel: 2 },
-  { id: "dosdemayo", nombre: "2 de Mayo", pais: "Paraguay", copa: "Libertadores", nivel: 1 },
-  { id: "olimpia", nombre: "Olimpia", pais: "Paraguay", copa: "Sudamericana", nivel: 4, grande: true },
-  { id: "recoleta", nombre: "Deportivo Recoleta", pais: "Paraguay", copa: "Sudamericana", nivel: 1 },
+  { id: "olimpia", nombre: "Olimpia", nombreCompleto: "Club Olimpia", pais: "Paraguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Decano", estadio: "Tigo Manuel Ferreira", colores: { primario: "#FFFFFF", secundario: "#000000" }, titulos: { libertadores: 3, sudamericana: 0 } },
+  { id: "cerro-porteno", nombre: "Cerro Porteño", nombreCompleto: "Club Cerro Porteño", pais: "Paraguay", copa: "Libertadores", nivel: 4, grande: true, apodo: "Ciclón", estadio: "General Pablo Rojas", colores: { primario: "#FF0000", secundario: "#003DA5" } },
+  { id: "libertad", nombre: "Libertad", nombreCompleto: "Club Libertad", pais: "Paraguay", copa: "Libertadores", nivel: 4, apodo: "Gumarelo", estadio: "Tigo La Huerta", colores: { primario: "#000000", secundario: "#FFFFFF" } },
+  { id: "guarani", nombre: "Guaraní", nombreCompleto: "Club Guaraní", pais: "Paraguay", copa: "Libertadores", nivel: 3, apodo: "Aborigen", estadio: "Rogelio Livieres", colores: { primario: "#000000", secundario: "#FFD700" } },
+  { id: "nacional-par", nombre: "Nacional (Par)", nombreCompleto: "Club Nacional", pais: "Paraguay", copa: "Libertadores", nivel: 2, apodo: "Tricolor", estadio: "Arsenio Erico", colores: { primario: "#FFFFFF", secundario: "#003DA5" } },
+  { id: "sportivo-luqueno", nombre: "Sportivo Luqueño", nombreCompleto: "Club Sportivo Luqueño", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "Kure Luque", estadio: "Feliciano Cáceres", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "sol-de-america", nombre: "Sol de América", nombreCompleto: "Club Sol de América", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "Danzarín", estadio: "Luis Alfonso Giagni", colores: { primario: "#003DA5", secundario: "#FF0000" } },
+  { id: "sportivo-ameliano", nombre: "Sportivo Ameliano", nombreCompleto: "Club Sportivo Ameliano", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "V Azulada", estadio: "Martín Torres", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
 
   // ---- Perú ----
   { id: "universitario", nombre: "Universitario", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true },
