@@ -1211,7 +1211,9 @@ function renderMatchResult() {
 
   const shootoutText = m.shootout
     ? `Se definió por penales: ${home.name} ${m.shootout.homeScore} - ${m.shootout.awayScore} ${away.name}.`
-    : '';
+    : m.extraTime
+      ? `Se definió en el alargue, con ${m.extraTime.homeGoals + m.extraTime.awayGoals === 1 ? 'un gol' : `${m.extraTime.homeGoals + m.extraTime.awayGoals} goles`} en los 30 minutos extra.`
+      : '';
 
   const contextLabel = m.context === 'bracket' ? competitionLabel() : 'Liga';
 

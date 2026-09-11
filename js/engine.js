@@ -841,6 +841,18 @@ const Engine = {
     return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
   },
 
+  // Los 30 minutos del alargue: un tercio de un partido, con los mismos
+  // lambdas de simulateScore divididos por tres. Sin ventaja de localía, que
+  // en un alargue ya pesa poco y en cancha neutral directamente no existe.
+  simulateExtraTime(m) {
+    const mia = this.squadStrength();
+    const suya = this.clubStrength(m.opponentId);
+    const diff = (m.isHome ? mia - suya : suya - mia);
+    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40)) / 3;
+    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40)) / 3;
+    return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
+  },
+
   updateTableRow(table, id, gf, ga) {
     const row = table[id];
     row.played++;
@@ -1997,7 +2009,19 @@ const Engine = {
     const m = s.pendingMatch;
     // Liga: los empates quedan como empate. Cualquier otro contexto (Copa
     // Argentina, playoffs, Final por el ascenso, Reducido) es eliminación
-    // directa: un empate se define por penales.
+    // directa: primero se juega un alargue de 30 minutos y, si sigue empatado,
+    // recién ahí van los penales.
+    // El alargue es un tercio de un partido, así que la mayoría de las veces
+    // termina 0-0 y se define por penales igual, pero de vez en cuando aparece
+    // el gol y la serie se cierra ahí.
+    if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
+      const enAlargue = this.simulateExtraTime(m);
+      if (enAlargue.homeGoals || enAlargue.awayGoals) {
+        m.homeGoals += enAlargue.homeGoals;
+        m.awayGoals += enAlargue.awayGoals;
+        m.extraTime = enAlargue;
+      }
+    }
     if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
       const myStrength = this.squadStrength();
       const oppStrength = this.clubStrength(m.opponentId);
@@ -2406,7 +2430,7 @@ const Engine = {
       const m = s.pendingMatch;
       const clubName = (id) => this.getClub(id).name;
       const label = this.bracketStageLabel();
-      if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : ''}.`);
+      if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : m.extraTime ? ' (en el alargue)' : ''}.`);
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
     }
 
