@@ -1121,6 +1121,7 @@ const Engine = {
       market: null,
       lastSeasonSummary: null,
       noticias: [],
+      finanzas: null,
       mercado: null,
       notasMercado: [],
       log: [],
@@ -1211,6 +1212,7 @@ const Engine = {
     };
     s.bracket = null;
     s.lastSeasonSummary = null;
+    Economia.nuevaTemporada(s);
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
     this.setupCopaBracket();
@@ -1333,6 +1335,9 @@ const Engine = {
     while (true) {
       cal.dayInWeek++;
       cal.dayCount++;
+      // El club genera plata todos los días, no una vez al año: cada 7 días
+      // de calendario entra el goteo fijo (TV, sponsors, cuota social).
+      if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
       Noticias.tick(this);
 
       if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
@@ -1764,6 +1769,7 @@ const Engine = {
       if (homeTable) this.updateTableRow(homeTable, m.home, m.homeGoals, m.awayGoals);
       if (awayTable) this.updateTableRow(awayTable, m.away, m.awayGoals, m.homeGoals);
       s.log.unshift(`Liga: ${clubName(m.home)} ${m.homeGoals}-${m.awayGoals} ${clubName(m.away)}`);
+      if (m.isHome) Economia.cobrarPartidoDeLocal(this, !!(s.matchContext && s.matchContext.clasico));
       this.simulateWholeRound(s.season.roundIndex, m);
       this.recordRoundResult(m.home, m.away, m.homeGoals, m.awayGoals);
       Noticias.trasLaFecha(this);
@@ -1928,6 +1934,16 @@ const Engine = {
     const s = this.state;
     const isFinal = s.bracket.pendingIsFinal;
 
+    // Premio de la Copa Argentina. Se cobra por la ronda jugada, ganes o
+    // pierdas (así funciona el premio por instancia alcanzada), y va acá
+    // arriba porque la final sale de esta función por un return propio.
+    // Cuántos equipos había antes de esta ronda: los que ya pasaron, más el
+    // que salga de tu llave, por dos.
+    if (s.bracket.kind === 'copa') {
+      const vivosAntes = (s.bracket.pendingWinners.length + 1) * 2;
+      Economia.premioCopaArgentina(this, vivosAntes, isFinal && userWon);
+    }
+
     if (!isBye) {
       const m = s.pendingMatch;
       const clubName = (id) => this.getClub(id).name;
@@ -2050,16 +2066,13 @@ const Engine = {
     // cualquier pantalla que necesite un arquero, como los penales).
     const soleAtPosition = player && s.squad.filter((p) => p.pos === player.pos).length <= 1;
     if (player && (renew || s.squad.length <= MIN_SQUAD || soleAtPosition)) {
-      // El presupuesto no puede quedar negativo. Renovar cuesta
-      // rating * 8000 y se renuevan varios por año, así que sin este tope el
-      // saldo se iba a menos y no volvía nunca: en una prueba de 9
-      // temporadas quedaba en -32 millones ya desde el año 2, y con saldo
-      // negativo ninguna compra vuelve a pasar el control de "¿te alcanza?".
-      // Ojo que esto tapa el agujero, no lo arregla: renovar sigue saliendo
-      // bastante más de lo que entra por premios, así que la economía del
-      // juego pide una repasada aparte.
-      const cost = Math.round(player.rating * 8000);
-      s.budget = Math.max(0, s.budget - cost);
+      // Lo que cuesta renovar sale de la categoría económica del club (ver
+      // Economia.costoRenovacion): no es lo mismo renovarle a un titular en
+      // Boca que en un club de la Nacional. Antes era rating * 8000 para
+      // todos, y como el club no generaba plata en todo el año, el saldo se
+      // iba a menos y no volvía nunca.
+      const cost = Economia.costoRenovacion(this, player);
+      Economia.registrar(this, `Renovación de ${player.name}`, -cost);
       player.contractYears = 2 + Math.floor(Math.random() * 2);
     } else if (player) {
       s.squad = s.squad.filter((p) => p.id !== playerId);
@@ -2117,7 +2130,7 @@ const Engine = {
     const offer = s.market[marketIndex];
     if (!offer || s.budget < offer.price) return false;
     if (s.squad.length >= MAX_SQUAD) return false;
-    s.budget -= offer.price;
+    Economia.registrar(this, `Compra de ${offer.name}`, -offer.price);
     s.squad.push({
       id: offer.id,
       name: offer.name,
@@ -2146,7 +2159,7 @@ const Engine = {
     if (s.squad.length <= MIN_SQUAD) return false;
     const player = s.squad[squadIndex];
     const monto = this.sellValue(player);
-    s.budget += monto;
+    Economia.registrar(this, `Venta de ${player.name}`, monto);
     s.squad.splice(squadIndex, 1);
     Noticias.trasUnaOperacion(this, 'venta', player, monto);
     this.repairStartingSlots();
@@ -2336,25 +2349,40 @@ const Engine = {
     Noticias.trasLasCopas(this, copasDelAnio);
     s.copaQualification = qualification;
 
+    // Premios de verdad de fin de año. Antes acá había un único ingreso
+    // inventado (un bonus por puesto en la tabla anual y, en la Nacional,
+    // $150.000 fijos) que era TODA la plata que el club generaba en el año.
+    // Ahora el ingreso ordinario entra semana a semana, así que este bloque
+    // se ocupa solo de los premios que se cobran por lograr algo:
+    // los títulos de liga y lo que pagó CONMEBOL por la copa que jugaste.
+    // El premio por posición en la tabla anual se fue porque, según los
+    // datos, no existe: la Liga Profesional paga por salir campeón, no por
+    // terminar octavo.
+    const notasEconomia = [];
+    if (d1Data.aperturaChampion === s.clubId) {
+      notasEconomia.push(`Premio por salir campeón del Apertura: ${Economia.monto(Economia.premioTitulo(this, 'apertura'))}.`);
+    }
+    if (d1Data.clausuraChampion === s.clubId) {
+      notasEconomia.push(`Premio por salir campeón del Clausura: ${Economia.monto(Economia.premioTitulo(this, 'clausura'))}.`);
+    }
+    copasDelAnio.forEach((c) => {
+      if (!c.userStage) return;
+      const cobrado = Economia.premioInternacional(this, c.copa, c.userStage);
+      if (cobrado) notasEconomia.push(`${c.copa}: ${Economia.monto(cobrado)} de premio por llegar a ${c.userStage}.`);
+    });
+
     const userRelegated = relegated.includes(s.clubId);
     const userPromoted = promoted.includes(s.clubId);
-    let economyNote = '';
     if (userRelegated) {
       const penalty = Math.round(s.budget * 0.25);
-      s.budget -= penalty;
-      economyNote = `Por el descenso, el presupuesto bajó $${penalty.toLocaleString('es-AR')} para la próxima temporada.`;
+      Economia.registrar(this, 'Recorte por el descenso', -penalty);
+      notasEconomia.push(`Por el descenso, el presupuesto bajó ${Economia.monto(penalty)} para la próxima temporada.`);
     } else if (userPromoted) {
-      s.budget += 400000;
-      economyNote = 'Por el ascenso, la dirigencia sumó un refuerzo económico de $400.000.';
-    } else if (divisionThisSeason === 'D1') {
-      const pos = tablaAnualD1.findIndex((r) => r.id === s.clubId) + 1;
-      const bonus = Math.max(0, Math.round((31 - pos) * 120000));
-      s.budget += bonus;
-      economyNote = `Premio por terminar ${pos}° en la tabla anual: $${bonus.toLocaleString('es-AR')}.`;
-    } else {
-      s.budget += 150000;
-      economyNote = 'Ingresos de la temporada: $150.000.';
+      Economia.registrar(this, 'Refuerzo económico por el ascenso', 400000);
+      notasEconomia.push(`Por el ascenso, la dirigencia sumó un refuerzo económico de ${Economia.monto(400000)}.`);
     }
+    if (!notasEconomia.length) notasEconomia.push('Sin premios extra este año: el club se movió con sus ingresos de siempre.');
+    const economyNote = notasEconomia.join(' ');
 
     s.lastSeasonSummary = {
       division: divisionThisSeason,

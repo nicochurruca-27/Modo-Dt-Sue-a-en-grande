@@ -330,6 +330,9 @@ js/escudos.js → escudos reales embebidos como data URI
 js/noticias.js → portal de noticias: arma los titulares a partir de lo que
                 va pasando en la partida (resultados, lesiones, mercado,
                 copas) y los guarda en s.noticias
+js/economia.js → de dónde sale la plata: datos reales de ingresos, gastos y
+                premios de los clubes argentinos por categoría, y el modelo
+                que los convierte en el presupuesto del DT
 js/mercado.js → mercado de pases club por club: genera el plantel de cada
                 club con un generador sembrado (mismo resultado siempre, sin
                 guardarlo en la partida), define en qué situación de contrato

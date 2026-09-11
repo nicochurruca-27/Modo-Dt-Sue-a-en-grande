@@ -361,7 +361,9 @@ const Mercado = {
         notas.push(`${j.name} no pudo sumarse: hacían falta ${this.plata(a.precio)} y no los tenías. El acuerdo se cayó.`);
         return;
       }
-      s.budget -= a.precio;
+      // Pasa por Economia.registrar y no por s.budget directo, para que la
+      // compra quede anotada en el detalle de "de dónde sale la plata".
+      Economia.registrar(engine, `Fichaje de ${j.name}`, -a.precio);
       s.squad.push({
         id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
         rating: j.rating, age: j.age, nation: j.nation, role: j.role,

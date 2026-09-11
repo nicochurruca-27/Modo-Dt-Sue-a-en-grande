@@ -1500,6 +1500,42 @@ function mercadoJugadorHtml(j) {
   `;
 }
 
+// ---------- De dónde sale la plata ----------
+//
+// El presupuesto ya no aparece y desaparece sin explicación: cada ingreso y
+// cada gasto queda anotado (ver Economia.registrar) y acá se listan los
+// últimos. Va colapsado adentro del panel del mercado, que es donde importa
+// saber con cuánto contás.
+
+function finanzasHtml() {
+  const s = Engine.state;
+  const f = s.finanzas;
+  if (!f || !f.movimientos.length) return '';
+  const club = Engine.getClub(s.clubId);
+  const resumen = Economia.resumenAnual(club);
+  return `
+    <details class="collapsible finanzas">
+      <summary>De dónde sale la plata</summary>
+      <div class="collapsible-body">
+        <p class="muted finanzas-resumen">
+          Entran <strong>${money(resumen.semanal)}</strong> por semana de TV, sponsors y cuota social,
+          más <strong>${money(resumen.local)}</strong> cada partido de local.
+          Balance de la temporada: <strong class="${f.totalTemporada >= 0 ? 'finanzas-positivo' : 'finanzas-negativo'}">${f.totalTemporada >= 0 ? '+' : ''}${money(f.totalTemporada)}</strong>.
+        </p>
+        <ul class="finanzas-lista">
+          ${f.movimientos.map((m) => `
+            <li>
+              <span class="finanzas-concepto">${m.concepto}</span>
+              <span class="finanzas-monto ${m.monto >= 0 ? 'finanzas-positivo' : 'finanzas-negativo'}">${m.monto >= 0 ? '+' : ''}${money(m.monto)}</span>
+              <span class="finanzas-fecha muted">${formatCalendarDate(m.dia)}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    </details>
+  `;
+}
+
 function renderMarketPanel() {
   const panel = document.getElementById('market-panel');
   if (!panel) return;
@@ -1529,6 +1565,7 @@ function renderMarketPanel() {
     <div class="card mercado-card">
       <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
       <p class="muted mercado-aviso">Podés negociar cuando quieras, pero nada se firma hasta que abra el mercado (al terminar el Apertura y en la pretemporada). Un acuerdo cerrado se concreta ahí.</p>
+      ${finanzasHtml()}
 
       ${acuerdos.length ? `
         <div class="mercado-acuerdos">

@@ -1041,3 +1041,36 @@ h1, h2, h3 {
 }
 
 .mercado-acciones .option-btn { flex: 1 1 auto; }
+
+/* ---- Detalle de finanzas ---- */
+.finanzas { margin-bottom: 10px; }
+
+.finanzas-resumen { font-size: 0.82em; margin: 0 0 8px; }
+
+.finanzas-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.8em;
+}
+
+.finanzas-lista li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid #1f2937;
+}
+
+.finanzas-lista li:first-child { border-top: none; }
+
+.finanzas-concepto { flex: 1 1 auto; min-width: 0; }
+
+.finanzas-monto { flex: 0 0 auto; font-weight: 700; white-space: nowrap; }
+
+.finanzas-fecha { flex: 0 0 auto; font-size: 0.9em; }
+
+.finanzas-positivo { color: var(--accent); }
+.finanzas-negativo { color: var(--danger); }
