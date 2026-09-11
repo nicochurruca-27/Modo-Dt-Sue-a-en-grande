@@ -2644,6 +2644,12 @@ const Engine = {
       const m = s.pendingMatch;
       const clubName = (id) => this.getClub(id).name;
       const label = this.bracketStageLabel();
+      // La recaudación de la llave: si se jugó en cancha neutral se reparte
+      // 70/30 entre ganador y perdedor; si fuiste local en tu cancha, es toda
+      // tuya como en cualquier partido de local.
+      const ctx = s.matchContext;
+      if (ctx && ctx.isNeutral) Economia.cobrarPartidoNeutral(this, m.opponentId, userWon);
+      else if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
       if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : m.extraTime ? ' (en el alargue)' : ''}.`);
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
     }

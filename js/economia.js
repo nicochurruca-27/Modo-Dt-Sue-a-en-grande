@@ -142,6 +142,10 @@ const ECONOMIA_DATOS = {
   // (1,25 M) es más chico que el de grupos (3 M): no es que valga menos
   // llegar a octavos, es que ese monto se suma al anterior.
   premios: {
+    // OJO: estos dos son los únicos premios ESTIMADOS de todo el archivo. La
+    // LPF no publica un monto fijo para el campeón del Apertura ni del
+    // Clausura, así que el número está puesto por el juego para que ganar el
+    // torneo pague algo. Todos los demás premios sí salen de datos reales.
     ligaProfesional: { campeonApertura: 500000, campeonClausura: 500000 },
     copaArgentina: { treintaidosavos: 7000, dieciseisavos: 12000, octavos: 22000, cuartos: 40000, semifinal: 70000, subcampeon: 120000, campeon: 237500 },
     // Los montos de las copas son los de la edición 2026, por instancia. La
@@ -341,6 +345,21 @@ const Economia = {
       * (esClasico ? d.multiplicadorClasico : 1)
       * this.factorPorRendimiento(engine);
     this.registrar(engine, esClasico ? 'Recaudación del clásico de local' : 'Recaudación de local',
+      bruto * this.margen(club) * this.porcionDe(club));
+  },
+
+  // En cancha neutral no hay local que se quede con la recaudación: el neto de
+  // entradas y publicidad se reparte 70% para el que gana y 30% para el que
+  // pierde. Como el pozo lo llenan las dos hinchadas, se toma el promedio de
+  // lo que recauda cada uno en su propia cancha.
+  cobrarPartidoNeutral(engine, rivalId, ganaste) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    const rival = engine.getClub(rivalId);
+    if (!club || !rival) return;
+    const pozo = (this.datosDe(club).recaudacionPartidoLocal + this.datosDe(rival).recaudacionPartidoLocal) / 2;
+    const bruto = pozo * (ganaste ? 0.7 : 0.3) * this.factorPorRendimiento(engine);
+    this.registrar(engine, `Recaudación en cancha neutral (${ganaste ? '70' : '30'}%)`,
       bruto * this.margen(club) * this.porcionDe(club));
   },
 
