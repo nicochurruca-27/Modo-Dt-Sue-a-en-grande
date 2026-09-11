@@ -192,6 +192,11 @@ function anualTableBody() {
 // Resultado de la Libertadores y la Sudamericana que se jugaron este año
 // (con los clasificados de la temporada anterior). La primera temporada de
 // una carrera no tiene copas todavía.
+// "Copa Libertadores", pero la Recopa ya trae su nombre completo.
+function nombreDeCopa(c) {
+  return c.esRecopa ? c.copa : `Copa ${c.copa}`;
+}
+
 function copasResultHtml(copas) {
   if (!copas || !copas.length) {
     return '<p class="muted">Las copas internacionales se juegan a partir del año que viene, con los clasificados de esta temporada.</p>';
@@ -201,7 +206,7 @@ function copasResultHtml(copas) {
     if (c.userWon) tuyo = '<div class="me-line">¡La ganaste vos!</div>';
     else if (c.userStage) tuyo = `<div class="me-line">Tu club llegó hasta ${c.userStage}.</div>`;
     return `
-      <h4>Copa ${c.copa}</h4>
+      <h4>${nombreDeCopa(c)}</h4>
       <p>Campeón: <strong>${c.championName}</strong>${c.championPais ? ` <span class="muted">(${c.championPais})</span>` : ''}${c.runnerUpName ? `<br><span class="muted">Finalista: ${c.runnerUpName}</span>` : ''}</p>
       ${tuyo}
     `;
@@ -1409,14 +1414,14 @@ function renderSeasonEnd() {
   if (sum.userWasAperturaChampion) trofeos.push('Campeón del Apertura');
   if (sum.userWasClausuraChampion) trofeos.push('Campeón del Clausura');
   if (sum.userWonCopa) trofeos.push('Campeón de la Copa Argentina');
-  (sum.copasInternacionales || []).forEach((c) => { if (c.userWon) trofeos.push(`Campeón de la Copa ${c.copa}`); });
+  (sum.copasInternacionales || []).forEach((c) => { if (c.userWon) trofeos.push(`Campeón de la ${nombreDeCopa(c)}`); });
   if (sum.userPromotedDirect || sum.userPromotedReducido) trofeos.push('Ascenso a Primera División');
 
   // Si no la ganaste pero jugaste una copa internacional, igual va arriba:
   // es de las cosas que más te interesa saber apenas termina el año.
   const copasDeTuClub = (sum.copasInternacionales || [])
     .filter((c) => !c.userWon && c.userStage)
-    .map((c) => `En la Copa ${c.copa} llegaste hasta ${c.userStage}.`);
+    .map((c) => `En la ${nombreDeCopa(c)} llegaste hasta ${c.userStage}.`);
 
   const bloque = (titulo, contenido) => `
     <details class="collapsible">

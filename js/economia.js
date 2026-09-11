@@ -144,8 +144,21 @@ const ECONOMIA_DATOS = {
   premios: {
     ligaProfesional: { campeonApertura: 500000, campeonClausura: 500000 },
     copaArgentina: { dieciseisavos: 12000, octavos: 22000, cuartos: 40000, semifinal: 70000, subcampeon: 120000, campeon: 237500 },
-    libertadores: { fasePrevia: 500000, grupos: 3000000, octavos: 1250000, cuartos: 1700000, semifinal: 2300000, subcampeon: 7000000, campeon: 25000000 },
-    sudamericana: { fasePrevia: 225000, grupos: 900000, octavos: 600000, cuartos: 700000, semifinal: 800000, subcampeon: 2500000, campeon: 7000000 },
+    // Los montos de las copas son los de la edición 2026, por instancia. La
+    // previa se paga distinto en cada copa: la Libertadores tiene tres fases
+    // y paga más cuanto más adentro, y la Sudamericana tiene una sola, a
+    // partido único, que paga según te haya tocado de local o de visitante.
+    libertadores: {
+      previaFase1: 400000, previaFase2: 500000, previaFase3: 600000, fasePrevia: 500000,
+      grupos: 3000000, victoriaEnGrupos: 340000,
+      octavos: 1250000, cuartos: 1700000, semifinal: 2300000, subcampeon: 7000000, campeon: 25000000,
+    },
+    sudamericana: {
+      fasePreviaLocal: 225000, fasePreviaVisitante: 250000, fasePrevia: 225000,
+      grupos: 900000, victoriaEnGrupos: 125000,
+      octavos: 600000, cuartos: 700000, semifinal: 800000, subcampeon: 2500000, campeon: 7000000,
+    },
+    recopa: { campeon: 1800000, subcampeon: 900000 },
   },
 };
 
@@ -374,13 +387,38 @@ const Economia = {
     if (monto) this.registrar(engine, `Copa Argentina — premio por ${vivos === 2 ? (salioCampeon ? 'salir campeón' : 'llegar a la final') : 'pasar de ronda'}`, this.porcion(engine, monto));
   },
 
+  // Lo que paga la fase previa, que no es un monto fijo.
+  //
+  // En la Libertadores se cobra por cada fase previa jugada, y cada una paga
+  // más que la anterior: si entraste en la Fase 1 y llegaste hasta la 3,
+  // cobrás las tres. En la Sudamericana hay una sola, a partido único, y paga
+  // distinto según te haya tocado de local o de visitante.
+  premioPrevia(copa, camino) {
+    const p = copa === 'Libertadores' ? ECONOMIA_DATOS.premios.libertadores : ECONOMIA_DATOS.premios.sudamericana;
+    if (!camino) return 0;
+    if (copa === 'Libertadores') {
+      const porFase = [p.previaFase1, p.previaFase2, p.previaFase3];
+      return (camino.fases || []).reduce((t, n) => t + (porFase[n - 1] || 0), 0);
+    }
+    return camino.deLocal ? p.fasePreviaLocal : p.fasePreviaVisitante;
+  },
+
+  // La Recopa: un solo cruce de ida y vuelta entre los campeones del año
+  // pasado, así que no tiene escalera de instancias.
+  premioRecopa(engine, salioCampeon) {
+    const p = ECONOMIA_DATOS.premios.recopa;
+    const paraElDT = this.porcion(engine, salioCampeon ? p.campeon : p.subcampeon);
+    if (paraElDT) this.registrar(engine, `Recopa Sudamericana — ${salioCampeon ? 'campeón' : 'subcampeón'}`, paraElDT);
+    return paraElDT;
+  },
+
   // Libertadores y Sudamericana: acumulativo hasta la instancia alcanzada.
   // `fase` es el texto que arma simulateCopa ('los cuartos de final', etc.).
   //
-  // Queda algo afuera a propósito: los datos traen un premio por cada partido
-  // ganado en la fase de grupos, pero el juego no guarda cuántos ganó cada
-  // club, así que cobrarlo sería inventar el número.
-  premioInternacional(engine, copa, fase) {
+  // `extras` trae lo que depende de cómo le fue de verdad al club y no solo de
+  // hasta dónde llegó: cuántos partidos ganó en la fase de grupos (cada uno se
+  // paga aparte) y por qué fases previas pasó.
+  premioInternacional(engine, copa, fase, extras) {
     const tabla = copa === 'Libertadores' ? ECONOMIA_DATOS.premios.libertadores : ECONOMIA_DATOS.premios.sudamericana;
     // El playoff de octavos de la Sudamericana no paga premio propio, pero
     // tiene que estar en la escalera igual: si no, un club eliminado ahí no
@@ -389,12 +427,23 @@ const Economia = {
     const claves = ['fasePrevia', 'grupos', 'playoffOctavos', 'octavos', 'cuartos', 'semifinal', 'subcampeon', 'campeon'];
     const hasta = escalera.indexOf(fase);
     if (hasta < 0) return 0;
+    const detalle = extras || {};
     let total = 0;
     for (let i = 0; i <= hasta; i++) {
       // Si salió campeón no cobra además el premio de subcampeón.
       if (claves[i] === 'subcampeon' && hasta === escalera.length - 1) continue;
+      // La previa solo se cobra si de verdad se jugó: un club que entró
+      // directo a la fase de grupos no cobra nada por ella. (Antes se pagaba
+      // siempre, que era plata de más.) Si el club llegó hasta la previa y
+      // nada más pero no vino el detalle del camino, se paga el monto suelto.
+      if (claves[i] === 'fasePrevia') {
+        if (detalle.previa) total += this.premioPrevia(copa, detalle.previa);
+        else if (hasta === 0) total += tabla.fasePrevia || 0;
+        continue;
+      }
       total += tabla[claves[i]] || 0;
     }
+    total += (tabla.victoriaEnGrupos || 0) * (detalle.victoriasEnGrupos || 0);
     const paraElDT = this.porcion(engine, total);
     if (paraElDT) this.registrar(engine, `${copa} — premio por llegar a ${fase}`, paraElDT);
     return paraElDT;

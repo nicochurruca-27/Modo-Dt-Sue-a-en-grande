@@ -1032,10 +1032,18 @@ const Engine = {
   // espera, se resuelve en una sola ronda cruzando a todos de a dos.
   jugarFasesPrevias(copa, previa, byId) {
     const formato = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copa]) || {};
-    const cruzar = (ids) => {
+    // El camino del usuario, para cobrar la previa por lo que jugó de verdad:
+    // en qué fases estuvo y, en la Sudamericana (que es a partido único), si
+    // le tocó de local.
+    const camino = { fases: [], deLocal: false };
+    const cruzar = (ids, numeroDeFase) => {
       const pasan = [];
       const eliminados = [];
       for (let i = 0; i < ids.length; i += 2) {
+        if (ids[i] === this.state.clubId || ids[i + 1] === this.state.clubId) {
+          camino.fases.push(numeroDeFase);
+          camino.deLocal = ids[i] === this.state.clubId;
+        }
         const ganador = this.copaTieWinner(ids[i], ids[i + 1], byId);
         pasan.push(ganador);
         const perdedor = ganador === ids[i] ? ids[i + 1] : ids[i];
@@ -1054,28 +1062,64 @@ const Engine = {
       const pasan = [];
       const eliminados = [];
       Object.values(porPais).forEach((delPais) => {
-        const r = cruzar(this.shuffled(delPais));
+        const r = cruzar(this.shuffled(delPais), 1);
         pasan.push(...r.pasan);
         eliminados.push(...r.eliminados);
       });
-      return { pasan, eliminados };
+      return { pasan, eliminados, camino };
     }
 
     const fases = formato.encadenadas || [];
-    if (!fases.length || previa.length < fases[0]) return cruzar(previa);
+    if (!fases.length || previa.length < fases[0]) return { ...cruzar(previa, 1), camino };
 
     const esperando = previa.slice();
     let vivos = [];
     let eliminadosUltima = [];
-    fases.forEach((cuantosJuegan) => {
+    fases.forEach((cuantosJuegan, i) => {
       vivos = vivos.concat(esperando.splice(0, Math.max(0, cuantosJuegan - vivos.length)));
-      const r = cruzar(vivos);
+      const r = cruzar(vivos, i + 1);
       vivos = r.pasan;
       eliminadosUltima = r.eliminados;
     });
     // Si quedó alguno sin entrar a ninguna fase (porque ese año hubo más
     // equipos en previa de los que el formato contempla), pasa directo.
-    return { pasan: vivos.concat(esperando), eliminados: eliminadosUltima };
+    return { pasan: vivos.concat(esperando), eliminados: eliminadosUltima, camino };
+  },
+
+  // Ordena un grupo con los criterios de desempate que rigen desde 2026: lo
+  // primero son los puntos, pero entre los que quedaron empatados manda el
+  // mano a mano (puntos, diferencia y goles SOLO en los partidos entre ellos)
+  // y recién después la diferencia de gol de todo el grupo. Hasta 2025 se
+  // arrancaba por la diferencia general, que es lo que hacía el juego antes.
+  //
+  // Las tarjetas, que en el reglamento van después de los goles, no se usan:
+  // el simulador no lleva amonestados en las copas.
+  ordenarGrupo(filas, partidos) {
+    const porPuntos = {};
+    filas.forEach((f) => { (porPuntos[f.pts] = porPuntos[f.pts] || []).push(f); });
+    const generales = (a, b) => (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf;
+    return Object.keys(porPuntos)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .reduce((orden, pts) => {
+        const empatados = porPuntos[pts];
+        if (empatados.length < 2) return orden.concat(empatados);
+        const entreEllos = new Set(empatados.map((f) => f.id));
+        const mini = {};
+        empatados.forEach((f) => { mini[f.id] = { pts: 0, gf: 0, ga: 0 }; });
+        partidos.forEach((p) => {
+          if (!entreEllos.has(p.local) || !entreEllos.has(p.visitante)) return;
+          mini[p.local].gf += p.golesLocal; mini[p.local].ga += p.golesVisitante;
+          mini[p.visitante].gf += p.golesVisitante; mini[p.visitante].ga += p.golesLocal;
+          if (p.golesLocal > p.golesVisitante) mini[p.local].pts += 3;
+          else if (p.golesVisitante > p.golesLocal) mini[p.visitante].pts += 3;
+          else { mini[p.local].pts += 1; mini[p.visitante].pts += 1; }
+        });
+        return orden.concat(empatados.slice().sort((a, b) =>
+          mini[b.id].pts - mini[a.id].pts
+          || generales(mini[a.id], mini[b.id])
+          || generales(a, b)));
+      }, []);
   },
 
   copaTieWinner(idA, idB, byId) {
@@ -1098,16 +1142,89 @@ const Engine = {
   simulateCopasDelAnio(qualification) {
     if (!qualification || !qualification.length) return [];
     const internacionales = this.sortearCuposInternacionales();
-    const libertadores = this.simulateCopa('Libertadores', qualification, internacionales);
+    const recopa = this.simularRecopa();
+    const libertadores = this.simulateCopa('Libertadores', qualification, internacionales, {
+      aGrupos: this.campeonesVigentes(qualification, internacionales),
+    });
     const sudamericana = this.simulateCopa('Sudamericana', qualification, internacionales, {
       aGrupos: libertadores ? libertadores.bajanAGrupos : [],
       alPlayoff: libertadores ? libertadores.bajanAlPlayoff : [],
     });
     // Los que bajan son para armar la otra copa, no para guardarlos en la
     // partida: se sacan del resumen que queda en el save.
-    return [libertadores, sudamericana]
+    return [recopa, libertadores, sudamericana]
       .filter(Boolean)
       .map(({ bajanAGrupos, bajanAlPlayoff, ...resumen }) => resumen);
+  },
+
+  // Un club, en el formato mínimo que usan las copas. Sirve tanto para los
+  // argentinos (que salen de s.clubs) como para el resto del continente.
+  entrantDeClub(id) {
+    const propio = this.getClub(id);
+    if (propio) return { id, nombre: propio.name, pais: 'Argentina', nivel: propio.reputation };
+    const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .find((c) => c.id === id);
+    return deAfuera ? { id, nombre: deAfuera.nombre, pais: deAfuera.pais, nivel: deAfuera.nivel } : null;
+  },
+
+  // Los campeones del año pasado de las dos copas tienen su cupo propio en la
+  // Libertadores y entran directo a la fase de grupos. Son los dos lugares que
+  // hacen que la copa llegue a 47 equipos y 32 en la fase de grupos.
+  //
+  // Si el campeón ya se había ganado un lugar por su liga, el cupo NO se
+  // pierde: se corre al mejor club de su país que había quedado afuera, que es
+  // como se reparte en la realidad. La excepción es un campeón argentino,
+  // porque los cupos argentinos ya salieron de la temporada del juego: ahí sí
+  // se pierde el lugar y la copa queda con uno menos.
+  campeonesVigentes(qualification, internacionales) {
+    const yaEstan = new Set(
+      (qualification || []).map((q) => q.clubId).concat((internacionales || []).map((c) => c.id)),
+    );
+    const entrants = [];
+    const sumar = (club) => {
+      if (!club || yaEstan.has(club.id)) return false;
+      yaEstan.add(club.id);
+      entrants.push({ ...club, fase: 'grupos' });
+      return true;
+    };
+    ((this.state && this.state.ultimasCopas) || []).forEach((c) => {
+      if (c.esRecopa || !c.championId) return;
+      const campeon = this.entrantDeClub(c.championId);
+      if (!campeon || sumar(campeon)) return;
+      const suplente = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+        .filter((x) => x.pais === campeon.pais && !yaEstan.has(x.id))
+        .sort((a, b) => b.nivel - a.nivel)[0];
+      if (suplente) sumar({ id: suplente.id, nombre: suplente.nombre, pais: suplente.pais, nivel: suplente.nivel });
+    });
+    return entrants;
+  },
+
+  // La Recopa: los dos campeones del año pasado, ida y vuelta. Se juega antes
+  // que las copas nuevas, como en la realidad.
+  simularRecopa() {
+    const ultimas = (this.state && this.state.ultimasCopas) || [];
+    const campeonDe = (copa) => {
+      const r = ultimas.find((c) => c.copa === copa && c.championId);
+      return r ? this.entrantDeClub(r.championId) : null;
+    };
+    const deLaLibertadores = campeonDe('Libertadores');
+    const deLaSudamericana = campeonDe('Sudamericana');
+    if (!deLaLibertadores || !deLaSudamericana || deLaLibertadores.id === deLaSudamericana.id) return null;
+
+    const byId = { [deLaLibertadores.id]: deLaLibertadores, [deLaSudamericana.id]: deLaSudamericana };
+    const ganador = this.copaTieWinner(deLaLibertadores.id, deLaSudamericana.id, byId);
+    const perdedor = ganador === deLaLibertadores.id ? deLaSudamericana.id : deLaLibertadores.id;
+    const jugaste = ganador === this.state.clubId || perdedor === this.state.clubId;
+    return {
+      copa: 'Recopa Sudamericana',
+      esRecopa: true,
+      championId: ganador,
+      championName: byId[ganador].nombre,
+      championPais: byId[ganador].pais,
+      runnerUpName: byId[perdedor].nombre,
+      userWon: ganador === this.state.clubId,
+      userStage: jugaste ? 'la final' : null,
+    };
   },
 
   simulateCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
@@ -1143,18 +1260,24 @@ const Engine = {
     const primeros = [];
     const segundos = [];
     const terceros = [];
+    let victoriasDelUsuario = 0;
     grupos.forEach((grupo) => {
       const table = Object.fromEntries(grupo.map((id) => [id, this.emptyTableRow()]));
+      const partidos = [];
       for (let i = 0; i < grupo.length; i++) {
         for (let j = i + 1; j < grupo.length; j++) {
           const score = this.simulateScore(this.copaStrength(byId[grupo[i]]), this.copaStrength(byId[grupo[j]]), 4);
           this.updateTableRow(table, grupo[i], score.homeGoals, score.awayGoals);
           this.updateTableRow(table, grupo[j], score.awayGoals, score.homeGoals);
+          partidos.push({ local: grupo[i], visitante: grupo[j], golesLocal: score.homeGoals, golesVisitante: score.awayGoals });
+          if (grupo[i] === this.state.clubId && score.homeGoals > score.awayGoals) victoriasDelUsuario++;
+          if (grupo[j] === this.state.clubId && score.awayGoals > score.homeGoals) victoriasDelUsuario++;
         }
       }
-      const orden = Object.entries(table)
-        .map(([id, row]) => ({ id, ...row }))
-        .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+      const orden = this.ordenarGrupo(
+        Object.entries(table).map(([id, row]) => ({ id, ...row })),
+        partidos,
+      );
       if (orden[0]) primeros.push(orden[0]);
       if (orden[1]) segundos.push(orden[1]);
       if (orden[2]) terceros.push(orden[2]);
@@ -1201,13 +1324,22 @@ const Engine = {
 
     const champion = alive[0] || null;
     if (champion) reached[champion] = 'el título';
+    const userStage = reached[this.state.clubId] || null;
     return {
       copa,
+      championId: champion,
       championName: champion ? byId[champion].nombre : null,
       championPais: champion ? byId[champion].pais : null,
       runnerUpName: runnerUp && byId[runnerUp] ? byId[runnerUp].nombre : null,
       userWon: champion === this.state.clubId,
-      userStage: reached[this.state.clubId] || null,
+      userStage,
+      // Lo que hace falta para cobrar más allá de hasta dónde llegó: cada
+      // partido ganado en la fase de grupos se paga aparte, y la previa
+      // depende de qué fases jugó y de si le tocó de local.
+      userExtras: {
+        victoriasEnGrupos: victoriasDelUsuario,
+        previa: resultadoPrevia.camino && resultadoPrevia.camino.fases.length ? resultadoPrevia.camino : null,
+      },
       // Los que se van de esta copa pero siguen en la otra (ver
       // simulateCopasDelAnio). Solo los usa la Libertadores para alimentar a
       // la Sudamericana; no quedan guardados en la partida.
@@ -2681,8 +2813,16 @@ const Engine = {
     }
     copasDelAnio.forEach((c) => {
       if (!c.userStage) return;
-      const cobrado = Economia.premioInternacional(this, c.copa, c.userStage);
-      if (cobrado) notasEconomia.push(`${c.copa}: ${Economia.monto(cobrado)} de premio por llegar a ${c.userStage}.`);
+      if (c.esRecopa) {
+        const cobrado = Economia.premioRecopa(this, c.userWon);
+        if (cobrado) notasEconomia.push(`Recopa Sudamericana: ${Economia.monto(cobrado)} por salir ${c.userWon ? 'campeón' : 'subcampeón'}.`);
+        return;
+      }
+      const cobrado = Economia.premioInternacional(this, c.copa, c.userStage, c.userExtras);
+      if (!cobrado) return;
+      const ganados = (c.userExtras && c.userExtras.victoriasEnGrupos) || 0;
+      const porVictorias = ganados ? ` (incluye ${ganados} ${ganados === 1 ? 'partido ganado' : 'partidos ganados'} en la fase de grupos)` : '';
+      notasEconomia.push(`${c.copa}: ${Economia.monto(cobrado)} de premio por llegar a ${c.userStage}${porVictorias}.`);
     });
 
     const userRelegated = relegated.includes(s.clubId);
