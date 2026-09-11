@@ -46,12 +46,13 @@ const FIFA_ROUNDS = [5, 11];
 // rondas y necesita seis fechas repartidas a lo largo de la edición.
 const COPA_ROUNDS = [2, 4, 6, 8, 11, 14];
 const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
-const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su único torneo
+const TRANSFER_ROUND_D2 = 17; // ventana de pases de la Nacional, a mitad de su único torneo
 // Primera juega 16 fechas: las 15 del fixture de su zona (14 partidos contra
 // su zona + el interzonal de emparejamiento en la fecha que le tocaría estar
 // libre) más una última fecha de clásicos, también interzonal. La Nacional
-// son 17 fechas a una rueda contra su propia zona de 18.
-const TOTAL_ROUNDS = { D1: 16, D2: 17 };
+// juega DOS ruedas contra su propia zona de 18 (34 fechas, ida y vuelta) más
+// una fecha interzonal al final: 35 partidos de fase regular por club.
+const TOTAL_ROUNDS = { D1: 16, D2: 35 };
 // Límites del plantel: con el máximo lleno hay que vender para poder
 // comprar, y con el mínimo no se puede vender más (si no te quedás sin
 // equipo).
@@ -1557,24 +1558,31 @@ const Engine = {
     const runZoneStage = () => {
       const tableA = Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()]));
       const tableB = Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()]));
-      const scheduleA = this.buildSchedule(idsA);
-      const scheduleB = this.buildSchedule(idsB);
+      // La Nacional va a ida y vuelta, igual que cuando la dirige el usuario:
+      // si acá jugara una sola rueda, la división simulada terminaría el año
+      // con la mitad de los partidos y los ascensos saldrían de otra cosa.
+      const idaYVuelta = (rondas) => rondas.concat(
+        rondas.map((ronda) => ronda.map((m) => ({ home: m.away, away: m.home }))),
+      );
+      const scheduleA = division === 'D2' ? idaYVuelta(this.buildSchedule(idsA)) : this.buildSchedule(idsA);
+      const scheduleB = division === 'D2' ? idaYVuelta(this.buildSchedule(idsB)) : this.buildSchedule(idsB);
       scheduleA.forEach((round) => this.simulateRoundOntoTable(round, tableA));
       scheduleB.forEach((round) => this.simulateRoundOntoTable(round, tableB));
-      // Primera juega además sus dos fechas interzonales, así que acá se
-      // simulan igual que en la división del usuario: si no, las dos mitades
-      // del país llegarían a fin de año con distinta cantidad de partidos
-      // jugados y la Tabla Anual no cerraría.
-      if (division === 'D1') {
-        const enA = new Set(idsA);
-        this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB).forEach((round) => {
-          round.forEach((fixture) => {
-            const score = this.simulateScore(this.clubStrength(fixture.home), this.clubStrength(fixture.away), 4);
-            this.updateTableRow(enA.has(fixture.home) ? tableA : tableB, fixture.home, score.homeGoals, score.awayGoals);
-            this.updateTableRow(enA.has(fixture.away) ? tableA : tableB, fixture.away, score.awayGoals, score.homeGoals);
-          });
+      // Las fechas interzonales se simulan igual que en la división del
+      // usuario: si no, las dos mitades del país llegarían a fin de año con
+      // distinta cantidad de partidos jugados y la tabla no cerraría. Primera
+      // tiene dos; la Nacional, una sola al final.
+      const enA = new Set(idsA);
+      const interzonales = division === 'D1'
+        ? this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB)
+        : [this.buildClasicoRound(idsA, idsB)];
+      interzonales.forEach((round) => {
+        round.forEach((fixture) => {
+          const score = this.simulateScore(this.clubStrength(fixture.home), this.clubStrength(fixture.away), 4);
+          this.updateTableRow(enA.has(fixture.home) ? tableA : tableB, fixture.home, score.homeGoals, score.awayGoals);
+          this.updateTableRow(enA.has(fixture.away) ? tableA : tableB, fixture.away, score.awayGoals, score.homeGoals);
         });
-      }
+      });
       return { zoneATable: this.sortTable(tableA), zoneBTable: this.sortTable(tableB) };
     };
 
@@ -1819,18 +1827,23 @@ const Engine = {
     const zoneBId = `${club.division}-B`;
     const idsA = s.clubs.filter((c) => c.division === club.division && c.zone === 'A').map((c) => c.id);
     const idsB = s.clubs.filter((c) => c.division === club.division && c.zone === 'B').map((c) => c.id);
-    const scheduleA = this.buildSchedule(idsA);
-    const scheduleB = this.buildSchedule(idsB);
+    // La Nacional es a ida y vuelta, así que su fixture es el de una rueda más
+    // el mismo dado vuelta (el que fue local ahora es visitante).
+    const idaYVuelta = (rondas) => rondas.concat(
+      rondas.map((ronda) => ronda.map((m) => ({ home: m.away, away: m.home }))),
+    );
+    const esNacional = club.division === 'D2';
+    const scheduleA = esNacional ? idaYVuelta(this.buildSchedule(idsA)) : this.buildSchedule(idsA);
+    const scheduleB = esNacional ? idaYVuelta(this.buildSchedule(idsB)) : this.buildSchedule(idsB);
     season.zones = {
       [zoneAId]: { clubIds: idsA, schedule: scheduleA, table: Object.fromEntries(idsA.map((id) => [id, this.emptyTableRow()])) },
       [zoneBId]: { clubIds: idsB, schedule: scheduleB, table: Object.fromEntries(idsB.map((id) => [id, this.emptyTableRow()])) },
     };
-    // Solo Primera tiene fechas interzonales: en la Nacional las zonas son de
-    // 18 equipos, así que no queda nadie libre y el torneo son 17 fechas
-    // contra la propia zona.
-    season.interzonal = club.division === 'D1'
-      ? this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB)
-      : [];
+    // Primera tiene dos fechas interzonales repartidas en el torneo; la
+    // Nacional tiene una sola, al final, después de las dos ruedas.
+    season.interzonal = esNacional
+      ? Array.from({ length: scheduleA.length }, () => []).concat([this.buildClasicoRound(idsA, idsB)])
+      : this.buildInterzonalSchedule(scheduleA, idsA, scheduleB, idsB);
 
     this.enterEditionRound();
   },
