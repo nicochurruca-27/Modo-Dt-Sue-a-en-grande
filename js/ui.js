@@ -782,7 +782,7 @@ function header() {
       <div class="topbar-club">${clubCrest(club, 28)}<span><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></span></div>
       ${dtLine}
       ${objectiveLine}
-      <div class="muted">${competitionLabel()}</div>
+      ${compromisoHtml()}
       <div class="muted">Presupuesto: ${money(s.budget)}${table ? ` · Posición en zona: ${pos}°/${table.length}` : ''} · Ánimo: ${s.morale}</div>
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
     </div>
@@ -984,6 +984,89 @@ function renderCalendar() {
 function dondeSeJuega(ctx) {
   if (ctx.isNeutral) return `Se juega en cancha neutral${ctx.sede ? `: ${ctx.sede}` : ''}`;
   return `Jugás de ${ctx.isHome ? 'local' : 'visitante'}${ctx.sede ? ` en ${ctx.sede}` : ''}`;
+}
+
+// ---------- El próximo compromiso ----------
+//
+// La línea de arriba de todo: qué se juega, contra quién y de qué lado. Tiene
+// que funcionar en los dos momentos, y ahí está la gracia:
+//
+//   - Cuando ya estás en el partido hay `matchContext` y sale todo de ahí.
+//   - Durante los días previos NO hay contexto todavía (se arma recién al
+//     terminar la semana), así que se mira el fixture para adelante y se
+//     anuncia lo que viene. Sin esto, los días de calendario no te dicen nada
+//     de lo que se te viene encima, que es justo cuando querés saberlo.
+function proximoCompromiso() {
+  const s = Engine.state;
+  if (!s || !s.season) return null;
+
+  const ctx = s.matchContext;
+  if (ctx) {
+    const localia = ctx.isNeutral ? 'Cancha neutral' : ctx.isHome ? 'De local' : 'De visitante';
+    return {
+      competicion: competicionDelPartido(),
+      titulo: tituloDelCompromiso(),
+      detalle: `${localia} vs ${Engine.getClub(ctx.opponentId).name}`,
+    };
+  }
+
+  // Una llave en curso (playoffs, Copa Argentina, Reducido).
+  if (s.bracket && s.bracket.alive && s.bracket.alive.length > 1) {
+    return {
+      competicion: s.bracket.kind === 'copa' ? 'copaArgentina' : 'liga',
+      titulo: etiquetaDeLlave(),
+      detalle: 'Llave eliminatoria',
+    };
+  }
+
+  // Fase regular: se busca el partido de la fecha que viene. Entre temporadas
+  // las zonas todavía no existen, así que hay que bancarse que no haya nada.
+  const season = s.season;
+  const zona = season.zones && season.zones[Engine.myZoneKey()];
+  if (!zona || season.roundIndex >= season.totalRounds) return null;
+
+  const fecha = `Fecha ${season.roundIndex + 1} de ${season.totalRounds}`;
+  const encontrado = Engine.findUserMatch(season.roundIndex);
+  if (!encontrado) return { competicion: 'liga', titulo: fecha, detalle: 'Fecha libre' };
+
+  const esLocal = encontrado.fixture.home === s.clubId;
+  const rivalId = esLocal ? encontrado.fixture.away : encontrado.fixture.home;
+  return {
+    competicion: 'liga',
+    titulo: fecha,
+    detalle: `${esLocal ? 'De local' : 'De visitante'} vs ${Engine.getClub(rivalId).name}`,
+  };
+}
+
+// La instancia de una llave. En la Copa Argentina se dice solo la ronda
+// ("Octavos de Final") porque el chip de al lado ya dice de qué copa se
+// trata; en los playoffs se aclara cuál es, porque el chip dice "Liga
+// Profesional" y eso no distingue el Apertura del Clausura.
+function etiquetaDeLlave() {
+  const b = Engine.state.bracket;
+  const ronda = b.stageNames[b.stageIndex] || '';
+  if (b.kind === 'copa') return ronda;
+  return Engine.bracketStageLabel();
+}
+
+// El nombre corto de lo que se juega, para el título de al lado del chip.
+function tituloDelCompromiso() {
+  const s = Engine.state;
+  const ctx = s.matchContext;
+  if (ctx && ctx.context === 'bracket') return etiquetaDeLlave();
+  const extra = ctx && ctx.clasico ? ' · Clásico' : ctx && ctx.interzonal ? ' · Interzonal' : '';
+  return `Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
+}
+
+// La línea entera, con el chip de la competición pintado con su color.
+function compromisoHtml() {
+  const c = proximoCompromiso();
+  if (!c) return '';
+  const comp = typeof COLORES_COMPETICIONES !== 'undefined' ? COLORES_COMPETICIONES[c.competicion] : null;
+  const chip = comp
+    ? `<span class="comp-chip" style="--chip:${comp.ui.acento}">${comp.nombre}</span>`
+    : '';
+  return `<div class="proximo-compromiso">${chip}<span class="compromiso-titulo">${c.titulo}</span><span class="compromiso-detalle">${c.detalle}</span></div>`;
 }
 
 // En qué competición se juega el partido que tenés delante. Hoy se juegan la

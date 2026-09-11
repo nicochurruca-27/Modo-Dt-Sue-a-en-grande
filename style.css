@@ -1115,3 +1115,36 @@ h1, h2, h3 {
     var(--card-bg);
   border-top: 2px solid var(--comp-acento, transparent);
 }
+
+/* La línea de arriba de todo: qué se juega, contra quién y de qué lado.
+   Reemplaza la línea gris suelta que decía solo "Apertura — Fecha 1 de 16".
+   El chip va pintado con el color de la competición (ver
+   COLORES_COMPETICIONES en data.js), que es lo que permite distinguirlas de
+   un vistazo sin depender del fondo. */
+.proximo-compromiso {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+
+.comp-chip {
+  border: 1px solid var(--chip, #475569);
+  color: var(--chip, #94a3b8);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.compromiso-titulo {
+  font-weight: 700;
+}
+
+.compromiso-detalle {
+  color: var(--muted);
+}
