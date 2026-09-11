@@ -1,0 +1,10 @@
+# El archivo único que se arma para jugar sin la carpeta al lado. Es generado
+# a partir de index.html + style.css + js/, así que no se versiona: sería
+# duplicar todo el código del repo y habría que regenerarlo en cada cambio.
+modo-dt-sueno-en-grande.html
+
+# Playwright se instala solo para correr las pruebas en el navegador y se
+# borra después.
+node_modules/
+package.json
+package-lock.json
