@@ -23,16 +23,18 @@
 //   simulación (no queda "vacante").
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
-// - Descienden 2 de Primera por año: los dos últimos de la Tabla Anual (suma
-//   de las fases regulares del Apertura y el Clausura). En la realidad baja
-//   el último de esa tabla y, aparte, el peor promedio de las últimas 3
-//   temporadas; acá se usan los dos últimos de la Anual para no arrastrar
-//   una segunda tabla con el historial de cada club.
+// - Descienden 2 de Primera por año: el último de la tabla de PROMEDIOS
+//   (puntos sobre partidos de las últimas 3 temporadas en Primera) y el
+//   último de la Tabla Anual que no sea ese mismo. La Tabla Anual es la suma
+//   de las fases regulares del Apertura y el Clausura, 32 partidos: los
+//   playoffs no cuentan ni para la Anual ni para el promedio. Un campeón
+//   puede descender.
 // - Cupos a copas internacionales: 6 a Libertadores (campeón Apertura,
-//   campeón Clausura, campeón Copa Argentina, y los 3 mejores de la Tabla
-//   Anual que no hayan clasificado ya, el tercero de ellos a fase previa) y
-//   6 a Sudamericana (los 6 siguientes de la Tabla Anual). Un campeón que
-//   además desciende conserva igual su cupo, como en la realidad.
+//   campeón Clausura, campeón Copa Argentina, y los mejores de la Tabla
+//   Anual que no hayan clasificado ya, el último de ellos a fase previa) y
+//   6 a Sudamericana (los 6 siguientes de la Anual que no hayan clasificado).
+//   Un club que descendió pierde el cupo aunque lo haya ganado en la cancha,
+//   y su lugar se corre al siguiente.
 // - La división en la que NO juega el usuario se simula completa e
 //   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
 //   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
@@ -939,6 +941,62 @@ const Engine = {
   // solo dice quién es el mejor ubicado de la fase regular, que es el que
   // juega de local. Se numera por puesto en la zona (los dos 1º primero, los
   // dos 2º después, y así), desempatando por puntos entre zonas.
+  // ---------- Promedios ----------
+  //
+  // Bajan dos por año: el último de la tabla de PROMEDIOS y, aparte, el último
+  // de la Tabla Anual que no sea ese mismo. Si el peor promedio es además el
+  // último de la Anual, no baja dos veces: baja por promedio y el segundo
+  // descenso se lo lleva el anteúltimo de la Anual.
+  //
+  // El promedio es la suma de puntos dividida por la suma de partidos de las
+  // últimas tres temporadas EN PRIMERA. A un recién ascendido NO se le
+  // rellenan con cero las temporadas que jugó en la Nacional: se le divide
+  // solo por los partidos que jugó acá, así que puede tener mejor promedio que
+  // un club con más historia pero peor campaña.
+  //
+  // Solo entran los puntos de las fases regulares del Apertura y el Clausura
+  // (32 partidos por año). Los playoffs, la Copa Argentina y las copas
+  // internacionales no cuentan.
+  registrarTemporadaEnHistorial(tablaAnual) {
+    const s = this.state;
+    s.historialPuntos = s.historialPuntos || {};
+    tablaAnual.forEach((row) => {
+      const previas = s.historialPuntos[row.id] || [];
+      s.historialPuntos[row.id] = previas.concat([{ pts: row.pts, pj: row.played }]).slice(-3);
+    });
+  },
+
+  tablaDePromedios(tablaAnual) {
+    const historial = (this.state && this.state.historialPuntos) || {};
+    return tablaAnual
+      .map((row) => {
+        const temporadas = historial[row.id] || [];
+        const pts = temporadas.reduce((t, x) => t + x.pts, 0);
+        const pj = temporadas.reduce((t, x) => t + x.pj, 0);
+        return { id: row.id, name: row.name, pts, pj, temporadas: temporadas.length, promedio: pj ? pts / pj : 0 };
+      })
+      .sort((a, b) => b.promedio - a.promedio);
+  },
+
+  // Al arrancar una carrera nadie tiene historial, así que la tabla de
+  // promedios sería idéntica a la Anual y el descenso por promedio no
+  // significaría nada hasta la tercera temporada. Por eso se siembran dos
+  // temporadas previas inventadas pero verosímiles, sacadas de la reputación
+  // de cada club: un grande arranca con colchón y uno chico arranca comprometido,
+  // que es justo lo que hace que el promedio pese.
+  sembrarHistorialDePromedios() {
+    const s = this.state;
+    s.historialPuntos = {};
+    s.clubs.filter((c) => c.division === 'D1').forEach((club) => {
+      const temporadas = [];
+      for (let i = 0; i < 2; i++) {
+        const porPartido = 0.95 + club.reputation * 0.19 + (Math.random() * 0.3 - 0.15);
+        temporadas.push({ pts: Math.round(Math.max(0.6, porPartido) * 32), pj: 32 });
+      }
+      s.historialPuntos[club.id] = temporadas;
+    });
+  },
+
   playoffSeedsFromZones(zoneATable, zoneBTable) {
     const a = zoneATable.slice(0, 8);
     const b = zoneBTable.slice(0, 8);
@@ -1461,8 +1519,10 @@ const Engine = {
       finanzas: null,
       mercado: null,
       notasMercado: [],
+      historialPuntos: {},
       log: [],
     };
+    this.sembrarHistorialDePromedios();
     const club = this.getClub(clubId);
     let budget = this.startingBudget(club);
     if (dt && dt.style === 'conservador') budget = Math.round(budget * 1.1);
@@ -2753,12 +2813,17 @@ const Engine = {
   // de un título) se completan corriendo la Tabla Anual, y el último de esos
   // 6 entra por fase previa en vez de fase de grupos. Después de eso, los 6
   // siguientes de la Tabla Anual van a la Sudamericana.
-  assignQualification(d1Data) {
+  // Un club que descendió pierde el cupo internacional aunque lo haya ganado
+  // en la cancha: si el campeón del Apertura o del Clausura se va a la
+  // Nacional, no juega la Libertadores y su lugar se corre al siguiente de la
+  // Tabla Anual.
+  assignQualification(d1Data, relegated) {
     const s = this.state;
+    const bajaron = new Set(relegated || []);
     const assigned = new Set();
     const results = [];
     const grant = (clubId, comp, stage) => {
-      if (!clubId || assigned.has(clubId)) return;
+      if (!clubId || assigned.has(clubId) || bajaron.has(clubId)) return;
       assigned.add(clubId);
       results.push({ clubId, name: this.getClub(clubId).name, comp, stage });
     };
@@ -2767,7 +2832,7 @@ const Engine = {
     grant(d1Data.clausuraChampion, 'Libertadores', 'Fase de grupos');
     grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos');
 
-    const porTabla = d1Data.tablaAnualYear.filter((row) => !assigned.has(row.id));
+    const porTabla = d1Data.tablaAnualYear.filter((row) => !assigned.has(row.id) && !bajaron.has(row.id));
     const cuposLibertadores = Math.max(0, 6 - results.length);
     porTabla.slice(0, cuposLibertadores).forEach((row, i) => {
       grant(row.id, 'Libertadores', i === cuposLibertadores - 1 ? 'Fase previa' : 'Fase de grupos');
@@ -2807,12 +2872,18 @@ const Engine = {
     const d1Data = divisionThisSeason === 'D1' ? myYearResult : bg;
     const d2Data = divisionThisSeason === 'D2' ? myYearResult : bg;
 
-    // En la realidad baja el último de la Tabla Anual y, aparte, el peor
-    // promedio de las últimas 3 temporadas. Acá bajan los dos últimos de la
-    // Tabla Anual: es una simplificación deliberada para no arrastrar una
-    // segunda tabla con el historial de cada club.
+    // Baja el último de la tabla de promedios y, aparte, el último de la Tabla
+    // Anual que no sea ese mismo (ver tablaDePromedios). La temporada que
+    // termina se suma al historial ANTES de calcular los promedios, porque
+    // cuenta para ellos.
     const tablaAnualD1 = d1Data.tablaAnualYear;
-    const relegated = tablaAnualD1.slice(-2).map((row) => row.id);
+    this.registrarTemporadaEnHistorial(tablaAnualD1);
+    const promedios = this.tablaDePromedios(tablaAnualD1);
+    const bajaPorPromedio = promedios.length ? promedios[promedios.length - 1].id : null;
+    const bajaPorAnual = tablaAnualD1.slice().reverse()
+      .map((row) => row.id)
+      .find((id) => id !== bajaPorPromedio) || null;
+    const relegated = [bajaPorPromedio, bajaPorAnual].filter(Boolean);
 
     const promoted = d2Data.promoted.filter((id) => !!id);
 
@@ -2833,7 +2904,7 @@ const Engine = {
     // siguiente, con los cupos que se ganen ahora.
     const copasDelAnio = this.simulateCopasDelAnio(s.copaQualification);
 
-    const qualification = this.assignQualification(d1Data);
+    const qualification = this.assignQualification(d1Data, relegated);
     // Estos dos sobreviven al cambio de temporada (a diferencia de
     // lastSeasonSummary, que se limpia): son los que alimentan la pestaña
     // "Copas" del panel durante todo el año siguiente.
