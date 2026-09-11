@@ -151,27 +151,45 @@ const Engine = {
   // 90, como mucho a un par de puntos más. A partir de los 26 ya no hay
   // margen adicional (ver developSquadAfterMatch, más abajo, para cómo se
   // aplica este techo).
+  canteraDe(club) {
+    if (!club) return 3;
+    const c = typeof CANTERAS !== 'undefined' && CANTERAS[club.id];
+    return c || (typeof CANTERA_POR_DEFECTO !== 'undefined' ? CANTERA_POR_DEFECTO[club.division] : 3) || 3;
+  },
+
   // Techo estimado de un jugador del que no se investigó la proyección real.
   //
-  // El margen por edad es el máximo, no lo que le toca a cada uno: se sortea
-  // una porción de ese margen, cargada para abajo. Antes era un número fijo
-  // (+12 a todo juvenil de 19) y el resultado era que TODOS los pibes
-  // generados terminaban siendo buenos: en una prueba de 5 temporadas, los
-  // juveniles de Platense subían +9, +10 y +11 puntos, más que los de Boca,
-  // que tienen proyecciones reales y por lo tanto más modestas. En la
-  // realidad la mayoría de los juveniles no llega: unos pocos pegan el salto
-  // y el resto se queda en el camino. Con el sorteo, un pibe de 19 saca entre
-  // +3 y +12 y el promedio queda cerca de +6.
-  computePotential(rating, age) {
+  // Dos cosas deciden cuánto margen le toca: la edad y LA CANTERA DEL CLUB
+  // donde se formó. Lo segundo faltaba y era el error de fondo: el techo no
+  // dependía del club para nada, así que Platense sacaba tantas joyas como
+  // River y Argentinos no tenía ninguna ventaja sobre Barracas Central.
+  //
+  // La cantera mueve dos perillas a la vez:
+  //   - cuánto margen se puede sortear como máximo (un club de cantera 5
+  //     puede sacar un pibe con 14 puntos por delante; uno de cantera 1 no
+  //     pasa de 7, así que directamente NO produce joyas);
+  //   - qué tan cargado está el sorteo hacia arriba (exponente): en una
+  //     cantera grande el buen sorteo es frecuente, en una chica es raro.
+  //
+  // El margen por edad sigue siendo el máximo, no lo que le toca a cada uno:
+  // en la realidad la mayoría de los juveniles no llega, unos pocos pegan el
+  // salto y el resto se queda en el camino.
+  computePotential(rating, age, club) {
     let maxMargin = 0;
     if (age <= 19) maxMargin = 12;
     else if (age <= 21) maxMargin = 9;
     else if (age <= 23) maxMargin = 6;
     else if (age <= 25) maxMargin = 3;
     if (!maxMargin) return Math.min(99, rating);
-    // Math.random() al cuadrado carga el sorteo hacia los valores bajos.
-    const porcion = 0.25 + Math.pow(Math.random(), 2) * 0.75;
-    return Math.min(99, rating + Math.round(maxMargin * porcion));
+
+    const cantera = this.canteraDe(club);
+    const tope = { 5: 1.2, 4: 1.05, 3: 0.9, 2: 0.7, 1: 0.55 }[cantera] || 0.9;
+    // Exponente del sorteo: más bajo = más parejo = más seguido sale un
+    // margen grande. Más alto = cargado hacia abajo.
+    const sesgo = { 5: 1.3, 4: 1.7, 3: 2.2, 2: 2.9, 1: 3.6 }[cantera] || 2.2;
+
+    const porcion = 0.25 + Math.pow(Math.random(), sesgo) * 0.75;
+    return Math.min(99, rating + Math.round(maxMargin * tope * porcion));
   },
 
   // Si el club tiene un plantel real cargado en players.js, se usa ese en
@@ -185,7 +203,7 @@ const Engine = {
         // Datos económicos reales, cuando el club los tiene investigados.
         value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
         // Si vino una proyección investigada se usa esa; si no, la estimada.
-        potential: p.projection || this.computePotential(p.rating, p.age),
+        potential: p.projection || this.computePotential(p.rating, p.age, club),
       }));
     }
     const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
@@ -207,7 +225,7 @@ const Engine = {
       const nation = this.rollNation();
       const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
       const role = pos === 'MED' ? MED_ROLES[Math.floor(Math.random() * MED_ROLES.length)] : undefined;
-      return { id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age) };
+      return { id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age, club) };
     });
   },
 
@@ -2275,7 +2293,9 @@ const Engine = {
       name: offer.name,
       pos: offer.pos,
       rating: offer.rating,
-      potential: this.computePotential(offer.rating, offer.age),
+      // El jugador que llega del mercado se formó en otro lado, pero de acá
+      // en más crece en tu club: se usa tu cantera como aproximación.
+      potential: this.computePotential(offer.rating, offer.age, this.getClub(s.clubId)),
       age: offer.age,
       nation: offer.nation,
       contractYears: 3,

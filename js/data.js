@@ -306,6 +306,37 @@ const NAMES_BY_NATION = {
   },
 };
 
+// Calidad de la cantera de cada club: qué tan seguido saca un juvenil que
+// termina siendo bueno de verdad, del 1 al 5.
+//
+// Esto NO es lo mismo que el tamaño del club ni su presupuesto, y por eso es
+// un campo aparte de `reputation` y de `budgetTier`. El caso más claro es
+// Argentinos Juniors: económicamente es un club de media tabla, y tiene la
+// cantera más famosa del fútbol argentino (Maradona, Riquelme, Redondo,
+// Cambiasso, Sorín). Si la cantera saliera del presupuesto, La Paternal
+// sacaría los mismos juveniles que Barracas Central, que es exactamente el
+// error que tenía el juego antes: el techo de un juvenil no dependía del club
+// para nada, así que Platense sacaba tantas joyas como River.
+//
+// ACLARACIÓN IMPORTANTE: estos números son criterio nuestro, puestos según la
+// historia conocida de cada club sacando jugadores. No salen de una
+// investigación puntual como los datos económicos o los planteles. Si algún
+// día se investigan en serio, se cambian acá y nada más.
+//
+// Un club que no está en esta lista usa el valor por defecto de su categoría.
+const CANTERAS = {
+  // Las mejores del país.
+  argentinos: 5, river: 5, boca: 5, velez: 5,
+  // Muy buenas, con historia larga de sacar jugadores.
+  racing: 4, independiente: 4, sanlorenzo: 4, newells: 4, rosariocentral: 4,
+  estudianteslp: 4, banfield: 4, lanus: 4, defensayjusticia: 4,
+  // Chicas pero con trabajo de inferiores serio.
+  riestra: 2, aldosivi: 2, barracascentral: 2, sarmientojunin: 2,
+  gimnasiamendoza: 2, riocuarto: 2,
+};
+
+const CANTERA_POR_DEFECTO = { D1: 3, D2: 2 };
+
 // 18 jugadores por plantel: 2 arqueros, 6 defensores, 6 mediocampistas, 4
 // delanteros — deja margen suficiente de suplentes para todas las formaciones
 // (incluidas las más pobladas de una línea, como 5-4-1 o 3-6-1).

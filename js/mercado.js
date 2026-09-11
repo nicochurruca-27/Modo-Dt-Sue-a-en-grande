@@ -409,7 +409,7 @@ const Mercado = {
         id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
         rating: j.rating, age: j.age, nation: j.nation, role: j.role,
         contractYears: 3,
-        potential: engine.computePotential(j.rating, j.age),
+        potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
       });
       m.fichados.push(j.id);
       notas.push(a.tipo === 'fin-contrato'
