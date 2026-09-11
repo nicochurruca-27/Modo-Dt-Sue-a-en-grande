@@ -957,31 +957,37 @@ const Engine = {
     return arr;
   },
 
-  // Cada país del resto del continente reparte sus plazas de nuevo todos los
-  // años. Las plazas en sí no cambian (las mismas que trae internacional.js:
-  // tantas a la Libertadores, tantas por fase previa, tantas a la
-  // Sudamericana), pero quién ocupa cada una se define por la campaña de ese
-  // año: el nivel del club pesa, pero con bastante azar encima. Así Peñarol
-  // suele ir a la Libertadores y a veces cae en la Sudamericana, y no
-  // clasifican siempre exactamente los mismos.
+  // Cada país del resto del continente reparte sus cupos de nuevo todos los
+  // años. Cuántos cupos tiene cada uno no cambia (sale de
+  // CUPOS_INTERNACIONALES, tomado de las ediciones reales), pero quién los
+  // ocupa se define por la campaña de ese año: el nivel del club pesa, pero
+  // con bastante azar encima.
   //
-  // El valor de una plaza ordena de mejor a peor: entrar directo a los grupos
-  // de la Libertadores es lo máximo, después su fase previa, después la
-  // Sudamericana.
+  // La gracia es que internacional.js tiene bastantes más clubes por país que
+  // cupos, así que los que sobran se quedan afuera esa temporada. Por eso
+  // Flamengo está casi siempre y Coritiba aparece de vez en cuando, y no te
+  // cruzás todos los años exactamente con los mismos.
+  //
+  // Los cupos se reparten de mejor a peor: los grupos de la Libertadores
+  // primero, después su fase previa, después la Sudamericana.
   sortearCuposInternacionales() {
-    const valorPlaza = (p) => (p.copa === 'Libertadores' ? (p.fase === 'grupos' ? 3 : 2) : 1);
     const porPais = {};
     (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
       .forEach((c) => { (porPais[c.pais] = porPais[c.pais] || []).push(c); });
 
     const sorteados = [];
-    Object.values(porPais).forEach((clubes) => {
-      const plazas = clubes.map((c) => ({ copa: c.copa, fase: c.fase }))
-        .sort((a, b) => valorPlaza(b) - valorPlaza(a));
+    Object.entries(porPais).forEach(([pais, clubes]) => {
+      const cupos = CUPOS_INTERNACIONALES[pais];
+      if (!cupos) return;
+      const plazas = [
+        ...Array.from({ length: cupos.libertadoresGrupos }, () => ({ copa: 'Libertadores', fase: 'grupos' })),
+        ...Array.from({ length: cupos.libertadoresPrevia }, () => ({ copa: 'Libertadores', fase: 'previa' })),
+        ...Array.from({ length: cupos.sudamericana }, () => ({ copa: 'Sudamericana', fase: 'grupos' })),
+      ];
       const ranking = clubes
         .map((c) => ({ club: c, campania: c.nivel + Math.random() * 3.5 }))
         .sort((a, b) => b.campania - a.campania);
-      ranking.forEach((r, i) => {
+      ranking.slice(0, plazas.length).forEach((r, i) => {
         sorteados.push({ id: r.club.id, nombre: r.club.nombre, pais: r.club.pais, nivel: r.club.nivel, ...plazas[i] });
       });
     });
