@@ -31,10 +31,9 @@
 //             nombre del estadio, etc.).
 //
 // Datos investigados contrastando fuentes: todos los clubes que jugaron
-// alguna de las dos copas en los últimos 10 años, con el doble de clubes por
-// país que cupos tiene ese país. Brasil, Uruguay, Colombia, Chile, Ecuador y
-// Paraguay ya están con el detalle completo; Perú, Bolivia y Venezuela
-// todavía tienen la lista corta original, pendiente de la misma pasada.
+// alguna de las dos copas en los últimos 10 años, apuntando a cargar por
+// país alrededor del doble de clubes que cupos tiene. Están los nueve
+// países cargados.
 const CLUBES_INTERNACIONALES = [
   // ---- Brasil ----
   { id: "flamengo", nombre: "Flamengo", nombreCompleto: "Clube de Regatas do Flamengo", pais: "Brasil", copa: "Libertadores", nivel: 5, grande: true, apodo: "Mengão", estadio: "Maracanã", colores: { primario: "#000000", secundario: "#FF0000" }, titulos: { libertadores: 4, sudamericana: 0 } },
@@ -119,28 +118,31 @@ const CLUBES_INTERNACIONALES = [
   { id: "sportivo-ameliano", nombre: "Sportivo Ameliano", nombreCompleto: "Club Sportivo Ameliano", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "V Azulada", estadio: "Martín Torres", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
 
   // ---- Perú ----
-  { id: "universitario", nombre: "Universitario", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "cuscofc", nombre: "Cusco FC", pais: "Perú", copa: "Libertadores", nivel: 2 },
-  { id: "sportingcristal", nombre: "Sporting Cristal", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "alianzalima", nombre: "Alianza Lima", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "cienciano", nombre: "Cienciano", pais: "Perú", copa: "Sudamericana", nivel: 2 },
-  { id: "alianzaatletico", nombre: "Alianza Atlético", pais: "Perú", copa: "Sudamericana", nivel: 1 },
+  { id: "universitario", nombre: "Universitario", nombreCompleto: "Club Universitario de Deportes", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true, apodo: "Cremas", estadio: "Monumental", colores: { primario: "#8B0000", secundario: "#FFFFFF" } },
+  { id: "alianza-lima", nombre: "Alianza Lima", nombreCompleto: "Club Alianza Lima", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true, apodo: "Blanquiazules", estadio: "Alejandro Villanueva", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "sporting-cristal", nombre: "Sporting Cristal", nombreCompleto: "Club Sporting Cristal", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true, apodo: "Celestes", estadio: "Alberto Gallardo", colores: { primario: "#00AEEF", secundario: "#FFFFFF" } },
+  { id: "melgar", nombre: "Melgar", nombreCompleto: "Foot Ball Club Melgar", pais: "Perú", copa: "Libertadores", nivel: 3, apodo: "Rojinegros", estadio: "Monumental de la UNSA", colores: { primario: "#FF0000", secundario: "#000000" } },
+  { id: "sport-huancayo", nombre: "Sport Huancayo", nombreCompleto: "Club Sport Huancayo", pais: "Perú", copa: "Sudamericana", nivel: 2, apodo: "Rojo Matador", estadio: "Huancayo", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
+  { id: "utc", nombre: "UTC", nombreCompleto: "Universidad Técnica de Cajamarca", pais: "Perú", copa: "Sudamericana", nivel: 2, apodo: "Gavilán del Norte", estadio: "Héroes de San Ramón", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
+  { id: "binacional", nombre: "Binacional", nombreCompleto: "Deportivo Binacional Fútbol Club", pais: "Perú", copa: "Libertadores", nivel: 1, apodo: "Poderoso del Sur", estadio: "Guillermo Briceño Rosamedina", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
 
   // ---- Bolivia ----
-  { id: "alwaysready", nombre: "Always Ready", pais: "Bolivia", copa: "Libertadores", nivel: 2 },
-  { id: "bolivar", nombre: "Bolívar", pais: "Bolivia", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "nacionalpotosi", nombre: "Nacional Potosí", pais: "Bolivia", copa: "Libertadores", nivel: 2 },
-  { id: "thestrongest", nombre: "The Strongest", pais: "Bolivia", copa: "Libertadores", nivel: 3, grande: true },
-  { id: "petrolero", nombre: "Independiente Petrolero", pais: "Bolivia", copa: "Sudamericana", nivel: 1 },
-  { id: "blooming", nombre: "Blooming", pais: "Bolivia", copa: "Sudamericana", nivel: 2, grande: true },
+  { id: "bolivar", nombre: "Bolívar", nombreCompleto: "Club Bolívar", pais: "Bolivia", copa: "Libertadores", nivel: 4, grande: true, apodo: "La Academia", estadio: "Hernando Siles", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "the-strongest", nombre: "The Strongest", nombreCompleto: "Club The Strongest", pais: "Bolivia", copa: "Libertadores", nivel: 3, grande: true, apodo: "Tigres", estadio: "Hernando Siles", colores: { primario: "#FFD700", secundario: "#000000" } },
+  { id: "jorge-wilstermann", nombre: "Jorge Wilstermann", nombreCompleto: "Club Deportivo Jorge Wilstermann", pais: "Bolivia", copa: "Libertadores", nivel: 3, grande: true, apodo: "Aviador", estadio: "Félix Capriles", colores: { primario: "#FF0000", secundario: "#000000" } },
+  { id: "oriente-petrolero", nombre: "Oriente Petrolero", nombreCompleto: "Club Deportivo Oriente Petrolero", pais: "Bolivia", copa: "Libertadores", nivel: 2, apodo: "Refineros", estadio: "Ramón Aguilera Costas", colores: { primario: "#008000", secundario: "#FFFFFF" } },
+  { id: "blooming", nombre: "Blooming", nombreCompleto: "Club Blooming", pais: "Bolivia", copa: "Sudamericana", nivel: 2, apodo: "Celestes", estadio: "Ramón Aguilera Costas", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "aurora", nombre: "Aurora", nombreCompleto: "Club Aurora", pais: "Bolivia", copa: "Libertadores", nivel: 2, apodo: "Celestes", estadio: "Félix Capriles", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "nacional-potosi", nombre: "Nacional Potosí", nombreCompleto: "Club Atlético Nacional Potosí", pais: "Bolivia", copa: "Sudamericana", nivel: 2, apodo: "Rancho Guitarras", estadio: "Víctor Agustín Ugarte", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
 
   // ---- Venezuela ----
-  { id: "ucv", nombre: "Universidad Central", pais: "Venezuela", copa: "Libertadores", nivel: 1 },
-  { id: "laguaira", nombre: "Deportivo La Guaira", pais: "Venezuela", copa: "Libertadores", nivel: 2 },
-  { id: "carabobo", nombre: "Carabobo", pais: "Venezuela", copa: "Libertadores", nivel: 2 },
-  { id: "tachira", nombre: "Deportivo Táchira", pais: "Venezuela", copa: "Libertadores", nivel: 2, grande: true },
-  { id: "caracas", nombre: "Caracas FC", pais: "Venezuela", copa: "Sudamericana", nivel: 2, grande: true },
-  { id: "puertocabello", nombre: "Academia Puerto Cabello", pais: "Venezuela", copa: "Sudamericana", nivel: 1 },
+  { id: "caracas", nombre: "Caracas", nombreCompleto: "Caracas Fútbol Club", pais: "Venezuela", copa: "Libertadores", nivel: 3, grande: true, apodo: "Rojos del Ávila", estadio: "Olímpico de la UCV", colores: { primario: "#FF0000", secundario: "#000000" } },
+  { id: "deportivo-tachira", nombre: "Deportivo Táchira", nombreCompleto: "Deportivo Táchira Fútbol Club", pais: "Venezuela", copa: "Libertadores", nivel: 3, grande: true, apodo: "Aurinegro", estadio: "Polideportivo de Pueblo Nuevo", colores: { primario: "#FFD700", secundario: "#000000" } },
+  { id: "zamora", nombre: "Zamora", nombreCompleto: "Zamora Fútbol Club", pais: "Venezuela", copa: "Libertadores", nivel: 2, apodo: "Blanquinegros", estadio: "Agustín Tovar", colores: { primario: "#000000", secundario: "#FFFFFF" } },
+  { id: "monagas", nombre: "Monagas", nombreCompleto: "Monagas Sport Club", pais: "Venezuela", copa: "Libertadores", nivel: 2, apodo: "Azulgranas", estadio: "Monumental de Maturín", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "estudiantes-de-merida", nombre: "Estudiantes de Mérida", nombreCompleto: "Estudiantes de Mérida Fútbol Club", pais: "Venezuela", copa: "Sudamericana", nivel: 2, apodo: "Académicos", estadio: "Metropolitano de Mérida", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
+  { id: "carabobo", nombre: "Carabobo", nombreCompleto: "Carabobo Fútbol Club", pais: "Venezuela", copa: "Libertadores", nivel: 2, apodo: "Granate", estadio: "Misael Delgado", colores: { primario: "#FF0000", secundario: "#000000" } },
+  { id: "metropolitanos", nombre: "Metropolitanos", nombreCompleto: "Metropolitanos Fútbol Club", pais: "Venezuela", copa: "Sudamericana", nivel: 2, apodo: "Violetas", estadio: "Olímpico de la UCV", colores: { primario: "#800080", secundario: "#FFFFFF" } },
 ];
 
 // Cuántos cupos reparte cada país todos los años, tomado de las ediciones
