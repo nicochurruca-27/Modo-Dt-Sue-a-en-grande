@@ -728,6 +728,13 @@ h1, h2, h3 {
   color: #04220f;
 }
 
+/* El penal errado: ni gol ni atajada. Va en amarillo porque no es un logro
+   de nadie, es un error del que pateó. */
+.goal-result-banner.errado {
+  background: rgba(245, 158, 11, 0.92);
+  color: #1c1206;
+}
+
 .goal-result-banner.atajada {
   background: rgba(239, 68, 68, 0.9);
   color: #2a0a0a;

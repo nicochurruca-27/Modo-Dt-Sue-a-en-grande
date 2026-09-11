@@ -1674,21 +1674,40 @@ const Engine = {
   // remate del rival) — decide la probabilidad, y se guarda también para
   // que la UI pueda animar la cinemática del penal con la posición real de
   // cada uno.
+  // Tres finales posibles, no dos. Esto es lo que arregla el bug que reportó
+  // el usuario: "lo pateó, entró, y contó como atajada del rival".
+  //
+  // Antes se sorteaba si era gol SIN mirar si el arquero había adivinado el
+  // palo. Entonces podías patear a la izquierda, el arquero volaba a la
+  // derecha —y la animación te lo mostraba así— y el cartel igual decía
+  // ATAJADA. Al revés también: el arquero se tiraba justo encima de la
+  // pelota y decía GOL. La animación contaba una cosa y el resultado otra.
+  //
+  // Ahora el resultado se deduce de lo que pasó:
+  //   - entró                     -> 'gol'
+  //   - no entró y el arquero
+  //     adivinó el palo           -> 'atajada' (la sacó)
+  //   - no entró y el arquero
+  //     se tiró para el otro lado -> 'errado' (la tiró afuera)
+  // Ese tercer caso es el que faltaba y el que generaba las atajadas
+  // imposibles: si el arquero salió para cualquier lado y no fue gol, es
+  // porque el que pateó la mandó a la tribuna.
   resolvePenalty(direction, shooterOrKeeper) {
     const s = this.state;
     const pen = s.pendingMatch.penalty;
     const guess = PENALTY_ZONES[Math.floor(Math.random() * PENALTY_ZONES.length)].id;
     let scored;
+    let matched;
 
     if (pen.side === 'user') {
-      const matched = guess === direction;
+      matched = guess === direction;
       const chance = Math.max(0.05, Math.min(0.97, (matched ? 0.3 : 0.9) + (shooterOrKeeper.rating - 70) / 300));
       scored = Math.random() < chance;
       pen.shooterName = shooterOrKeeper.name;
       pen.direction = direction; // dónde pateó el usuario
       pen.keeperZone = guess; // a dónde se tiró el arquero rival
     } else {
-      const matched = guess === direction;
+      matched = guess === direction;
       const chance = Math.max(0.05, Math.min(0.95, (matched ? 0.25 : 0.85) - (shooterOrKeeper.rating - 70) / 300));
       scored = Math.random() < chance;
       pen.keeperName = shooterOrKeeper.name;
@@ -1698,6 +1717,8 @@ const Engine = {
 
     pen.resolved = true;
     pen.scored = scored;
+    pen.atajadoEnElPalo = matched; // el arquero fue para el lado correcto
+    pen.resultado = scored ? 'gol' : (matched ? 'atajada' : 'errado');
 
     if (scored) {
       const scoringIsHome = (pen.side === 'user') === s.pendingMatch.isHome;

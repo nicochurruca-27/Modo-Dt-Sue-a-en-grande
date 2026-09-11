@@ -1065,24 +1065,43 @@ function animatePenaltyResult(side) {
 
   const shotZone = side === 'user' ? pen.direction : pen.shooterZone;
   const keeperZone = side === 'user' ? pen.keeperZone : pen.direction;
+  const resultado = pen.resultado || (pen.scored ? 'gol' : 'atajada');
   const ballTarget = goalZoneCenter(shotZone);
   const keeperTarget = keeperSpot(keeperZone);
 
-  ball.style.left = `${ballTarget.leftPct}%`;
-  ball.style.top = `${ballTarget.topPct}%`;
-  keeper.style.left = `${keeperTarget.leftPct}%`;
+  // Que la animación cuente exactamente lo que pasó:
+  //
+  // - errado: la pelota NO puede terminar adentro del arco. Se va contra el
+  //   palo o por arriba del travesaño, según a qué altura fue el remate.
+  //   (No se puede mandar más afuera todavía porque .goal-wrap recorta lo que
+  //   se sale, así que el borde del marco es lo más lejos que llega.)
+  // - gol con el arquero en el palo correcto: si los dos van al mismo punto,
+  //   se ve al arquero tapando la pelota y el cartel diciendo GOL. Se lo corre
+  //   un poco al costado para que se lea "llegó a tocarla pero se le escapó".
+  const zona = PENALTY_ZONES.find((z) => z.id === shotZone);
+  if (resultado === 'errado') {
+    if (zona.row === 0) ball.style.top = '2%';                 // por arriba del travesaño
+    else ball.style.left = zona.col === 2 ? '97%' : '3%';      // contra el palo
+    if (zona.row === 0) ball.style.left = `${ballTarget.leftPct}%`;
+    else ball.style.top = `${ballTarget.topPct}%`;
+  } else {
+    ball.style.left = `${ballTarget.leftPct}%`;
+    ball.style.top = `${ballTarget.topPct}%`;
+  }
+
+  const corrido = resultado === 'gol' && pen.atajadoEnElPalo ? (zona.col === 0 ? 9 : -9) : 0;
+  keeper.style.left = `${keeperTarget.leftPct + corrido}%`;
   keeper.style.top = `${keeperTarget.topPct}%`;
 
   setTimeout(() => {
-    if (pen.scored) {
-      banner.textContent = '¡GOL!';
-      banner.className = 'goal-result-banner show gol';
-      // La pelota queda clavada adentro del arco como confirmación visual del gol.
-      ball.style.top = `${ballTarget.topPct}%`;
-    } else {
-      banner.textContent = '¡ATAJADA!';
-      banner.className = 'goal-result-banner show atajada';
-    }
+    const carteles = {
+      gol: ['¡GOL!', 'gol'],
+      atajada: ['¡ATAJADA!', 'atajada'],
+      errado: [zona.row === 0 ? '¡POR ARRIBA!' : '¡AL PALO!', 'errado'],
+    };
+    const [texto, clase] = carteles[resultado];
+    banner.textContent = texto;
+    banner.className = `goal-result-banner show ${clase}`;
   }, 650);
 
   setTimeout(() => { render(); }, 2000);
@@ -1161,14 +1180,19 @@ function renderMatchResult() {
   let penaltyText = '';
   if (m.penalty) {
     const dirLabel = zoneLabel(m.penalty.direction);
+    const resultado = m.penalty.resultado || (m.penalty.scored ? 'gol' : 'atajada');
     if (m.penalty.side === 'user') {
-      penaltyText = m.penalty.scored
-        ? `${m.penalty.shooterName} pateó ${dirLabel} y marcó el penal.`
-        : `${m.penalty.shooterName} pateó ${dirLabel} y el arquero lo contuvo.`;
+      penaltyText = {
+        gol: `${m.penalty.shooterName} pateó ${dirLabel} y marcó el penal.`,
+        atajada: `${m.penalty.shooterName} pateó ${dirLabel} y el arquero adivinó el palo: se lo contuvo.`,
+        errado: `${m.penalty.shooterName} pateó ${dirLabel} y la mandó afuera. El arquero ni se enteró.`,
+      }[resultado];
     } else {
-      penaltyText = m.penalty.scored
-        ? `Tu arquero se tiró ${dirLabel} y no llegó: gol de penal rival.`
-        : `Tu arquero se tiró ${dirLabel} y ¡atajó el penal!`;
+      penaltyText = {
+        gol: `Tu arquero se tiró ${dirLabel} y no llegó: gol de penal rival.`,
+        atajada: `Tu arquero se tiró ${dirLabel}, adivinó el palo y ¡atajó el penal!`,
+        errado: `Tu arquero se tiró ${dirLabel} y no hizo falta: el rival la tiró afuera.`,
+      }[resultado];
     }
   }
 
