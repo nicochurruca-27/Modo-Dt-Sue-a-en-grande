@@ -11,8 +11,9 @@
 // los planteles de los otros equipos: ahí sí hay nombres de jugadores
 // inventados con el mismo generador que usa el resto del juego.
 //
-// La excepción es joyaJuvenil(): el pibe que nombra existe de verdad en el
-// plantel de ese club y lo podés ir a fichar al Mercado de pases.
+// La excepción es joyaJuvenil(): solo habla de clubes con plantel real
+// investigado, así que el pibe que nombra es un jugador que existe de verdad
+// y lo podés ir a fichar al Mercado de pases.
 //
 // Todo lo que se guarda en s.noticias es JSON puro (strings y números), sin
 // funciones ni objetos Date, para que sobreviva al save/load de localStorage
@@ -319,14 +320,26 @@ const Noticias = {
   joyaJuvenil(engine) {
     const s = engine.state;
     if (typeof Mercado === 'undefined') return;
+    // SOLO clubes con plantel real investigado. Es la diferencia entre una
+    // noticia que sirve y una que estorba: si hablara de cualquier club,
+    // estaría recomendándote fichar a un juvenil inventado por el generador,
+    // y ese jugador desaparece el día que carguemos el plantel real de ese
+    // club. Con este filtro, el pibe que nombra el diario es una persona que
+    // existe, y la noticia se va ampliando sola a medida que se cargan más
+    // planteles — sin tener que acordarse de volver a habilitarla.
+    const conPlantelReal = engine.state.clubs.filter((c) =>
+      c.id !== engine.state.clubId
+      && typeof REAL_ROSTERS !== 'undefined' && REAL_ROSTERS[c.id]
+      && REAL_ROSTERS[c.id].length >= 11);
+    if (!conPlantelReal.length) return;
+
     // Se prueban varios clubes en vez de uno solo: la mayoría no tiene ninguna
     // joya en ese momento, y probando uno solo la noticia salía 1 de cada 10
-    // veces. Probando cinco sale casi siempre que haya alguna en la liga.
+    // veces.
     let club = null;
     let joyas = [];
     for (let intento = 0; intento < 5 && !joyas.length; intento++) {
-      club = this.clubDeLaLigaAlAzar(engine, true);
-      if (!club) return;
+      club = this.alAzar(conPlantelReal);
       // Una joya es un pibe con mucho recorrido por delante. El margen se mide
       // contra el techo, que en el mercado ya viene calculado y es estable.
       joyas = Mercado.plantel(engine, club.id)
