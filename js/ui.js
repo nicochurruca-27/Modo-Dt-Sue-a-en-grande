@@ -945,6 +945,14 @@ function renderCalendar() {
   wireNoticias();
 }
 
+// "Jugás de local en La Bombonera", "Se juega en cancha neutral: el Kempes".
+// Si el club no tiene cancha cargada (los de la Nacional), se dice solo si sos
+// local o visitante, como antes.
+function dondeSeJuega(ctx) {
+  if (ctx.isNeutral) return `Se juega en cancha neutral${ctx.sede ? `: ${ctx.sede}` : ''}`;
+  return `Jugás de ${ctx.isHome ? 'local' : 'visitante'}${ctx.sede ? ` en ${ctx.sede}` : ''}`;
+}
+
 function renderPreMatch() {
   const s = Engine.state;
   const d = s.currentDecision;
@@ -954,7 +962,7 @@ function renderPreMatch() {
   app.innerHTML = `
     ${header()}
     <div class="card">
-      <p class="muted match-rival">${ctx.isNeutral ? 'Se juega en cancha neutral' : ctx.isHome ? 'Jugás de local' : 'Jugás de visitante'} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
+      <p class="muted match-rival">${dondeSeJuega(ctx)} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
       <h2>${d.title}</h2>
       <p>${d.description}</p>
       <div class="options">

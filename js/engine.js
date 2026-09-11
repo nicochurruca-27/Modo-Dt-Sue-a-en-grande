@@ -108,6 +108,18 @@ const Engine = {
     this.state = { screen: 'club-select', dt: { name: cleanName, nation, style } };
   },
 
+  // La cancha de un club, o null si todavía no está cargada (los de la
+  // Primera Nacional). Quien la muestre tiene que bancarse el null.
+  estadioDe(clubId) {
+    return (typeof ESTADIOS === 'undefined' ? null : ESTADIOS[clubId]) || null;
+  },
+
+  // Una cancha neutral al azar para las llaves (playoffs y Copa Argentina).
+  canchaNeutral() {
+    const canchas = typeof CANCHAS_NEUTRALES === 'undefined' ? [] : CANCHAS_NEUTRALES;
+    return canchas.length ? canchas[Math.floor(Math.random() * canchas.length)] : null;
+  },
+
   getClub(id) {
     return this.state.clubs.find((c) => c.id === id);
   },
@@ -1759,6 +1771,7 @@ const Engine = {
       context: 'league',
       opponentId: isHome ? userMatch.away : userMatch.home,
       isHome,
+      sede: this.estadioDe(isHome ? userMatch.home : userMatch.away),
       interzonal: encontrado.interzonal,
       // La última fecha de Primera es la de los clásicos.
       clasico: encontrado.interzonal && season.interzonal && season.roundIndex === season.interzonal.length - 1,
@@ -2351,15 +2364,17 @@ const Engine = {
       return;
     }
 
-    // Local el mejor ubicado de la fase regular (seed más bajo). La final de
-    // los playoffs de Primera se juega en cancha neutral, así que ahí no hay
-    // ventaja para ninguno de los dos.
-    const isPlayoffFinal = s.bracket.pendingIsFinal && (s.bracket.kind === 'apertura' || s.bracket.kind === 'clausura');
+    // Las llaves se juegan todas en cancha neutral: los playoffs del Apertura
+    // y el Clausura y toda la Copa Argentina. La sede sale sorteada de los
+    // estadios provinciales grandes (ver CANCHAS_NEUTRALES en data.js), que es
+    // donde se juegan de verdad: nunca en la cancha de uno de los grandes.
+    // Como no hay local, ninguno de los dos tiene ventaja.
     s.matchContext = {
       context: 'bracket',
       opponentId: opponentEntry.id,
-      isHome: userEntry.seed < opponentEntry.seed,
-      isNeutral: isPlayoffFinal,
+      isHome: false,
+      isNeutral: true,
+      sede: this.canchaNeutral(),
     };
     this.pickDecision();
     s.screen = 'pre-match';

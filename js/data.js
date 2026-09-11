@@ -337,6 +337,58 @@ const CANTERAS = {
 
 const CANTERA_POR_DEFECTO = { D1: 3, D2: 2 };
 
+// La cancha de cada club, para decir dónde se juega en vez de solo si sos
+// local o visitante. Están cargados los 30 de Primera; un club que no esté
+// acá (hoy, los de la Primera Nacional) simplemente no muestra estadio.
+const ESTADIOS = {
+  platense: 'el Estadio Ciudad de Vicente López',
+  defensayjusticia: 'el Norberto Tomaghello',
+  centralcordoba: 'el Alfredo Terrera',
+  lanus: 'La Fortaleza',
+  riestra: 'el Guillermo Laza',
+  talleres: 'La Boutique',
+  boca: 'La Bombonera',
+  estudianteslp: 'el Jorge Luis Hirschi',
+  instituto: 'el Juan Domingo Perón de Alta Córdoba',
+  gimnasiamendoza: 'el Víctor Legrotaglie',
+  sanlorenzo: 'el Nuevo Gasómetro',
+  independiente: 'el Libertadores de América',
+  newells: 'el Coloso del Parque',
+  union: 'el 15 de Abril',
+  velez: 'el José Amalfitani',
+  argentinos: 'el Diego Armando Maradona',
+  aldosivi: 'el José María Minella',
+  atleticotucuman: 'el Monumental José Fierro',
+  banfield: 'el Florencio Sola',
+  barracascentral: 'el Claudio Chiqui Tapia',
+  belgrano: 'el Gigante de Alberdi',
+  river: 'el Monumental',
+  gimnasialp: 'el Juan Carmelo Zerillo',
+  riocuarto: 'el Antonio Candini',
+  independienterivadavia: 'el Bautista Gargantini',
+  huracan: 'el Tomás Adolfo Ducó',
+  racing: 'el Cilindro',
+  rosariocentral: 'el Gigante de Arroyito',
+  sarmientojunin: 'el Eva Perón',
+  tigre: 'el José Dellagiovanna',
+};
+
+// Las canchas donde se juegan los partidos que no son de nadie: las llaves de
+// los playoffs del Apertura y el Clausura, y toda la Copa Argentina. Son los
+// estadios provinciales grandes que se usan de verdad para esto, así que
+// ninguno es la cancha de un club (menos todavía la de uno de los grandes,
+// que es justo lo que no pasa en la realidad).
+const CANCHAS_NEUTRALES = [
+  'el Estadio Único Madre de Ciudades, en Santiago del Estero',
+  'el Estadio Ciudad de La Plata',
+  'el Mario Alberto Kempes, en Córdoba',
+  'el Malvinas Argentinas, en Mendoza',
+  'el Estadio del Bicentenario, en San Juan',
+  'el Padre Ernesto Martearena, en Salta',
+  'el Brigadier Estanislao López, en Santa Fe',
+  'La Pedrera, en Villa Mercedes',
+];
+
 // 18 jugadores por plantel: 2 arqueros, 6 defensores, 6 mediocampistas, 4
 // delanteros — deja margen suficiente de suplentes para todas las formaciones
 // (incluidas las más pobladas de una línea, como 5-4-1 o 3-6-1).
