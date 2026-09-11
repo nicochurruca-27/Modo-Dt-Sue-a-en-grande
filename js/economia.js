@@ -143,7 +143,7 @@ const ECONOMIA_DATOS = {
   // llegar a octavos, es que ese monto se suma al anterior.
   premios: {
     ligaProfesional: { campeonApertura: 500000, campeonClausura: 500000 },
-    copaArgentina: { dieciseisavos: 12000, octavos: 22000, cuartos: 40000, semifinal: 70000, subcampeon: 120000, campeon: 237500 },
+    copaArgentina: { treintaidosavos: 7000, dieciseisavos: 12000, octavos: 22000, cuartos: 40000, semifinal: 70000, subcampeon: 120000, campeon: 237500 },
     // Los montos de las copas son los de la edición 2026, por instancia. La
     // previa se paga distinto en cada copa: la Libertadores tiene tres fases
     // y paga más cuanto más adentro, y la Sudamericana tiene una sola, a
@@ -382,7 +382,7 @@ const Economia = {
   // quedaban antes de jugarla.
   premioCopaArgentina(engine, vivos, salioCampeon) {
     const p = ECONOMIA_DATOS.premios.copaArgentina;
-    const porRonda = { 32: p.dieciseisavos, 16: p.octavos, 8: p.cuartos, 4: p.semifinal, 2: salioCampeon ? p.campeon : p.subcampeon };
+    const porRonda = { 64: p.treintaidosavos, 32: p.dieciseisavos, 16: p.octavos, 8: p.cuartos, 4: p.semifinal, 2: salioCampeon ? p.campeon : p.subcampeon };
     const monto = porRonda[vivos];
     if (monto) this.registrar(engine, `Copa Argentina — premio por ${vivos === 2 ? (salioCampeon ? 'salir campeón' : 'llegar a la final') : 'pasar de ronda'}`, this.porcion(engine, monto));
   },

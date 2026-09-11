@@ -42,8 +42,10 @@
 const SAVE_KEY = 'dt-simulador-save-v3';
 
 const FIFA_ROUNDS = [5, 11];
-const COPA_ROUNDS = [2, 4, 7, 10, 13];
-const COPA_STAGE_NAMES = ['Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
+// La Copa Argentina es un cuadro de 64 a partido único, así que son seis
+// rondas y necesita seis fechas repartidas a lo largo de la edición.
+const COPA_ROUNDS = [2, 4, 6, 8, 11, 14];
+const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const TRANSFER_ROUND_D2 = 9; // ventana de pases de la Nacional, a mitad de su único torneo
 // Primera juega 16 fechas: las 15 del fixture de su zona (14 partidos contra
 // su zona + el interzonal de emparejamiento en la fecha que le tocaría estar
@@ -1666,9 +1668,14 @@ const Engine = {
       [d2Pool[i], d2Pool[j]] = [d2Pool[j], d2Pool[i]];
     }
 
+    // El cuadro principal es de 64: los 30 de Primera entran directo a los
+    // treintaidosavos y el resto son clubes del ascenso. En la realidad esos
+    // 34 salen de la Primera Nacional, la Primera B, la Primera C y el Federal
+    // A; como el juego solo tiene cargada la Nacional, por ahora salen todos
+    // de ahí.
     const entrants = d1Ids.slice();
     if (club.division === 'D2') entrants.push(s.clubId);
-    while (entrants.length < 32) entrants.push(d2Pool.shift());
+    while (entrants.length < 64 && d2Pool.length) entrants.push(d2Pool.shift());
 
     for (let i = entrants.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -2073,8 +2080,10 @@ const Engine = {
     // recién ahí van los penales.
     // El alargue es un tercio de un partido, así que la mayoría de las veces
     // termina 0-0 y se define por penales igual, pero de vez en cuando aparece
-    // el gol y la serie se cierra ahí.
-    if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
+    // el gol y la serie se cierra ahí. La Copa Argentina es la excepción: no
+    // tiene alargue, del empate se va derecho a los penales.
+    const sinAlargue = !!(s.matchContext && s.matchContext.sinAlargue);
+    if (m.context !== 'league' && !sinAlargue && m.homeGoals === m.awayGoals) {
       const enAlargue = this.simulateExtraTime(m);
       if (enAlargue.homeGoals || enAlargue.awayGoals) {
         m.homeGoals += enAlargue.homeGoals;
@@ -2466,6 +2475,9 @@ const Engine = {
       isHome,
       isNeutral: enNeutral,
       sede: enNeutral ? this.canchaNeutral() : this.estadioDe(isHome ? s.clubId : opponentEntry.id),
+      // La Copa Argentina no tiene alargue: si termina empatada se va derecho
+      // a los penales. Los playoffs sí juegan los 30 minutos extra.
+      sinAlargue: s.bracket.kind === 'copa',
     };
     this.pickDecision();
     s.screen = 'pre-match';
