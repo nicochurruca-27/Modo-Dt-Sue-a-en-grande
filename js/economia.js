@@ -149,18 +149,72 @@ const ECONOMIA_DATOS = {
   },
 };
 
+// ---------- Dos correcciones sobre los datos de arriba ----------
+//
+// ECONOMIA_DATOS queda tal cual vino, sin retocar, para poder auditarlo. Las
+// correcciones viven acá abajo, separadas y explicadas, porque son criterio
+// nuestro y no dato.
+//
+// CORRECCIÓN 1 — los sueldos.
+// El informe da el gasto en sueldos como porcentaje del ingreso TOTAL, y ahí
+// la serie es prolija: 44% en los grandes, 52%, 54%, 59% y 64% en la
+// Nacional (cuanto más chico el club, mayor proporción se va en sueldos).
+// El problema aparece al medirlo contra los ingresos ORDINARIOS, que es lo
+// único que el juego reparte semana a semana: ahí la serie se da vuelta en
+// el medio y queda 61%, 74%, 76%, 70%, 69%. O sea, según ese número, un club
+// de la Primera Nacional tendría mejor margen operativo que Racing. Eso no
+// se sostiene, y es un artefacto de cómo está calculado: los clubes chicos
+// casi no tienen ingresos por ventas ni por copas, así que sus ingresos
+// ordinarios son casi todo su ingreso total, mientras que en un grande son
+// apenas dos tercios. Al sacar ventas y premios, el porcentaje de los chicos
+// se "desinfla" y el de los grandes no.
+// Acá se usa una serie monótona medida directamente contra los ingresos
+// ordinarios, que respeta lo que decía el propio informe (el club más grande
+// gasta proporcionalmente menos) sin el efecto óptico.
+const SUELDOS_SOBRE_ORDINARIOS = {
+  grandes: 0.61,
+  historicos: 0.66,
+  mediaTabla: 0.70,
+  chicosPrimera: 0.74,
+  primeraNacional: 0.78,
+};
+
+// CORRECCIÓN 2 — cuánto de ese excedente le llega al técnico.
+// Con una porción única para todos, el reparto quedaba deformado justo
+// arriba: los grandes facturan 3 veces lo que un histórico, pero terminaban
+// con 4,6 veces más presupuesto, y un grande podía comprarse un jugador de
+// 85 todos los años teniendo un plantel que promedia 74. Como además los
+// clubes rivales no compran a nadie (el juego solo modela tu plantel), esa
+// ventaja se acumula sin techo y en cuatro o cinco temporadas no hay partido.
+// Con la porción escalonada, cada categoría puede comprar un jugador unos 4
+// puntos por encima de su propio plantel — pareja para todos — y los saltos
+// entre categorías (1,9x, 2,2x, 1,9x, 2,5x) siguen a los saltos de ingreso
+// real (3,0x, 2,6x, 2,2x, 2,6x) en vez de dispararse.
+// Que un club grande reciba una porción menor no es un capricho: es el que
+// más deuda y más estructura tiene que pagar antes de llegar al plantel.
+const PORCION_DT_POR_CATEGORIA = {
+  grandes: 0.15,
+  historicos: 0.28,
+  mediaTabla: 0.35,
+  chicosPrimera: 0.40,
+  primeraNacional: 0.45,
+};
+
 const Economia = {
-  // Qué parte del excedente del club termina en el bolsillo del DT para
-  // fichajes. Es la única perilla inventada de todo esto: los datos dicen
-  // cuánto factura y cuánto gasta en sueldos un club, pero no cuánto de eso
-  // le sueltan al técnico. Con 0,35 un club de media tabla junta unos 700 mil
-  // por año (medio jugador de 70) y un grande unos 7 millones. Si algún día
-  // querés una economía más holgada o más ahogada, se toca acá y nada más.
+  // Porción por defecto, si alguna vez aparece una categoría sin entrada.
   PORCION_DT: 0.35,
 
   // Renovar no vuelve a cobrar el sueldo entero (ya está descontado del
   // goteo semanal): cobra esta fracción, que es la prima por firmar.
-  PRIMA_RENOVACION: 0.3,
+  //
+  // Estaba en 0,3 y era demasiado. Se renuevan unos 7 contratos por año, así
+  // que a ese precio las renovaciones se comían entre el 78% y el 83% del
+  // presupuesto en los clubes grandes y el 120% en los chicos — o sea que
+  // Platense gastaba más en renovar de lo que ganaba en todo el año y el
+  // plantel se le caía a pedazos sin poder reforzarse nunca. Con 0,12 las
+  // renovaciones pesan entre un 18% y un 48% según la categoría y queda
+  // margen para el mercado, que es de lo que se trata el juego.
+  PRIMA_RENOVACION: 0.12,
 
   SEMANAS_POR_ANIO: 52,
   MAX_MOVIMIENTOS: 25,
@@ -222,10 +276,13 @@ const Economia = {
   // sueldos de forma pareja sobre las dos partes, la proporción entre una y
   // otra queda como en la realidad.
   margen(club) {
-    const d = this.datosDe(club);
-    const ordinarios = d.fuentes.television.anual + d.fuentes.patrocinadores.anual
-      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual + d.fuentes.entradas.anual;
-    return Math.max(0, (ordinarios - d.masaSalarialAnual) / ordinarios);
+    const cat = this.categoriaDe(club);
+    return Math.max(0, 1 - (SUELDOS_SOBRE_ORDINARIOS[cat] !== undefined ? SUELDOS_SOBRE_ORDINARIOS[cat] : 0.7));
+  },
+
+  porcionDe(club) {
+    const cat = this.categoriaDe(club);
+    return PORCION_DT_POR_CATEGORIA[cat] !== undefined ? PORCION_DT_POR_CATEGORIA[cat] : this.PORCION_DT;
   },
 
   // Lo que entra todas las semanas pase lo que pase: televisión, sponsors,
@@ -235,7 +292,7 @@ const Economia = {
     const d = this.datosDe(club);
     const goteoAnual = d.fuentes.television.anual + d.fuentes.patrocinadores.anual
       + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual;
-    return Math.round((goteoAnual * this.margen(club) * this.PORCION_DT) / this.SEMANAS_POR_ANIO);
+    return Math.round((goteoAnual * this.margen(club) * this.porcionDe(club)) / this.SEMANAS_POR_ANIO);
   },
 
   cobrarSemana(engine) {
@@ -271,7 +328,7 @@ const Economia = {
       * (esClasico ? d.multiplicadorClasico : 1)
       * this.factorPorRendimiento(engine);
     this.registrar(engine, esClasico ? 'Recaudación del clásico de local' : 'Recaudación de local',
-      bruto * this.margen(club) * this.PORCION_DT);
+      bruto * this.margen(club) * this.porcionDe(club));
   },
 
   // ---------- Renovaciones ----------
@@ -300,8 +357,8 @@ const Economia = {
   // pareja, ganar la Sudamericana sigue siendo un golpe de suerte enorme para
   // un club chico (varios años de ingreso de una) pero no borra el resto.
 
-  porcion(monto) {
-    return Math.round(monto * this.PORCION_DT);
+  porcion(engine, monto) {
+    return Math.round(monto * this.porcionDe(engine.getClub(engine.state.clubId)));
   },
 
   // Copa Argentina: se cobra al pasar cada ronda. `vivos` es cuántos equipos
@@ -310,7 +367,7 @@ const Economia = {
     const p = ECONOMIA_DATOS.premios.copaArgentina;
     const porRonda = { 32: p.dieciseisavos, 16: p.octavos, 8: p.cuartos, 4: p.semifinal, 2: salioCampeon ? p.campeon : p.subcampeon };
     const monto = porRonda[vivos];
-    if (monto) this.registrar(engine, `Copa Argentina — premio por ${vivos === 2 ? (salioCampeon ? 'salir campeón' : 'llegar a la final') : 'pasar de ronda'}`, this.porcion(monto));
+    if (monto) this.registrar(engine, `Copa Argentina — premio por ${vivos === 2 ? (salioCampeon ? 'salir campeón' : 'llegar a la final') : 'pasar de ronda'}`, this.porcion(engine, monto));
   },
 
   // Libertadores y Sudamericana: acumulativo hasta la instancia alcanzada.
@@ -331,7 +388,7 @@ const Economia = {
       if (claves[i] === 'subcampeon' && hasta === escalera.length - 1) continue;
       total += tabla[claves[i]] || 0;
     }
-    const paraElDT = this.porcion(total);
+    const paraElDT = this.porcion(engine, total);
     if (paraElDT) this.registrar(engine, `${copa} — premio por llegar a ${fase}`, paraElDT);
     return paraElDT;
   },
@@ -339,8 +396,9 @@ const Economia = {
   premioTitulo(engine, edicion) {
     const p = ECONOMIA_DATOS.premios.ligaProfesional;
     const monto = edicion === 'apertura' ? p.campeonApertura : p.campeonClausura;
-    this.registrar(engine, `Campeón del ${edicion === 'apertura' ? 'Apertura' : 'Clausura'}`, this.porcion(monto));
-    return this.porcion(monto);
+    const paraElDT = this.porcion(engine, monto);
+    this.registrar(engine, `Campeón del ${edicion === 'apertura' ? 'Apertura' : 'Clausura'}`, paraElDT);
+    return paraElDT;
   },
 
   // ---------- Resumen para mostrar ----------
@@ -348,7 +406,7 @@ const Economia = {
   resumenAnual(club) {
     const d = this.datosDe(club);
     const semanal = this.ingresoSemanalFijo(club);
-    const local = Math.round(d.recaudacionPartidoLocal * this.margen(club) * this.PORCION_DT);
+    const local = Math.round(d.recaudacionPartidoLocal * this.margen(club) * this.porcionDe(club));
     return {
       categoria: this.categoriaDe(club),
       semanal,
