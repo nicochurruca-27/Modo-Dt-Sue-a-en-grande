@@ -182,27 +182,46 @@ const Noticias = {
     }
   },
 
-  // Resultado real de la Libertadores y la Sudamericana del año.
+  // Resultado de los torneos que se resuelven al cerrar el año: la
+  // Libertadores y la Sudamericana, y también los títulos nacionales (el
+  // Campeón de Liga, el Trofeo de Campeones y las dos Supercopas).
   trasLasCopas(engine, copas) {
     if (!copas || !copas.length) return;
     const s = engine.state;
     copas.forEach((c) => {
       if (!c.championName) return;
+      // Las copas internacionales van con artículo ("de la Libertadores");
+      // los títulos nacionales ya traen su nombre entero ("del Trofeo de
+      // Campeones"), así que no les corresponde.
+      const art = c.articulo || 'la';
+      const nombre = c.sinArticulo ? c.copa : `${art} ${c.copa}`;
+      const del = c.sinArticulo ? c.copa : `${art === 'la' ? 'de la' : 'del'} ${c.copa}`;
+      const donde = c.nombrePropio ? 'Vuelta olímpica en casa.' : 'Vuelta olímpica en el continente.';
+      // El Campeón de Liga no se gana en un partido sino sumando todo el año,
+      // así que se cuenta distinto: no hay final ni rival al que vencer.
+      if (c.sinArticulo) {
+        const suyo = c.userWon;
+        this.push(s, 'internacional',
+          suyo ? `¡${engine.getClub(s.clubId).name} es el ${c.copa}!` : `${c.championName} es el ${c.copa}`,
+          `Terminó primero en la Tabla Anual${c.runnerUpName ? `, por delante de ${c.runnerUpName}` : ''}.`,
+          suyo ? { clubId: s.clubId, destacada: true } : { destacada: true });
+        return;
+      }
       if (c.userWon) {
         this.push(s, 'internacional',
-          `¡${engine.getClub(s.clubId).name} campeón de la ${c.copa}!`,
-          `Vuelta olímpica en el continente. ${c.runnerUpName ? `Dejó en el camino a ${c.runnerUpName} en la final.` : ''}`,
+          `¡${engine.getClub(s.clubId).name} campeón ${del}!`,
+          `${donde} ${c.runnerUpName ? `Dejó en el camino a ${c.runnerUpName}.` : ''}`,
           { clubId: s.clubId, destacada: true });
       } else {
         this.push(s, 'internacional',
-          `${c.championName} se quedó con la ${c.copa}`,
-          `${c.championPais ? `El equipo de ${c.championPais} ` : ''}levantó el trofeo${c.runnerUpName ? ` tras vencer a ${c.runnerUpName} en la final` : ''}.`,
+          `${c.championName} se quedó con ${nombre}`,
+          `${c.championPais && !c.nombrePropio ? `El equipo de ${c.championPais} ` : ''}levantó el trofeo${c.runnerUpName ? ` tras vencer a ${c.runnerUpName}` : ''}.`,
           { destacada: true });
       }
       if (c.userStage && !c.userWon) {
         this.push(s, 'internacional',
-          `${engine.getClub(s.clubId).name} llegó hasta ${c.userStage} de la ${c.copa}`,
-          'Hasta ahí llegó la ilusión continental de esta temporada.',
+          `${engine.getClub(s.clubId).name} llegó hasta ${c.userStage} ${del}`,
+          'Hasta ahí llegó la ilusión de esta temporada.',
           { clubId: s.clubId });
       }
     });

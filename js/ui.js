@@ -192,9 +192,30 @@ function anualTableBody() {
 // Resultado de la Libertadores y la Sudamericana que se jugaron este año
 // (con los clasificados de la temporada anterior). La primera temporada de
 // una carrera no tiene copas todavía.
-// "Copa Libertadores", pero la Recopa ya trae su nombre completo.
+// "Copa Libertadores", pero los títulos nacionales y la Recopa ya traen su
+// nombre completo.
 function nombreDeCopa(c) {
-  return c.esRecopa ? c.copa : `Copa ${c.copa}`;
+  return c.nombrePropio ? c.copa : `Copa ${c.copa}`;
+}
+
+// El artículo lo trae el propio título (ver Engine.articuloDe); las copas
+// internacionales van siempre con "la" porque se las nombra "Copa ...".
+function articuloDe(c) {
+  return c.articulo || 'la';
+}
+
+// Cómo se nombra el título en una frase: "Campeón de la Copa Libertadores",
+// "Campeón del Trofeo de Campeones", y el Campeón de Liga, que ya se llama
+// así y no lleva nada adelante.
+function tituloDeCampeon(c) {
+  if (c.sinArticulo) return c.copa;
+  return `Campeón ${articuloDe(c) === 'la' ? 'de la' : 'del'} ${nombreDeCopa(c)}`;
+}
+
+// "En la Copa Libertadores", "En el Trofeo de Campeones".
+function enLaCopa(c) {
+  if (c.sinArticulo) return `En el ${c.copa}`;
+  return `En ${articuloDe(c)} ${nombreDeCopa(c)}`;
 }
 
 function copasResultHtml(copas) {
@@ -1424,14 +1445,14 @@ function renderSeasonEnd() {
   if (sum.userWasAperturaChampion) trofeos.push('Campeón del Apertura');
   if (sum.userWasClausuraChampion) trofeos.push('Campeón del Clausura');
   if (sum.userWonCopa) trofeos.push('Campeón de la Copa Argentina');
-  (sum.copasInternacionales || []).forEach((c) => { if (c.userWon) trofeos.push(`Campeón de la ${nombreDeCopa(c)}`); });
+  (sum.copasInternacionales || []).forEach((c) => { if (c.userWon) trofeos.push(tituloDeCampeon(c)); });
   if (sum.userPromotedDirect || sum.userPromotedReducido) trofeos.push('Ascenso a Primera División');
 
   // Si no la ganaste pero jugaste una copa internacional, igual va arriba:
   // es de las cosas que más te interesa saber apenas termina el año.
   const copasDeTuClub = (sum.copasInternacionales || [])
     .filter((c) => !c.userWon && c.userStage)
-    .map((c) => `En la ${nombreDeCopa(c)} llegaste hasta ${c.userStage}.`);
+    .map((c) => `${enLaCopa(c)} llegaste hasta ${c.userStage}.`);
 
   const bloque = (titulo, contenido) => `
     <details class="collapsible">

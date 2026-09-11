@@ -1283,6 +1283,116 @@ const Engine = {
     return entrants;
   },
 
+  // ---------- Títulos nacionales ----------
+  //
+  // Además del Apertura y el Clausura hay cuatro títulos más en juego, y no
+  // son amistosos: son oficiales y cuentan como vuelta olímpica.
+  //
+  //   Campeón de Liga        — el primero de la Tabla Anual. No se juega un
+  //                            partido: se gana sumando todo el año.
+  //   Trofeo de Campeones    — campeón del Apertura contra campeón del
+  //                            Clausura, partido único en cancha neutral.
+  //   Supercopa Argentina    — campeón del Trofeo contra campeón de la Copa
+  //                            Argentina, los dos del año pasado.
+  //   Supercopa Internacional— campeón del Trofeo contra el Campeón de Liga,
+  //                            también del año pasado.
+  //
+  // Las dos Supercopas se juegan al año siguiente, así que usan lo que quedó
+  // guardado en s.ultimosTitulos cuando cerró la temporada anterior.
+  //
+  // Queda afuera la Recopa de Campeones (un triangular que arranca recién en
+  // 2027 y que el propio reglamento pone por debajo de todos estos).
+  simularTitulosNacionales(d1Data) {
+    const s = this.state;
+    const resultados = [];
+    const anual = d1Data.tablaAnualYear || [];
+    const previos = s.ultimosTitulos || {};
+
+    const campeonDeLiga = anual[0] ? anual[0].id : null;
+    if (campeonDeLiga) {
+      resultados.push({
+        copa: 'Campeón de Liga',
+        nombrePropio: true,
+        sinArticulo: true,
+        championId: campeonDeLiga,
+        championName: this.getClub(campeonDeLiga).name,
+        runnerUpName: anual[1] ? anual[1].name : null,
+        userWon: campeonDeLiga === s.clubId,
+        userStage: campeonDeLiga === s.clubId ? 'el título' : null,
+      });
+    }
+
+    const trofeo = this.jugarTrofeoDeCampeones(d1Data);
+    if (trofeo) resultados.push(trofeo);
+
+    const supArg = this.finalDeUnPartido('Supercopa Argentina', previos.trofeoDeCampeones, previos.copaArgentina)
+      || this.finalDeUnPartido('Supercopa Argentina', previos.trofeoDeCampeones, previos.trofeoSubcampeon);
+    if (supArg) resultados.push(supArg);
+
+    const supInt = this.finalDeUnPartido('Supercopa Internacional', previos.trofeoDeCampeones, previos.campeonDeLiga)
+      || this.finalDeUnPartido('Supercopa Internacional', previos.trofeoDeCampeones, previos.segundoDeLaAnual);
+    if (supInt) resultados.push(supInt);
+
+    // Lo que necesitan las Supercopas del año que viene.
+    s.ultimosTitulos = {
+      trofeoDeCampeones: trofeo ? trofeo.championId : null,
+      trofeoSubcampeon: trofeo ? trofeo.runnerUpId : null,
+      copaArgentina: s.copaBracket ? s.copaBracket.champion : null,
+      campeonDeLiga,
+      segundoDeLaAnual: anual[1] ? anual[1].id : null,
+    };
+    return resultados;
+  },
+
+  // Un título que se define en un partido único. Devuelve null si falta
+  // alguno de los dos o si son el mismo club, para que el que llama pueda
+  // probar con el suplente que manda el reglamento.
+  // El artículo que le corresponde al nombre del título, para que las
+  // pantallas no tengan que adivinarlo: la Supercopa, la Recopa, el Trofeo.
+  articuloDe(nombre) {
+    return /^(Copa|Supercopa|Recopa|Liga)/.test(nombre) ? 'la' : 'el';
+  },
+
+  finalDeUnPartido(nombre, idA, idB) {
+    if (!idA || !idB || idA === idB) return null;
+    const a = this.entrantDeClub(idA);
+    const b = this.entrantDeClub(idB);
+    if (!a || !b) return null;
+    const byId = { [idA]: a, [idB]: b };
+    const ganador = this.copaTieWinner(idA, idB, byId);
+    const perdedor = ganador === idA ? idB : idA;
+    const jugaste = ganador === this.state.clubId || perdedor === this.state.clubId;
+    return {
+      copa: nombre,
+      nombrePropio: true,
+      articulo: this.articuloDe(nombre),
+      championId: ganador,
+      championName: byId[ganador].nombre,
+      championPais: byId[ganador].pais,
+      runnerUpId: perdedor,
+      runnerUpName: byId[perdedor].nombre,
+      userWon: ganador === this.state.clubId,
+      userStage: jugaste ? 'la final' : null,
+    };
+  },
+
+  // Si el mismo club ganó el Apertura y el Clausura no se queda el trofeo de
+  // arriba: el rival sale de un partido entre los dos subcampeones, y si esos
+  // también son el mismo club, ese pasa directo a la final.
+  jugarTrofeoDeCampeones(d1Data) {
+    const campeonApertura = d1Data.aperturaChampion;
+    const campeonClausura = d1Data.clausuraChampion;
+    if (!campeonApertura || !campeonClausura) return null;
+    if (campeonApertura !== campeonClausura) {
+      return this.finalDeUnPartido('Trofeo de Campeones', campeonApertura, campeonClausura);
+    }
+    const subApertura = d1Data.aperturaRunnerUp;
+    const subClausura = d1Data.clausuraRunnerUp;
+    const definicion = this.finalDeUnPartido('Clasificación al Trofeo', subApertura, subClausura);
+    const rival = definicion ? definicion.championId : (subApertura || subClausura);
+    return this.finalDeUnPartido('Trofeo de Campeones', campeonApertura, rival);
+  },
+
   // La Recopa: los dos campeones del año pasado, ida y vuelta. Se juega antes
   // que las copas nuevas, como en la realidad.
   simularRecopa() {
@@ -1302,6 +1412,8 @@ const Engine = {
     return {
       copa: 'Recopa Sudamericana',
       esRecopa: true,
+      nombrePropio: true,
+      articulo: 'la',
       championId: ganador,
       championName: byId[ganador].nombre,
       championPais: byId[ganador].pais,
@@ -2870,7 +2982,9 @@ const Engine = {
       myYearResult = {
         tablaAnualYear: this.combineEditionTables(season.myD1.apertura, season.myD1.clausura),
         aperturaChampion: season.myD1.apertura.champion,
+        aperturaRunnerUp: season.myD1.apertura.runnerUp,
         clausuraChampion: season.myD1.clausura.champion,
+        clausuraRunnerUp: season.myD1.clausura.runnerUp,
       };
     } else {
       myYearResult = {
@@ -2914,7 +3028,8 @@ const Engine = {
     // temporada anterior (como en la realidad), así que la primera temporada
     // de una carrera todavía no tiene copas: se juegan recién al año
     // siguiente, con los cupos que se ganen ahora.
-    const copasDelAnio = this.simulateCopasDelAnio(s.copaQualification);
+    const copasDelAnio = this.simulateCopasDelAnio(s.copaQualification)
+      .concat(this.simularTitulosNacionales(d1Data));
 
     const qualification = this.assignQualification(d1Data, relegated);
     // Estos dos sobreviven al cambio de temporada (a diferencia de
@@ -2947,6 +3062,10 @@ const Engine = {
         if (cobrado) notasEconomia.push(`Recopa Sudamericana: ${Economia.monto(cobrado)} por salir ${c.userWon ? 'campeón' : 'subcampeón'}.`);
         return;
       }
+      // Los títulos nacionales (Campeón de Liga, Trofeo de Campeones, las dos
+      // Supercopas) no tienen premio publicado, así que no pagan plata: valen
+      // por el título.
+      if (c.nombrePropio) return;
       const cobrado = Economia.premioInternacional(this, c.copa, c.userStage, c.userExtras);
       if (!cobrado) return;
       const ganados = (c.userExtras && c.userExtras.victoriasEnGrupos) || 0;
