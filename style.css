@@ -1074,3 +1074,7 @@ h1, h2, h3 {
 
 .finanzas-positivo { color: var(--accent); }
 .finanzas-negativo { color: var(--danger); }
+
+/* La evolución del plantel usa el mismo recuadro que el parte médico, pero
+   en verde: son novedades buenas (o el desgaste de los veteranos), no bajas. */
+.desarrollo-notes { border-left-color: var(--accent); }

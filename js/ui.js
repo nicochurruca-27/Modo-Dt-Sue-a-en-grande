@@ -1197,6 +1197,12 @@ function renderMatchResult() {
           ${s.lastAvailabilityNotes.map((n) => `<p>${n}</p>`).join('')}
         </div>
       ` : ''}
+      ${(s.lastDevelopmentNotes || []).length ? `
+        <div class="injury-notes desarrollo-notes">
+          <h3>Evolución del plantel</h3>
+          ${s.lastDevelopmentNotes.map((n) => `<p>${n}</p>`).join('')}
+        </div>
+      ` : ''}
       <button class="option-btn" id="continue-btn">Continuar</button>
     </div>
   `;

@@ -83,6 +83,14 @@ const REAL_ROSTERS = {
   // Boca Juniors. Investigado con el mismo criterio que River, pero con los
   // campos económicos ya cargados (valor, sueldo, cláusula, proyección).
   //
+  // Cuatro valoraciones se corrigieron a mano después de cargarlas: Milton
+  // Delgado 67→75, Tomás Aranda 62→70, Leonel Flores 62→69 y Adam Bareiro
+  // 68→71. El error fue del prompt con el que se pidió la investigación: para
+  // evitar que inflara a los juveniles caros, decía que la valoración de un
+  // juvenil "probablemente sea 62-68". Esa frase, pensada para el pibe que
+  // todavía no juega, terminó aplastando también a los que ya son titulares
+  // hace más de un año. El prompt ya está corregido para los próximos clubes.
+  //
   // Del plantel investigado (45 jugadores) quedaron los 29 profesionales: se
   // sacaron los de reserva, que son justamente aquellos de los que la propia
   // investigación no pudo confirmar ni la edad ni la fecha de nacimiento.
@@ -110,9 +118,9 @@ const REAL_ROSTERS = {
     { name: 'Rodrigo Battaglia', pos: 'MED', posDetail: 'mediocampista defensivo', altPosDetail: ['defensor central', 'mediocampista mixto'], age: 35, nation: 'ARG', contractYears: 2, rating: 70, projection: 68, number: 6, value: 800000, salary: 850000, transferState: 'Retenido', role: 'contención' },
     { name: 'Carlos Palacios', pos: 'MED', posDetail: 'mediocampista ofensivo', altPosDetail: ['extremo derecho', 'extremo izquierdo'], age: 26, nation: 'CHI', contractYears: 4, rating: 73, projection: 78, number: 7, value: 5000000, salary: 900000, clause: 18000000, transferState: 'Retenido', role: 'ofensivo' },
     { name: 'Tomás Belmonte', pos: 'MED', posDetail: 'mediocampista mixto', altPosDetail: ['mediocampista defensivo'], age: 28, nation: 'ARG', contractYears: 3, rating: 72, projection: 74, number: 8, value: 3000000, salary: 750000, transferState: 'Retenido', role: 'mixto' },
-    { name: 'Tomás Aranda', pos: 'MED', posDetail: 'mediocampista ofensivo', altPosDetail: ['extremo izquierdo', 'mediocampista mixto'], age: 19, nation: 'ARG', contractYears: 4, rating: 62, projection: 77, number: 10, value: 6500000, salary: 180000, clause: 15000000, transferState: 'Retenido', role: 'ofensivo' },
+    { name: 'Tomás Aranda', pos: 'MED', posDetail: 'mediocampista ofensivo', altPosDetail: ['extremo izquierdo', 'mediocampista mixto'], age: 19, nation: 'ARG', contractYears: 4, rating: 70, projection: 77, number: 10, value: 6500000, salary: 180000, clause: 15000000, transferState: 'Retenido', role: 'ofensivo' },
     { name: 'Williams Alarcón', pos: 'MED', posDetail: 'mediocampista mixto', altPosDetail: ['mediocampista defensivo'], age: 25, nation: 'CHI', contractYears: 3, rating: 71, projection: 75, number: 15, value: 3500000, salary: 750000, transferState: 'Retenido', role: 'mixto' },
-    { name: 'Milton Delgado', pos: 'MED', posDetail: 'mediocampista defensivo', altPosDetail: ['mediocampista mixto'], age: 21, nation: 'ARG', contractYears: 4, rating: 67, projection: 80, number: 18, value: 10000000, salary: 250000, clause: 20000000, transferState: 'Intocable', role: 'contención' },
+    { name: 'Milton Delgado', pos: 'MED', posDetail: 'mediocampista defensivo', altPosDetail: ['mediocampista mixto'], age: 21, nation: 'ARG', contractYears: 4, rating: 75, projection: 80, number: 18, value: 10000000, salary: 250000, clause: 20000000, transferState: 'Intocable', role: 'contención' },
     // La investigación lo trajo como MED, pero su posición es extremo
     // izquierdo y en el once titular ocupa un puesto de ataque: en el juego
     // los extremos son DEL (ver delWidth 'abierta' en las formaciones).
@@ -124,9 +132,9 @@ const REAL_ROSTERS = {
     { name: 'Ángel Romero', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['segundo delantero', 'extremo izquierdo'], age: 34, nation: 'PAR', contractYears: 1, rating: 69, projection: 66, number: 11, value: 800000, salary: 700000, transferState: 'Fin de contrato cercano' },
     { name: 'Enner Valencia', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 36, nation: 'ECU', contractYears: 2, rating: 72, projection: 70, number: 13, value: 1200000, salary: 1200000, transferState: 'Retenido' },
     { name: 'Miguel Merentiel', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero', 'extremo izquierdo'], age: 30, nation: 'URU', contractYears: 2, rating: 79, projection: 78, number: 16, value: 6000000, salary: 1100000, clause: 20000000, transferState: 'Intocable' },
-    { name: 'Leonel Flores', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['extremo izquierdo', 'segundo delantero'], age: 19, nation: 'ARG', contractYears: 3, rating: 62, projection: 79, number: 19, value: 4500000, salary: 160000, clause: 12000000, transferState: 'Retenido' },
+    { name: 'Leonel Flores', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['extremo izquierdo', 'segundo delantero'], age: 19, nation: 'ARG', contractYears: 3, rating: 69, projection: 79, number: 19, value: 4500000, salary: 160000, clause: 12000000, transferState: 'Retenido' },
     { name: 'Sebastián Villa', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['extremo izquierdo', 'segundo delantero'], age: 30, nation: 'COL', contractYears: 5, rating: 77, projection: 77, number: 22, value: 6500000, salary: 1200000, clause: 15000000, transferState: 'Intocable' },
-    { name: 'Adam Bareiro', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 30, nation: 'PAR', contractYears: 3, rating: 68, projection: 68, number: 28, value: 2800000, salary: 700000, transferState: 'Retenido' },
+    { name: 'Adam Bareiro', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 30, nation: 'PAR', contractYears: 3, rating: 71, projection: 71, number: 28, value: 2800000, salary: 700000, transferState: 'Retenido' },
   ],
 };
 

@@ -151,13 +151,27 @@ const Engine = {
   // 90, como mucho a un par de puntos más. A partir de los 26 ya no hay
   // margen adicional (ver developSquadAfterMatch, más abajo, para cómo se
   // aplica este techo).
+  // Techo estimado de un jugador del que no se investigó la proyección real.
+  //
+  // El margen por edad es el máximo, no lo que le toca a cada uno: se sortea
+  // una porción de ese margen, cargada para abajo. Antes era un número fijo
+  // (+12 a todo juvenil de 19) y el resultado era que TODOS los pibes
+  // generados terminaban siendo buenos: en una prueba de 5 temporadas, los
+  // juveniles de Platense subían +9, +10 y +11 puntos, más que los de Boca,
+  // que tienen proyecciones reales y por lo tanto más modestas. En la
+  // realidad la mayoría de los juveniles no llega: unos pocos pegan el salto
+  // y el resto se queda en el camino. Con el sorteo, un pibe de 19 saca entre
+  // +3 y +12 y el promedio queda cerca de +6.
   computePotential(rating, age) {
-    let margin = 0;
-    if (age <= 19) margin = 12;
-    else if (age <= 21) margin = 9;
-    else if (age <= 23) margin = 6;
-    else if (age <= 25) margin = 3;
-    return Math.min(99, rating + margin);
+    let maxMargin = 0;
+    if (age <= 19) maxMargin = 12;
+    else if (age <= 21) maxMargin = 9;
+    else if (age <= 23) maxMargin = 6;
+    else if (age <= 25) maxMargin = 3;
+    if (!maxMargin) return Math.min(99, rating);
+    // Math.random() al cuadrado carga el sorteo hacia los valores bajos.
+    const porcion = 0.25 + Math.pow(Math.random(), 2) * 0.75;
+    return Math.min(99, rating + Math.round(maxMargin * porcion));
   },
 
   // Si el club tiene un plantel real cargado en players.js, se usa ese en
@@ -175,6 +189,17 @@ const Engine = {
       }));
     }
     const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
+    // Los nombres salen de un pool chico, así que en 1 de cada 10 planteles
+    // aparecían dos jugadores con el mismo nombre y apellido. No rompía nada,
+    // pero en la lista de suplentes parece un error del juego.
+    const usados = new Set();
+    const nombreUnico = (nation) => {
+      for (let intento = 0; intento < 25; intento++) {
+        const n = this.randomPlayerName(nation);
+        if (!usados.has(n)) { usados.add(n); return n; }
+      }
+      return this.randomPlayerName(nation);
+    };
     return SQUAD_POSITIONS.map((pos, i) => {
       const base = 44 + club.reputation * 6;
       const rating = Math.max(35, Math.min(90, Math.round(base + (Math.random() * 16 - 8))));
@@ -182,7 +207,7 @@ const Engine = {
       const nation = this.rollNation();
       const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
       const role = pos === 'MED' ? MED_ROLES[Math.floor(Math.random() * MED_ROLES.length)] : undefined;
-      return { id: `p${i}`, name: this.randomPlayerName(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age) };
+      return { id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age) };
     });
   },
 
@@ -1124,6 +1149,7 @@ const Engine = {
       market: null,
       lastSeasonSummary: null,
       noticias: [],
+      lastDevelopmentNotes: [],
       finanzas: null,
       mercado: null,
       notasMercado: [],
@@ -1749,22 +1775,96 @@ const Engine = {
     return avisos;
   },
 
+  // ---------- Cómo evoluciona cada jugador ----------
+  //
+  // El sistema viejo agarraba 3 jugadores al azar por partido y les subía o
+  // bajaba un punto según la edad y el resultado. Tenía un problema grande:
+  // no le importaba si el jugador había jugado. Un pibe que se pasó la
+  // temporada en el banco mejoraba igual que el titular, que es justo al
+  // revés de lo que pasa en la realidad — un juvenil crece porque juega.
+  //
+  // Ahora todo se mueve alrededor del TECHO de cada jugador (`potential`, que
+  // en los clubes investigados es la proyección real que trajo la
+  // investigación). Si está por debajo del techo, crece; si está en el techo
+  // o por encima, lo único que le queda es el desgaste de la edad. Eso último
+  // no es un detalle: en los jugadores de más de 30 la investigación devuelve
+  // una proyección MENOR a la valoración actual, que es su forma de decir
+  // "a este se le viene la bajada". El sistema lo respeta.
+
+  // Cuánto ayuda el club a que un jugador crezca. Un grande tiene mejores
+  // entrenadores, mejor cuerpo médico y mejores instalaciones que un club de
+  // la Nacional: el mismo pibe rinde distinto según dónde se forme.
+  factorDeDesarrollo(club) {
+    const cat = typeof Economia !== 'undefined' ? Economia.categoriaDe(club) : null;
+    return { grandes: 1.25, historicos: 1.15, mediaTabla: 1, chicosPrimera: 0.9, primeraNacional: 0.8 }[cat] || 1;
+  },
+
+  // Probabilidad POR PARTIDO de ganar un punto. Los números están calibrados
+  // para que un juvenil titular en un grande sume unos 3 a 5 puntos por
+  // temporada (son ~40 partidos entre liga y copas), que es más o menos lo
+  // que progresa un jugador real que la está rompiendo.
+  probabilidadDeMejorar(player, jugo, factorClub, userWon) {
+    const techo = player.potential ?? 99;
+    if (player.rating >= techo) return 0;
+    const edad = player.age;
+    let base;
+    if (edad <= 19) base = 0.07;
+    else if (edad <= 21) base = 0.055;
+    else if (edad <= 23) base = 0.04;
+    else if (edad <= 25) base = 0.025;
+    else if (edad <= 27) base = 0.012;
+    else base = 0.004;
+    // El que no juega casi no progresa. Es la diferencia más importante con
+    // el sistema anterior.
+    base *= jugo ? 1 : 0.3;
+    // Cuanto más lejos está de su techo, más rápido avanza al principio.
+    base *= 0.8 + (techo - player.rating) / 20;
+    base *= factorClub;
+    if (userWon) base *= 1.15;
+    return base;
+  },
+
+  // Probabilidad por partido de perder un punto por edad. Antes de los 30 no
+  // se cae nadie.
+  probabilidadDeCaer(player) {
+    const edad = player.age;
+    if (edad < 30) return 0;
+    if (edad <= 31) return 0.008;
+    if (edad <= 33) return 0.02;
+    if (edad <= 35) return 0.035;
+    return 0.055;
+  },
+
   developSquadAfterMatch(userWon, userLost) {
     const s = this.state;
-    const sample = [...s.squad].sort(() => Math.random() - 0.5).slice(0, 3);
-    sample.forEach((p) => {
-      let chance = 0;
-      let delta = 0;
-      if (p.age <= 22) { chance = 0.2; delta = 1; }
-      else if (p.age >= 32) { chance = 0.2; delta = -1; }
-      else if (userWon) { chance = 0.08; delta = 1; }
-      else if (userLost) { chance = 0.08; delta = -1; }
-      // Cualquier crecimiento (no la baja) respeta el techo de potencial del
-      // jugador, calculado una sola vez al armar el plantel — así un joven
-      // mejora de a poco pero nunca de forma exagerada.
-      if (delta > 0 && p.rating >= (p.potential ?? 99)) delta = 0;
-      if (Math.random() < chance) p.rating = Math.max(35, Math.min(99, p.rating + delta));
+    const club = this.getClub(s.clubId);
+    const factorClub = this.factorDeDesarrollo(club);
+    const jugaron = new Set(this.getStartingXI().starters.map((e) => e.id));
+    const notas = [];
+
+    s.squad.forEach((p) => {
+      const antes = p.rating;
+      if (p.rating < (p.potential ?? 99)) {
+        if (Math.random() < this.probabilidadDeMejorar(p, jugaron.has(p.id), factorClub, userWon)) {
+          p.rating = Math.min(99, p.rating + 1);
+        }
+      } else if (Math.random() < this.probabilidadDeCaer(p)) {
+        p.rating = Math.max(35, p.rating - 1);
+      }
+      if (p.rating !== antes) {
+        notas.push(p.rating > antes
+          ? `${p.name} mejoró: ${antes} → ${p.rating}.`
+          : `${p.name} bajó un punto: ${antes} → ${p.rating}. Los años no perdonan.`);
+        if (p.rating > antes && p.age <= 23 && typeof Noticias !== 'undefined') {
+          Noticias.push(s, 'premios',
+            `${p.name} sigue creciendo en ${club.name}`,
+            `A los ${p.age} años ya está en ${p.rating} de valoración. En el club están convencidos de que todavía tiene margen.`,
+            { clubId: s.clubId });
+        }
+      }
     });
+
+    s.lastDevelopmentNotes = notas;
   },
 
   matchWinnerId(m) {
