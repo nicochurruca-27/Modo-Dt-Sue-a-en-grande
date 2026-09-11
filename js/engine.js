@@ -1022,6 +1022,33 @@ const Engine = {
   // Una llave de copa pesa más la diferencia de nivel que un partido de liga:
   // si no, en un torneo de eliminación directa el azar termina coronando
   // campeón a cualquiera y los grandes del continente no se notan.
+  // Las fases previas de una copa, encadenadas como en la realidad: en cada
+  // una juegan los que ganaron la anterior más los que recién entran ahí, se
+  // cruzan de a dos y los ganadores pasan a la siguiente. Los que sobreviven
+  // a la última llegan a la fase de grupos.
+  //
+  // Si la copa no tiene fases cargadas en FASES_PREVIAS, o entraron menos
+  // equipos de los que el formato espera, se resuelve en una sola ronda.
+  jugarFasesPrevias(copa, previa, byId) {
+    const fases = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copa]) || [];
+    const unaSolaRonda = (ids) => {
+      const ganadores = [];
+      for (let i = 0; i < ids.length; i += 2) ganadores.push(this.copaTieWinner(ids[i], ids[i + 1], byId));
+      return ganadores;
+    };
+    if (!fases.length || previa.length < fases[0]) return unaSolaRonda(previa);
+
+    const esperando = previa.slice();
+    let vivos = [];
+    fases.forEach((cuantosJuegan) => {
+      vivos = vivos.concat(esperando.splice(0, Math.max(0, cuantosJuegan - vivos.length)));
+      vivos = unaSolaRonda(vivos);
+    });
+    // Si quedó alguno sin entrar a ninguna fase (porque ese año hubo más
+    // equipos en previa de los que el formato contempla), pasa directo.
+    return vivos.concat(esperando);
+  },
+
   copaTieWinner(idA, idB, byId) {
     if (!idA) return idB;
     if (!idB) return idA;
@@ -1053,9 +1080,7 @@ const Engine = {
     const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
     mark(previa, 'la fase previa');
     const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id);
-    for (let i = 0; i < previa.length; i += 2) {
-      enGrupos.push(this.copaTieWinner(previa[i], previa[i + 1], byId));
-    }
+    this.jugarFasesPrevias(copa, previa, byId).forEach((id) => enGrupos.push(id));
 
     // 8 grupos como en las dos copas reales: de cada uno pasan 2, así los
     // octavos arrancan con 16 y las llaves cierran justo hasta la final.

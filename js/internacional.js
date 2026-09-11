@@ -157,23 +157,48 @@ const CLUBES_INTERNACIONALES = [
   { id: "deportivo-anzoategui", nombre: "Deportivo Anzoátegui", nombreCompleto: "Deportivo Anzoátegui Sport Club", pais: "Venezuela", copa: "Sudamericana", nivel: 1, apodo: "El Aurirrojo", estadio: "José Antonio Anzoátegui", colores: { primario: "#0057B8", secundario: "#FFFFFF" } },
 ];
 
-// Cuántos cupos reparte cada país todos los años, tomado de las ediciones
-// reales de ambas copas. Es lo que hace que el pozo de arriba sea un pozo: si
-// Brasil tiene 23 clubes cargados pero 14 cupos, nueve se quedan afuera cada
-// temporada, y cuáles son cambia según cómo les fue ese año (ver
-// Engine.sortearCuposInternacionales).
+// Cuántos cupos reparte cada país todos los años. Es lo que hace que el pozo
+// de arriba sea un pozo: si Brasil tiene 23 clubes cargados pero 13 cupos,
+// diez se quedan afuera cada temporada, y cuáles son cambia según cómo les
+// fue ese año (ver Engine.sortearCuposInternacionales).
+//
+// Los de la Libertadores son los de la edición 2026 de verdad: Brasil mete 7
+// (5 directo a grupos y 2 por fase previa) y los otros ocho países 4 cada uno
+// (2 y 2). Argentina no está acá porque sus 6 cupos salen del propio juego
+// (ver Engine.assignQualification), y coinciden con los reales: 5 a grupos y
+// el sexto a fase previa.
+//
+// Los de la Sudamericana todavía son los estimados de antes, pendientes de la
+// misma investigación.
 //
 //   `libertadoresGrupos` — entran directo a la fase de grupos.
-//   `libertadoresPrevia` — tienen que pasar una eliminatoria antes.
+//   `libertadoresPrevia` — arrancan en alguna de las fases previas.
 //   `sudamericana`       — van a la Sudamericana.
 const CUPOS_INTERNACIONALES = {
-  Brasil:    { libertadoresGrupos: 6, libertadoresPrevia: 2, sudamericana: 6 },
+  Brasil:    { libertadoresGrupos: 5, libertadoresPrevia: 2, sudamericana: 6 },
   Uruguay:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Colombia:  { libertadoresGrupos: 4, libertadoresPrevia: 0, sudamericana: 2 },
-  Chile:     { libertadoresGrupos: 2, libertadoresPrevia: 1, sudamericana: 3 },
-  Ecuador:   { libertadoresGrupos: 3, libertadoresPrevia: 1, sudamericana: 2 },
+  Colombia:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
+  Chile:     { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 3 },
+  Ecuador:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
   Paraguay:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  'Perú':    { libertadoresGrupos: 3, libertadoresPrevia: 1, sudamericana: 2 },
+  'Perú':    { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
   Bolivia:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
   Venezuela: { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
+};
+
+// Las fases previas encadenadas de cada copa: cuántos equipos juegan cada una.
+// Los que entran son los que ganaron la fase anterior más los que arrancaban
+// recién en esa fase, se cruzan de a dos y los ganadores siguen.
+//
+// La Libertadores 2026 tiene tres: 6 equipos en la Fase 1 (quedan 3), 16 en la
+// Fase 2 (esos 3 más 13 que entran ahí, quedan 8) y 8 en la Fase 3, de donde
+// salen los 4 que llegan a la fase de grupos. Con los cupos de arriba son
+// justo 19 los que arrancan en alguna previa (18 del continente más el sexto
+// argentino), que es exactamente lo que pide el formato real.
+//
+// Una copa que no esté acá resuelve su previa en una sola ronda, que es como
+// funcionaba todo antes. La Sudamericana está así hasta que se investigue su
+// formato.
+const FASES_PREVIAS = {
+  Libertadores: [6, 16, 8],
 };
