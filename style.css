@@ -1091,3 +1091,16 @@ h1, h2, h3 {
   border-left: 3px solid #f59e0b;
   padding-left: 10px;
 }
+
+/* Tarjeta del partido teñida con los colores de la competición que se juega
+   (ver COLORES_COMPETICIONES en data.js). Es un degradado suave sobre el
+   fondo de siempre, no un bloque de color: el texto blanco tiene que
+   seguir leyéndose. Si la competición no está cargada, las variables no
+   existen y la tarjeta queda igual que antes. */
+.card-competicion {
+  background:
+    linear-gradient(160deg, var(--comp-fondo, transparent) 0%, transparent 65%),
+    radial-gradient(120% 80% at 100% 0%, var(--comp-brillo, transparent) 0%, transparent 55%),
+    var(--card-bg);
+  border-top: 2px solid var(--comp-acento, transparent);
+}

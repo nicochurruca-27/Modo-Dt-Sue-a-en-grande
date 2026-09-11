@@ -986,6 +986,30 @@ function dondeSeJuega(ctx) {
   return `Jugás de ${ctx.isHome ? 'local' : 'visitante'}${ctx.sede ? ` en ${ctx.sede}` : ''}`;
 }
 
+// En qué competición se juega el partido que tenés delante. Hoy se juegan la
+// liga, sus playoffs, la Copa Argentina y las llaves de la Nacional; las dos
+// copas internacionales se resuelven solas al cierre de temporada, así que
+// todavía no tienen pantalla de partido, pero sus colores ya están cargados
+// para cuando la tengan.
+function competicionDelPartido() {
+  const s = Engine.state;
+  const ctx = s && s.matchContext;
+  if (!ctx) return null;
+  if (ctx.context === 'league') return 'liga';
+  const kind = s.bracket && s.bracket.kind;
+  if (kind === 'copa') return 'copaArgentina';
+  return 'liga';
+}
+
+// Las variables de color que pinta la tarjeta del partido. Si la competición
+// no está cargada, devuelve vacío y la tarjeta queda como siempre.
+function estiloDeCompeticion() {
+  const id = competicionDelPartido();
+  const comp = id && typeof COLORES_COMPETICIONES !== 'undefined' ? COLORES_COMPETICIONES[id] : null;
+  if (!comp) return '';
+  return ` style="--comp-fondo:${comp.ui.fondo};--comp-brillo:${comp.ui.brillo};--comp-acento:${comp.ui.acento}"`;
+}
+
 function renderPreMatch() {
   const s = Engine.state;
   const d = s.currentDecision;
@@ -994,7 +1018,7 @@ function renderPreMatch() {
 
   app.innerHTML = `
     ${header()}
-    <div class="card">
+    <div class="card card-competicion"${estiloDeCompeticion()}>
       <p class="muted match-rival">${dondeSeJuega(ctx)} vs ${clubCrest(opponent, 24)}<strong>${opponent.name}</strong></p>
       <h2>${d.title}</h2>
       <p>${d.description}</p>
@@ -1268,7 +1292,7 @@ function renderMatchResult() {
 
   app.innerHTML = `
     ${header()}
-    <div class="card ${resultClass}">
+    <div class="card card-competicion ${resultClass}"${estiloDeCompeticion()}>
       <h2>Resultado — ${contextLabel}</h2>
       <p class="outcome-banner">${outcomeBanner}</p>
       <div class="scoreline">${home.name} <strong>${m.homeGoals}</strong> - <strong>${m.awayGoals}</strong> ${away.name}</div>

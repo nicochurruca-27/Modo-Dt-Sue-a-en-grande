@@ -337,6 +337,44 @@ const CANTERAS = {
 
 const CANTERA_POR_DEFECTO = { D1: 3, D2: 2 };
 
+// Los colores de cada competición, para que la pantalla del partido se vea
+// distinta según en qué torneo estás jugando.
+//
+// Hay dos cosas separadas a propósito, y es importante no mezclarlas:
+//
+//   `oficial` — los hexadecimales que figuran en el manual de marca de la
+//               competición. Si un color no está documentado va en null: no
+//               se inventa. La Libertadores y la Sudamericana tienen manual
+//               público; la Liga Profesional estrenó identidad en 2026
+//               (celeste, azul y blanco) pero no publicó los códigos, y el
+//               brandbook de la Copa Argentina no es verificable.
+//   `ui`      — los colores con los que el juego PINTA la pantalla. Son
+//               decisión de diseño, no dato oficial. El fondo del juego es
+//               casi negro, así que acá van tonos oscuros: un dorado a
+//               pantalla completa sería ilegible.
+const COLORES_COMPETICIONES = {
+  liga: {
+    nombre: 'Liga Profesional',
+    oficial: { primario: null, secundario: null, acento: '#FFFFFF' },
+    ui: { fondo: '#08083A', brillo: '#141470', acento: '#7DD3FC' },
+  },
+  copaArgentina: {
+    nombre: 'Copa Argentina',
+    oficial: { primario: null, secundario: null, acento: null },
+    ui: { fondo: '#061B2A', brillo: '#0B3A57', acento: '#36C5F0' },
+  },
+  libertadores: {
+    nombre: 'Copa Libertadores',
+    oficial: { primario: '#DBAF4A', secundario: '#000000', acento: '#FFFFFF' },
+    ui: { fondo: '#0B0A07', brillo: '#231B0C', acento: '#DBAF4A' },
+  },
+  sudamericana: {
+    nombre: 'Copa Sudamericana',
+    oficial: { primario: '#000000', secundario: '#FFFFFF', acento: null },
+    ui: { fondo: '#080808', brillo: '#1C1F22', acento: '#8C9298' },
+  },
+};
+
 // La cancha de cada club, para decir dónde se juega en vez de solo si sos
 // local o visitante. Están cargados los 30 de Primera; un club que no esté
 // acá (hoy, los de la Primera Nacional) simplemente no muestra estadio.
