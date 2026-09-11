@@ -145,7 +145,7 @@ const ECONOMIA_DATOS = {
     ligaProfesional: { campeonApertura: 500000, campeonClausura: 500000 },
     copaArgentina: { dieciseisavos: 12000, octavos: 22000, cuartos: 40000, semifinal: 70000, subcampeon: 120000, campeon: 237500 },
     libertadores: { fasePrevia: 500000, grupos: 3000000, octavos: 1250000, cuartos: 1700000, semifinal: 2300000, subcampeon: 7000000, campeon: 25000000 },
-    sudamericana: { fasePrevia: 225000, grupos: 900000, octavos: 600000, cuartos: 700000, semifinal: 800000, subcampeon: 2000000, campeon: 10000000 },
+    sudamericana: { fasePrevia: 225000, grupos: 900000, octavos: 600000, cuartos: 700000, semifinal: 800000, subcampeon: 2500000, campeon: 7000000 },
   },
 };
 
@@ -382,8 +382,11 @@ const Economia = {
   // club, así que cobrarlo sería inventar el número.
   premioInternacional(engine, copa, fase) {
     const tabla = copa === 'Libertadores' ? ECONOMIA_DATOS.premios.libertadores : ECONOMIA_DATOS.premios.sudamericana;
-    const escalera = ['la fase previa', 'la fase de grupos', 'los octavos de final', 'los cuartos de final', 'las semifinales', 'la final', 'el título'];
-    const claves = ['fasePrevia', 'grupos', 'octavos', 'cuartos', 'semifinal', 'subcampeon', 'campeon'];
+    // El playoff de octavos de la Sudamericana no paga premio propio, pero
+    // tiene que estar en la escalera igual: si no, un club eliminado ahí no
+    // cobraría ni lo que le corresponde por la fase de grupos.
+    const escalera = ['la fase previa', 'la fase de grupos', 'el playoff de octavos', 'los octavos de final', 'los cuartos de final', 'las semifinales', 'la final', 'el título'];
+    const claves = ['fasePrevia', 'grupos', 'playoffOctavos', 'octavos', 'cuartos', 'semifinal', 'subcampeon', 'campeon'];
     const hasta = escalera.indexOf(fase);
     if (hasta < 0) return 0;
     let total = 0;

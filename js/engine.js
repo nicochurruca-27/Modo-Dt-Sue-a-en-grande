@@ -982,7 +982,8 @@ const Engine = {
       const plazas = [
         ...Array.from({ length: cupos.libertadoresGrupos }, () => ({ copa: 'Libertadores', fase: 'grupos' })),
         ...Array.from({ length: cupos.libertadoresPrevia }, () => ({ copa: 'Libertadores', fase: 'previa' })),
-        ...Array.from({ length: cupos.sudamericana }, () => ({ copa: 'Sudamericana', fase: 'grupos' })),
+        ...Array.from({ length: cupos.sudamericanaGrupos }, () => ({ copa: 'Sudamericana', fase: 'grupos' })),
+        ...Array.from({ length: cupos.sudamericanaPrimeraFase }, () => ({ copa: 'Sudamericana', fase: 'previa' })),
       ];
       const ranking = clubes
         .map((c) => ({ club: c, campania: c.nivel + Math.random() * 3.5 }))
@@ -1022,31 +1023,59 @@ const Engine = {
   // Una llave de copa pesa más la diferencia de nivel que un partido de liga:
   // si no, en un torneo de eliminación directa el azar termina coronando
   // campeón a cualquiera y los grandes del continente no se notan.
-  // Las fases previas de una copa, encadenadas como en la realidad: en cada
-  // una juegan los que ganaron la anterior más los que recién entran ahí, se
-  // cruzan de a dos y los ganadores pasan a la siguiente. Los que sobreviven
-  // a la última llegan a la fase de grupos.
+  // Lo que se juega antes de la fase de grupos. Devuelve { pasan, eliminados }:
+  // los `eliminados` importan porque en la Libertadores los que pierden la
+  // última fase previa no se van a casa, caen a los grupos de la Sudamericana.
   //
-  // Si la copa no tiene fases cargadas en FASES_PREVIAS, o entraron menos
-  // equipos de los que el formato espera, se resuelve en una sola ronda.
+  // Ver FASES_PREVIAS en internacional.js para el formato de cada copa. Una
+  // copa sin formato cargado, o con menos equipos de los que ese formato
+  // espera, se resuelve en una sola ronda cruzando a todos de a dos.
   jugarFasesPrevias(copa, previa, byId) {
-    const fases = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copa]) || [];
-    const unaSolaRonda = (ids) => {
-      const ganadores = [];
-      for (let i = 0; i < ids.length; i += 2) ganadores.push(this.copaTieWinner(ids[i], ids[i + 1], byId));
-      return ganadores;
+    const formato = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copa]) || {};
+    const cruzar = (ids) => {
+      const pasan = [];
+      const eliminados = [];
+      for (let i = 0; i < ids.length; i += 2) {
+        const ganador = this.copaTieWinner(ids[i], ids[i + 1], byId);
+        pasan.push(ganador);
+        const perdedor = ganador === ids[i] ? ids[i + 1] : ids[i];
+        if (perdedor) eliminados.push(perdedor);
+      }
+      return { pasan, eliminados };
     };
-    if (!fases.length || previa.length < fases[0]) return unaSolaRonda(previa);
+
+    // Sudamericana: los equipos de cada país se cruzan entre ellos.
+    if (formato.cruceEntreCompatriotas) {
+      const porPais = {};
+      previa.forEach((id) => {
+        const pais = (byId[id] && byId[id].pais) || '—';
+        (porPais[pais] = porPais[pais] || []).push(id);
+      });
+      const pasan = [];
+      const eliminados = [];
+      Object.values(porPais).forEach((delPais) => {
+        const r = cruzar(this.shuffled(delPais));
+        pasan.push(...r.pasan);
+        eliminados.push(...r.eliminados);
+      });
+      return { pasan, eliminados };
+    }
+
+    const fases = formato.encadenadas || [];
+    if (!fases.length || previa.length < fases[0]) return cruzar(previa);
 
     const esperando = previa.slice();
     let vivos = [];
+    let eliminadosUltima = [];
     fases.forEach((cuantosJuegan) => {
       vivos = vivos.concat(esperando.splice(0, Math.max(0, cuantosJuegan - vivos.length)));
-      vivos = unaSolaRonda(vivos);
+      const r = cruzar(vivos);
+      vivos = r.pasan;
+      eliminadosUltima = r.eliminados;
     });
     // Si quedó alguno sin entrar a ninguna fase (porque ese año hubo más
     // equipos en previa de los que el formato contempla), pasa directo.
-    return vivos.concat(esperando);
+    return { pasan: vivos.concat(esperando), eliminados: eliminadosUltima };
   },
 
   copaTieWinner(idA, idB, byId) {
@@ -1060,16 +1089,32 @@ const Engine = {
 
   // Las dos copas de un mismo año se juegan con UN solo sorteo de cupos: si
   // no, un club del resto del continente podría terminar jugando las dos.
+  //
+  // La Libertadores va primero porque le da de comer a la Sudamericana, como
+  // en la realidad: los que pierden su última fase previa caen a los grupos de
+  // la Sudamericana, y los 8 terceros de grupo van a su playoff de octavos.
+  // Por eso un club puede aparecer en las dos copas el mismo año, y cobrar
+  // premio en las dos.
   simulateCopasDelAnio(qualification) {
     if (!qualification || !qualification.length) return [];
     const internacionales = this.sortearCuposInternacionales();
-    return ['Libertadores', 'Sudamericana']
-      .map((copa) => this.simulateCopa(copa, qualification, internacionales))
-      .filter(Boolean);
+    const libertadores = this.simulateCopa('Libertadores', qualification, internacionales);
+    const sudamericana = this.simulateCopa('Sudamericana', qualification, internacionales, {
+      aGrupos: libertadores ? libertadores.bajanAGrupos : [],
+      alPlayoff: libertadores ? libertadores.bajanAlPlayoff : [],
+    });
+    // Los que bajan son para armar la otra copa, no para guardarlos en la
+    // partida: se sacan del resumen que queda en el save.
+    return [libertadores, sudamericana]
+      .filter(Boolean)
+      .map(({ bajanAGrupos, bajanAlPlayoff, ...resumen }) => resumen);
   },
 
-  simulateCopa(copa, qualification, internacionales) {
-    const entrants = this.copaEntrants(copa, qualification, internacionales);
+  simulateCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
+    const deLaOtra = desdeLaOtraCopa || {};
+    const alPlayoff = deLaOtra.alPlayoff || [];
+    const entrants = this.copaEntrants(copa, qualification, internacionales)
+      .concat(deLaOtra.aGrupos || [], alPlayoff);
     if (entrants.length < 4) return null;
     const byId = Object.fromEntries(entrants.map((e) => [e.id, e]));
     // Hasta dónde llegó cada club: se pisa en cada instancia que juega, así
@@ -1079,18 +1124,25 @@ const Engine = {
 
     const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
     mark(previa, 'la fase previa');
-    const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id);
-    this.jugarFasesPrevias(copa, previa, byId).forEach((id) => enGrupos.push(id));
+    const resultadoPrevia = this.jugarFasesPrevias(copa, previa, byId);
+    const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id)
+      .concat(resultadoPrevia.pasan);
 
-    // 8 grupos como en las dos copas reales: de cada uno pasan 2, así los
-    // octavos arrancan con 16 y las llaves cierran justo hasta la final.
+    // 8 grupos como en las dos copas reales.
     mark(enGrupos, 'la fase de grupos');
     const sorteo = this.shuffled(enGrupos);
     const cantGrupos = Math.max(1, Math.min(8, Math.floor(sorteo.length / 2)));
     const grupos = Array.from({ length: cantGrupos }, () => []);
     sorteo.forEach((id, i) => grupos[i % cantGrupos].push(id));
 
-    let clasificados = [];
+    // De mejor a peor campaña, que es como CONMEBOL numera a los que
+    // terminaron en la misma posición de sus grupos.
+    const porCampania = (filas) => filas.slice()
+      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+
+    const primeros = [];
+    const segundos = [];
+    const terceros = [];
     grupos.forEach((grupo) => {
       const table = Object.fromEntries(grupo.map((id) => [id, this.emptyTableRow()]));
       for (let i = 0; i < grupo.length; i++) {
@@ -1103,8 +1155,35 @@ const Engine = {
       const orden = Object.entries(table)
         .map(([id, row]) => ({ id, ...row }))
         .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-      clasificados = clasificados.concat(orden.slice(0, 2).map((r) => r.id));
+      if (orden[0]) primeros.push(orden[0]);
+      if (orden[1]) segundos.push(orden[1]);
+      if (orden[2]) terceros.push(orden[2]);
     });
+
+    // En la Sudamericana el primero de cada grupo se mete derecho en octavos y
+    // el segundo tiene que ganar el playoff contra un tercero de la
+    // Libertadores. En la Libertadores no hay playoff: pasan los dos.
+    //
+    // Los cruces del playoff NO se sortean: están armados por campaña. Los
+    // segundos de la Sudamericana se numeran del 9º al 16º y los terceros de
+    // la Libertadores del 17º al 24º, y se cruzan 9º vs 24º, 10º vs 23º, y así
+    // hasta 16º vs 17º. O sea que al que mejor le fue le toca el rival más
+    // flojo.
+    let clasificados;
+    if (alPlayoff.length) {
+      const deLaSuda = porCampania(segundos).map((r) => r.id);
+      const deLaLibertadores = alPlayoff.map((e) => e.id);
+      mark(deLaSuda.concat(deLaLibertadores), 'el playoff de octavos');
+      const ganadores = [];
+      const cruces = Math.max(deLaSuda.length, deLaLibertadores.length);
+      for (let i = 0; i < cruces; i++) {
+        const rival = deLaLibertadores[deLaLibertadores.length - 1 - i];
+        ganadores.push(this.copaTieWinner(deLaSuda[i], rival, byId));
+      }
+      clasificados = primeros.map((r) => r.id).concat(ganadores.filter(Boolean));
+    } else {
+      clasificados = primeros.concat(segundos).map((r) => r.id);
+    }
 
     let alive = this.shuffled(clasificados);
     let runnerUp = null;
@@ -1129,6 +1208,14 @@ const Engine = {
       runnerUpName: runnerUp && byId[runnerUp] ? byId[runnerUp].nombre : null,
       userWon: champion === this.state.clubId,
       userStage: reached[this.state.clubId] || null,
+      // Los que se van de esta copa pero siguen en la otra (ver
+      // simulateCopasDelAnio). Solo los usa la Libertadores para alimentar a
+      // la Sudamericana; no quedan guardados en la partida.
+      //
+      // Los terceros van ordenados de mejor a peor campaña (el 17º primero y
+      // el 24º último), porque así es como se arman los cruces del playoff.
+      bajanAGrupos: resultadoPrevia.eliminados.map((id) => ({ ...byId[id], fase: 'grupos' })),
+      bajanAlPlayoff: porCampania(terceros).map((r) => ({ ...byId[r.id], fase: 'playoff' })),
     };
   },
 

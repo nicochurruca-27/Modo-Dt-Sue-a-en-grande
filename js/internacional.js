@@ -168,37 +168,42 @@ const CLUBES_INTERNACIONALES = [
 // (ver Engine.assignQualification), y coinciden con los reales: 5 a grupos y
 // el sexto a fase previa.
 //
-// Los de la Sudamericana todavía son los estimados de antes, pendientes de la
-// misma investigación.
+// Los de la Sudamericana también son los de 2026: Brasil mete sus 6 directo a
+// la fase de grupos (igual que los 6 argentinos, que salen del juego) y los
+// otros ocho países mandan 4 cada uno a la Primera Fase. Son 32 equipos
+// cruzándose ahí, de los que sobreviven 16.
 //
-//   `libertadoresGrupos` — entran directo a la fase de grupos.
-//   `libertadoresPrevia` — arrancan en alguna de las fases previas.
-//   `sudamericana`       — van a la Sudamericana.
+//   `libertadoresGrupos`      — entran directo a los grupos de la Libertadores.
+//   `libertadoresPrevia`      — arrancan en alguna fase previa de la Libertadores.
+//   `sudamericanaGrupos`      — entran directo a los grupos de la Sudamericana.
+//   `sudamericanaPrimeraFase` — arrancan en la Primera Fase de la Sudamericana.
 const CUPOS_INTERNACIONALES = {
-  Brasil:    { libertadoresGrupos: 5, libertadoresPrevia: 2, sudamericana: 6 },
-  Uruguay:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Colombia:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Chile:     { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 3 },
-  Ecuador:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Paraguay:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  'Perú':    { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Bolivia:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
-  Venezuela: { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericana: 2 },
+  Brasil:    { libertadoresGrupos: 5, libertadoresPrevia: 2, sudamericanaGrupos: 6, sudamericanaPrimeraFase: 0 },
+  Uruguay:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Colombia:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Chile:     { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Ecuador:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Paraguay:  { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  'Perú':    { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Bolivia:   { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
+  Venezuela: { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
 };
 
-// Las fases previas encadenadas de cada copa: cuántos equipos juegan cada una.
-// Los que entran son los que ganaron la fase anterior más los que arrancaban
-// recién en esa fase, se cruzan de a dos y los ganadores siguen.
+// Cómo resuelve cada copa lo que se juega ANTES de la fase de grupos.
 //
-// La Libertadores 2026 tiene tres: 6 equipos en la Fase 1 (quedan 3), 16 en la
-// Fase 2 (esos 3 más 13 que entran ahí, quedan 8) y 8 en la Fase 3, de donde
-// salen los 4 que llegan a la fase de grupos. Con los cupos de arriba son
-// justo 19 los que arrancan en alguna previa (18 del continente más el sexto
-// argentino), que es exactamente lo que pide el formato real.
+// La Libertadores tiene tres fases encadenadas: en cada una juegan los que
+// ganaron la anterior más los que recién entran ahí. Son 6 en la Fase 1
+// (quedan 3), 16 en la Fase 2 (esos 3 más 13 nuevos, quedan 8) y 8 en la
+// Fase 3, de donde salen los 4 que llegan a los grupos. Con los cupos de
+// arriba arrancan en previa justo 19 equipos (18 del continente más el sexto
+// argentino), que es lo que pide el formato real. Los 4 que pierden la Fase 3
+// no quedan eliminados: caen a los grupos de la Sudamericana.
 //
-// Una copa que no esté acá resuelve su previa en una sola ronda, que es como
-// funcionaba todo antes. La Sudamericana está así hasta que se investigue su
-// formato.
+// La Sudamericana tiene una sola ronda, a partido único, y con una particu-
+// laridad linda: los cuatro equipos de cada país se cruzan ENTRE ELLOS. Los
+// dos bolivianos contra los otros dos bolivianos, y así con los ocho países.
+// De los 32 que entran pasan 16.
 const FASES_PREVIAS = {
-  Libertadores: [6, 16, 8],
+  Libertadores: { encadenadas: [6, 16, 8] },
+  Sudamericana: { cruceEntreCompatriotas: true },
 };
