@@ -174,7 +174,12 @@ const Engine = {
   // El margen por edad sigue siendo el máximo, no lo que le toca a cada uno:
   // en la realidad la mayoría de los juveniles no llega, unos pocos pegan el
   // salto y el resto se queda en el camino.
-  computePotential(rating, age, club) {
+  // `rng` permite pasar un generador sembrado en vez de Math.random. Lo usa el
+  // mercado de pases para que el techo de un juvenil de otro club sea siempre
+  // el mismo: si usara Math.random, el pibe cambiaría de proyección cada vez
+  // que abrís su club.
+  computePotential(rating, age, club, rng) {
+    const azar = rng || Math.random;
     let maxMargin = 0;
     if (age <= 19) maxMargin = 12;
     else if (age <= 21) maxMargin = 9;
@@ -188,7 +193,18 @@ const Engine = {
     // margen grande. Más alto = cargado hacia abajo.
     const sesgo = { 5: 1.3, 4: 1.7, 3: 2.2, 2: 2.9, 1: 3.6 }[cantera] || 2.2;
 
-    const porcion = 0.25 + Math.pow(Math.random(), sesgo) * 0.75;
+    // El golpe de suerte: de vez en cuando, en CUALQUIER club, sale un pibe
+    // que no tiene nada que ver con el resto de la cantera. Sin esto, un club
+    // chico tenía el techo cortado en +8 y por lo tanto era imposible que
+    // sacara una joya, que es demasiado absoluto — Riestra puede sacar un
+    // crack, solo que mucho menos seguido que River. Con este 5%, un club de
+    // cantera 2 saca joyas en torno al 2% de sus juveniles en vez de nunca.
+    if (azar() < 0.05) {
+      const porcionSuerte = 0.6 + azar() * 0.4;
+      return Math.min(99, rating + Math.round(maxMargin * porcionSuerte));
+    }
+
+    const porcion = 0.25 + Math.pow(azar(), sesgo) * 0.75;
     return Math.min(99, rating + Math.round(maxMargin * tope * porcion));
   },
 

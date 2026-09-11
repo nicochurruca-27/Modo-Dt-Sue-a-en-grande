@@ -144,7 +144,15 @@ const Mercado = {
     const club = engine.getClub(clubId);
     if (!club) return [];
     const anio = s.season ? s.season.year : 1;
-    const rnd = this.generador(this.semilla(`${clubId}|${anio}`));
+    // La semilla va SOLO con el id del club, sin el año. Antes llevaba el año
+    // y el plantel entero se rehacía en cada temporada: leías en el diario
+    // sobre una joya de otro club, pasaba el año y ese jugador no existía
+    // más. Con la semilla fija, el plantel es el mismo siempre y lo que
+    // cambia con los años es cada jugador: envejece y evoluciona hacia su
+    // techo, igual que los tuyos. Así se puede seguir a un pibe de una
+    // temporada a la otra, que es de lo que se trata.
+    const rnd = this.generador(this.semilla(clubId));
+    const aniosPasados = Math.max(0, anio - 1);
     const meses = this.mesesHastaFinDeTemporada(s.calendar ? s.calendar.dayCount : 0);
 
     const real = typeof REAL_ROSTERS !== 'undefined' && REAL_ROSTERS[clubId];
@@ -158,17 +166,25 @@ const Mercado = {
       }))
       : SQUAD_POSITIONS.map((pos, i) => {
         const promedio = 44 + club.reputation * 6;
-        const rating = Math.max(35, Math.min(90, Math.round(promedio + (rnd() * 16 - 8))));
-        const age = Math.round(17 + rnd() * 18);
+        const ratingBase = Math.max(35, Math.min(90, Math.round(promedio + (rnd() * 16 - 8))));
+        const edadBase = Math.round(17 + rnd() * 18);
         const nation = this.nacionSembrada(rnd);
+        const techo = engine.computePotential(ratingBase, edadBase, club, rnd);
+        const contratoBase = 1 + Math.floor(rnd() * 4);
         return {
-          id: `${clubId}-g${anio}-${i}`,
+          id: `${clubId}-g${i}`,
           name: this.nombreSembrado(rnd, nation),
-          pos, rating, age, nation,
-          contractYears: 1 + Math.floor(rnd() * 4),
+          pos, nation,
+          age: edadBase + aniosPasados,
+          rating: this.ratingConLosAnios(ratingBase, edadBase, techo, aniosPasados),
+          projection: techo,
+          // El contrato corre: si ya venció, se le renueva por otras tantas.
+          contractYears: Math.max(1, contratoBase - (aniosPasados % Math.max(1, contratoBase))),
           role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(rnd() * 3)] : undefined,
         };
-      });
+      })
+        // Los que se pasaron de edad se retiran y dejan el lugar libre.
+        .filter((p) => p.age <= 39);
 
     // El ranking por valoración decide a quiénes el club considera
     // intocables: las figuras del plantel.
@@ -211,10 +227,16 @@ const Mercado = {
         else if (estado === 'intocable') precio = Math.round(valor * (3.5 + rnd() * 1.5));
         else prima = Math.round(valor * (0.12 + rnd() * 0.15));
 
+        // El techo sale del generador SEMBRADO, no de Math.random: así el
+        // pibe de otro club tiene siempre la misma proyección y se lo puede
+        // seguir de una temporada a la otra.
+        const techo = p.projection || engine.computePotential(p.rating, p.age, club, rnd);
+
         const acordado = m.acuerdos.some((a) => a.jugadorId === p.id);
         return {
           ...p,
           clubId,
+          potential: techo,
           valor,
           estado,
           clausula,
@@ -227,6 +249,29 @@ const Mercado = {
         };
       })
       .sort((a, b) => b.rating - a.rating);
+  },
+
+  // Cómo evolucionó un jugador de otro club después de N temporadas. Es una
+  // versión determinística y simplificada de lo que le pasa a tu plantel
+  // (ver developSquadAfterMatch en engine.js): el joven sube hacia su techo y
+  // lo alcanza cerca de los 26, y el veterano se cae después de los 30. No se
+  // simula partido a partido porque serían 65 planteles por fecha; con la
+  // curva alcanza para que el mundo se mueva de forma creíble.
+  ratingConLosAnios(ratingBase, edadBase, techo, anios) {
+    if (!anios) return ratingBase;
+    const edad = edadBase + anios;
+    let rating = ratingBase;
+    if (techo > ratingBase) {
+      const aniosParaLlegar = Math.max(1, 26 - edadBase);
+      rating += Math.round((techo - ratingBase) * Math.min(1, anios / aniosParaLlegar));
+    }
+    // El declive cuenta solo los años vividos DESDE que arrancó la partida,
+    // no todos los que lleva encima. Contándolos todos, un jugador de 35 caía
+    // 5 puntos de golpe en la primera temporada (su valoración de arranque ya
+    // refleja su edad: no hay que volver a cobrársela).
+    const desde = Math.max(30, edadBase);
+    if (edad > desde) rating -= Math.round((edad - desde) * 0.8);
+    return Math.max(35, Math.min(99, rating));
   },
 
   // Mismo criterio de países y nombres que el resto del juego, pero tirando

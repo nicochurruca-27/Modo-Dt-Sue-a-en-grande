@@ -11,6 +11,9 @@
 // los planteles de los otros equipos: ahí sí hay nombres de jugadores
 // inventados con el mismo generador que usa el resto del juego.
 //
+// La excepción es joyaJuvenil(): el pibe que nombra existe de verdad en el
+// plantel de ese club y lo podés ir a fichar al Mercado de pases.
+//
 // Todo lo que se guarda en s.noticias es JSON puro (strings y números), sin
 // funciones ni objetos Date, para que sobreviva al save/load de localStorage
 // igual que el resto del estado.
@@ -308,6 +311,44 @@ const Noticias = {
     this.push(s, 'internacional', titular, bajada, {});
   },
 
+  // La joya de otro club. Esta es distinta al resto del relleno: el jugador
+  // que nombra EXISTE de verdad en el plantel de ese club (sale del mismo
+  // Mercado.plantel que ves al entrar ahí), con ese nombre, esa edad y esa
+  // valoración. O sea que después de leerla podés ir al Mercado, buscarlo y
+  // ficharlo. Es la única noticia del juego que te da algo para hacer.
+  joyaJuvenil(engine) {
+    const s = engine.state;
+    if (typeof Mercado === 'undefined') return;
+    // Se prueban varios clubes en vez de uno solo: la mayoría no tiene ninguna
+    // joya en ese momento, y probando uno solo la noticia salía 1 de cada 10
+    // veces. Probando cinco sale casi siempre que haya alguna en la liga.
+    let club = null;
+    let joyas = [];
+    for (let intento = 0; intento < 5 && !joyas.length; intento++) {
+      club = this.clubDeLaLigaAlAzar(engine, true);
+      if (!club) return;
+      // Una joya es un pibe con mucho recorrido por delante. El margen se mide
+      // contra el techo, que en el mercado ya viene calculado y es estable.
+      joyas = Mercado.plantel(engine, club.id)
+        .filter((j) => j.age <= 21 && j.potential && j.potential - j.rating >= 8);
+    }
+    if (!joyas.length) return;
+    const j = this.alAzar(joyas);
+
+    const plantillas = [
+      [`${j.name}, la joya de ${club.name}`,
+        `Tiene ${j.age} años y en el club no lo quieren soltar. Los que lo vieron dicen que de acá a dos temporadas no lo paga nadie.`],
+      [`En ${club.name} apareció ${j.name}`,
+        `${j.age} años y ya juega como un grande. En el mercado empezaron a preguntar por él.`],
+      [`Todos hablan de ${j.name}`,
+        `El pibe de ${j.age} años de ${club.name} es la novedad del campeonato. Si lo querés, conviene que sea ahora.`],
+      [`${club.name} se ilusiona con ${j.name}`,
+        `A los ${j.age} años ya está en ${j.rating} de valoración y en el club creen que todavía le sobra recorrido.`],
+    ];
+    const [titular, bajada] = this.alAzar(plantillas);
+    this.push(s, 'premios', titular, bajada, { clubId: club.id, destacada: true });
+  },
+
   climaDeVestuario(engine) {
     const s = engine.state;
     const club = engine.getClub(s.clubId);
@@ -356,6 +397,10 @@ const Noticias = {
       () => this.premio(engine),
       () => this.desdeAfuera(engine),
       () => this.climaDeVestuario(engine),
+      // Va dos veces porque muchas tiradas no encuentran ninguna joya en el
+      // club que le tocó y no publican nada.
+      () => this.joyaJuvenil(engine),
+      () => this.joyaJuvenil(engine),
     ];
     this.alAzar(generadores)();
   },
