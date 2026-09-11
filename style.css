@@ -100,7 +100,13 @@ body {
      paneles laterales ya lo tenían; a la columna del medio le faltaba, y por
      eso una pantalla de contenido angosto (por ejemplo la del penal) quedaba
      apretada contra la izquierda en vez de usar todo el ancho. */
-  .center-col { max-width: 100%; width: 100%; margin: 0; }
+  /* El flex-basis de 480px de .center-col está pensado para el ANCHO de la
+     columna del medio en la PC. Acá el layout es en columna, así que ese
+     mismo valor pasa a ser ALTO y la columna reservaba 480px de vacío aunque
+     sus dos hijos estuvieran ocultos: por eso, al entrar a Plantel, la
+     formación aparecía recién después de media pantalla en blanco. En
+     vertical la columna tiene que medir lo que mida su contenido. */
+  .center-col { flex: 0 0 auto; max-width: 100%; width: 100%; margin: 0; }
   .side-panel { flex: 1 1 auto; width: 100%; position: static; }
 
   /* Una pestaña por vez. El mercado es la cuarta: en el celular es su propia
@@ -110,9 +116,14 @@ body {
   .layout[data-view="app"] #table-panel,
   .layout[data-view="app"] #squad-panel,
   .layout[data-view="app"] #market-panel { display: none; }
+  /* En Tabla y en Plantel no se muestra nada de la columna del medio (ni
+     #app ni el mercado), así que se esconde la columna entera: si no, queda
+     igual sumando el gap de 16px del layout. */
+  .layout[data-view="table"] .center-col,
   .layout[data-view="table"] #app,
   .layout[data-view="table"] #squad-panel,
   .layout[data-view="table"] #market-panel { display: none; }
+  .layout[data-view="squad"] .center-col,
   .layout[data-view="squad"] #app,
   .layout[data-view="squad"] #table-panel,
   .layout[data-view="squad"] #market-panel { display: none; }
