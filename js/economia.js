@@ -337,6 +337,10 @@ const Economia = {
     const s = engine.state;
     const club = engine.getClub(s.clubId);
     const d = this.datosDe(club);
+    // Si el jugador tiene sueldo real investigado se usa ese, que es mucho
+    // mejor que estimar por categoría de club: en un mismo plantel no cuesta
+    // lo mismo renovarle a la figura que al tercer arquero.
+    if (jugador.salary) return Math.round(jugador.salary * this.PRIMA_RENOVACION);
     let base;
     if (jugador.age <= 21) base = d.costoRenovacionJuvenil;
     else {

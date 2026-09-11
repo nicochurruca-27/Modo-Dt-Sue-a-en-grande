@@ -263,6 +263,12 @@ const FORMATIONS = [
 // La bandera de cada país se dibuja en ui.js (ver NATION_FLAGS), no se
 // guarda acá como emoji: Windows no trae las banderas de países en su fuente
 // y las muestra como las dos letras del código.
+//
+// El `weight` es con qué frecuencia aparece ese país al generar jugadores al
+// azar. Ecuador va en 0 a propósito: no es un país habitual en los planteles
+// argentinos, pero tiene que existir en la lista porque hay jugadores reales
+// cargados con esa nacionalidad (Enner Valencia en Boca). Peso 0 = no se
+// genera solo, pero se muestra bien cuando aparece.
 const NATIONS = [
   { code: 'ARG', name: 'Argentina', weight: 0.82 },
   { code: 'URU', name: 'Uruguay', weight: 0.05 },
@@ -270,6 +276,7 @@ const NATIONS = [
   { code: 'PAR', name: 'Paraguay', weight: 0.04 },
   { code: 'COL', name: 'Colombia', weight: 0.02 },
   { code: 'CHI', name: 'Chile', weight: 0.02 },
+  { code: 'ECU', name: 'Ecuador', weight: 0.0 },
 ];
 
 const NAMES_BY_NATION = {

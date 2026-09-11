@@ -339,7 +339,9 @@ js/mercado.js → mercado de pases club por club: genera el plantel de cada
                 está cada jugador y maneja las negociaciones, que se firman
                 recién cuando abre la ventana de pases
 js/players.js → planteles reales investigados club por club (se van
-                sumando de a poco; sin entrada ahí = jugadores al azar)
+                sumando de a poco; sin entrada ahí = jugadores al azar).
+                También REAL_LINEUPS: la formación habitual y el once
+                titular de cada club con plantel cargado
 js/engine.js  → toda la lógica: arma planteles, arma el calendario de cada
                 zona, simula partidos y playoffs, aplica decisiones,
                 administra ascensos/descensos y cupos a copas

@@ -61,6 +61,7 @@ const NATION_FLAGS = {
   BRA: `<rect width="30" height="20" fill="#009739"/><polygon points="15,2.2 27.5,10 15,17.8 2.5,10" fill="#fedd00"/><circle cx="15" cy="10" r="3.6" fill="#012169"/>`,
   PAR: `<rect width="30" height="6.7" fill="#d52b1e"/><rect y="6.7" width="30" height="6.6" fill="#fff"/><rect y="13.3" width="30" height="6.7" fill="#0038a8"/><circle cx="15" cy="10" r="2.2" fill="#fff" stroke="#d52b1e" stroke-width="0.5"/>`,
   COL: `<rect width="30" height="10" fill="#fcd116"/><rect y="10" width="30" height="5" fill="#003893"/><rect y="15" width="30" height="5" fill="#ce1126"/>`,
+  ECU: `<rect width="30" height="20" fill="#ffdd00"/><rect y="10" width="30" height="5" fill="#0033a0"/><rect y="15" width="30" height="5" fill="#ef3340"/><circle cx="15" cy="10" r="3" fill="#c8b568" stroke="#0033a0" stroke-width="0.6"/>`,
   CHI: `<rect width="30" height="10" fill="#fff"/><rect y="10" width="30" height="10" fill="#d52b1e"/><rect width="10" height="10" fill="#0039a6"/><polygon points="5,2 5.71,4.03 7.85,4.07 6.14,5.37 6.76,7.43 5,6.2 3.24,7.43 3.86,5.37 2.15,4.07 4.29,4.03" fill="#fff"/>`,
 };
 
@@ -1465,10 +1466,12 @@ function mercadoValorTexto(j) {
     return `Libre en ${j.meses} ${j.meses === 1 ? 'mes' : 'meses'} · prima ${j.consultado ? Mercado.plata(j.prima) : Mercado.rango(j.prima)}`;
   }
   if (j.estado === 'clausula') return `Cláusula ${Mercado.plata(j.precio)}`;
+  if (j.estado === 'intocable') return `No está en venta · vale ${Mercado.plata(j.valor)}`;
   return j.consultado ? Mercado.plata(j.precio) : Mercado.rango(j.precio);
 }
 
 function mercadoBotonNegociar(j) {
+  if (j.estado === 'intocable') return 'Insistir igual';
   if (j.estado === 'fin-contrato') return 'Tentar libre';
   if (j.estado === 'clausula') return 'Pagar cláusula';
   return 'Hacer oferta';
@@ -1495,6 +1498,9 @@ function mercadoJugadorHtml(j) {
         ${j.acordado
           ? `<button class="option-btn small danger" data-mercado-cancelar="${j.id}">Cancelar acuerdo</button>`
           : `<button class="option-btn small" data-mercado-negociar="${j.id}" ${bloqueado ? 'disabled' : ''}>${mercadoBotonNegociar(j)}</button>`}
+        ${!j.acordado && j.clausula && j.estado !== 'clausula' && j.estado !== 'fin-contrato'
+          ? `<button class="option-btn small" data-mercado-clausula="${j.id}" ${j.loanFrom ? 'disabled' : ''}>Pagar cláusula ${Mercado.plata(j.clausula)}</button>`
+          : ''}
       </div>
     </li>
   `;
@@ -1609,6 +1615,9 @@ function renderMarketPanel() {
   });
   panel.querySelectorAll('[data-mercado-negociar]').forEach((btn) => {
     btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoNegociar); renderMarketPanel(); });
+  });
+  panel.querySelectorAll('[data-mercado-clausula]').forEach((btn) => {
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoClausula, true); renderMarketPanel(); });
   });
   panel.querySelectorAll('[data-mercado-cancelar]').forEach((btn) => {
     btn.addEventListener('click', () => { Mercado.cancelarAcuerdo(Engine, btn.dataset.mercadoCancelar); renderMarketPanel(); });

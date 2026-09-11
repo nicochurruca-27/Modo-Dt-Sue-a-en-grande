@@ -25,6 +25,11 @@
 // JSON puro, chico, y sobrevive al save/load como el resto del estado.
 
 const MERCADO_ESTADOS = {
+  intocable: {
+    label: 'Intocable',
+    color: '#a78bfa',
+    ayuda: 'El club no lo vende ni en broma. Solo sale si tiene cláusula y la pagás.',
+  },
   retenido: {
     label: 'Retenido',
     color: '#f87171',
@@ -45,6 +50,15 @@ const MERCADO_ESTADOS = {
     color: '#38bdf8',
     ayuda: 'Tiene cláusula de rescisión: si la pagás, el club no puede negarse.',
   },
+};
+
+// Cómo se traduce el estado que trae la investigación de cada club al estado
+// que maneja el juego.
+const MERCADO_ESTADO_POR_TEXTO = {
+  'Intocable': 'intocable',
+  'Retenido': 'retenido',
+  'Transferible': 'transferible',
+  'Fin de contrato cercano': 'fin-contrato',
 };
 
 const Mercado = {
@@ -140,6 +154,7 @@ const Mercado = {
         name: p.name, pos: p.pos, posDetail: p.posDetail, altPosDetail: p.altPosDetail,
         rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears,
         role: p.role, loanFrom: p.loanFrom,
+        value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
       }))
       : SQUAD_POSITIONS.map((pos, i) => {
         const promedio = 44 + club.reputation * 6;
@@ -162,22 +177,38 @@ const Mercado = {
     return base
       .filter((p) => !m.fichados.includes(p.id))
       .map((p) => {
-        const valor = engine.playerValue(p.rating, p.age);
+        const valor = engine.valueOf(p);
         const esFigura = ranking.indexOf(p.id) < 3;
         const dado = rnd();
 
+        // Con un club investigado, la situación de contrato sale de la
+        // investigación y no de un dado. "Intocable" es más duro que
+        // "Retenido": ahí el club directamente no negocia.
         let estado;
         if (p.loanFrom) estado = 'retenido';
+        else if (p.transferState) estado = MERCADO_ESTADO_POR_TEXTO[p.transferState] || 'transferible';
         else if (p.contractYears <= 1) estado = 'fin-contrato';
         else if (esFigura && dado < 0.8) estado = 'retenido';
         else if (dado < 0.35) estado = 'clausula';
         else estado = 'transferible';
 
+        // La cláusula NO pisa al estado. En el primer intento sí lo hacía, y
+        // el resultado era que "Intocable" no aparecía nunca en Boca: los
+        // cinco intocables tienen cláusula, así que todos se mostraban como
+        // "Cláusula" y se perdía la información de que el club no los quiere
+        // vender. Ahora el estado dice la postura del club y la cláusula es
+        // un camino aparte que siempre está disponible, que es como funciona
+        // de verdad: te pueden decir que no, pero si pagás la cláusula no
+        // tienen nada que hacer.
+        const clausula = p.clause || 0;
+
         let precio = 0;
         let prima = 0;
-        if (estado === 'transferible') precio = Math.round(valor * (0.9 + rnd() * 0.4));
+        if (estado === 'clausula') precio = clausula || Math.round(valor * (1.8 + rnd() * 0.8));
+        else if (estado === 'transferible') precio = Math.round(valor * (0.9 + rnd() * 0.4));
         else if (estado === 'clausula') precio = Math.round(valor * (1.8 + rnd() * 0.8));
         else if (estado === 'retenido') precio = Math.round(valor * (2.4 + rnd() * 1.2));
+        else if (estado === 'intocable') precio = Math.round(valor * (3.5 + rnd() * 1.5));
         else prima = Math.round(valor * (0.12 + rnd() * 0.15));
 
         const acordado = m.acuerdos.some((a) => a.jugadorId === p.id);
@@ -186,6 +217,7 @@ const Mercado = {
           clubId,
           valor,
           estado,
+          clausula,
           precio,
           prima,
           meses,
@@ -237,6 +269,8 @@ const Mercado = {
     let texto;
     if (j.loanFrom) {
       texto = `En ${club.name} te aclaran que ${j.name} está a préstamo de ${j.loanFrom}: no es de ellos, no lo pueden vender.`;
+    } else if (j.estado === 'intocable') {
+      texto = `En ${club.name} te cortan el teléfono: ${j.name} es intocable. Ni por ${this.plata(j.precio)} lo largan.`;
     } else if (j.estado === 'retenido') {
       texto = `En ${club.name} no lo quieren largar. "Por menos de ${this.plata(j.precio)} no lo escuchamos, y ni así te aseguro nada."`;
     } else if (j.estado === 'fin-contrato') {
@@ -246,6 +280,9 @@ const Mercado = {
     } else {
       texto = `En ${club.name} lo escuchan: piden ${this.plata(j.precio)} por ${j.name}.`;
     }
+    if (j.clausula && j.estado !== 'clausula' && j.estado !== 'fin-contrato') {
+      texto += ` Eso sí: tiene cláusula de ${this.plata(j.clausula)}, y contra eso no pueden hacer nada.`;
+    }
     this.guardarRespuesta(s, jugadorId, texto);
     engine.save();
     return texto;
@@ -253,13 +290,15 @@ const Mercado = {
 
   // Negociar de verdad. Nunca firma en el momento: si sale bien queda un
   // acuerdo pendiente que se concreta cuando abre el mercado de pases.
-  negociar(engine, clubId, jugadorId) {
+  negociar(engine, clubId, jugadorId, porLaClausula) {
     const s = engine.state;
     const m = this.init(s);
     const j = this.buscar(engine, clubId, jugadorId);
     if (!j) return null;
     const club = engine.getClub(clubId);
-    const costo = j.estado === 'fin-contrato' ? j.prima : j.precio;
+    // Pagar la cláusula es la vía rápida: cuesta más, pero no se negocia.
+    const porClausula = !!(porLaClausula && j.clausula);
+    const costo = porClausula ? j.clausula : (j.estado === 'fin-contrato' ? j.prima : j.precio);
 
     if (j.acordado) {
       return this.responder(engine, jugadorId, `Ya tenés un acuerdo cerrado por ${j.name}. Se concreta cuando abra el mercado.`, false);
@@ -278,7 +317,7 @@ const Mercado = {
     }
 
     // La cláusula no se negocia: se paga y listo.
-    if (j.estado === 'clausula') {
+    if (porClausula || j.estado === 'clausula') {
       return this.cerrarAcuerdo(engine, j, costo, `Pagás la cláusula de ${j.name}. ${club.name} no puede oponerse: arreglado por ${this.plata(costo)}.`);
     }
 
@@ -286,12 +325,14 @@ const Mercado = {
     // está a venderlo y qué tan grande sos vos comparado con él.
     const mio = engine.getClub(s.clubId);
     const tiron = (mio.reputation - club.reputation) * 0.06;
-    const baseProb = { transferible: 0.82, 'fin-contrato': 0.6, retenido: 0.12 }[j.estado] || 0.5;
+    const baseProb = { transferible: 0.82, 'fin-contrato': 0.6, retenido: 0.12, intocable: 0.03 }[j.estado] || 0.5;
     const prob = Math.max(0.05, Math.min(0.95, baseProb + tiron));
 
     if (Math.random() > prob) {
       m.rechazados.push(jugadorId);
-      const excusa = j.estado === 'retenido'
+      const excusa = j.estado === 'intocable'
+        ? `Ni escuchan la oferta por ${j.name}. En ${club.name} es intocable.`
+        : j.estado === 'retenido'
         ? `En ${club.name} rechazan la oferta por ${j.name}: "es intransferible".`
         : j.estado === 'fin-contrato'
           ? `${j.name} escuchó la propuesta pero prefiere seguir en ${club.name} por ahora.`

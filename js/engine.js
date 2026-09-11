@@ -168,7 +168,10 @@ const Engine = {
       return real.map((p, i) => ({
         id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
         posDetail: p.posDetail, altPosDetail: p.altPosDetail, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
-        potential: this.computePotential(p.rating, p.age),
+        // Datos económicos reales, cuando el club los tiene investigados.
+        value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
+        // Si vino una proyección investigada se usa esa; si no, la estimada.
+        potential: p.projection || this.computePotential(p.rating, p.age),
       }));
     }
     const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
@@ -1131,13 +1134,41 @@ const Engine = {
     if (dt && dt.style === 'conservador') budget = Math.round(budget * 1.1);
     this.state.budget = budget;
     this.state.squad = this.generateSquad(club);
-    this.recomputeStartingSlots();
+    this.applyRealLineup(club);
     this.startNewSeason(true);
     // La presentación en sociedad solo aparece al arrancar la carrera (acá,
     // después de armar la primera temporada): las temporadas siguientes
     // arrancan directo por startNewSeason() sin pasar por acá.
     this.state.objective = this.seasonObjective(club);
     this.state.screen = 'presentation';
+  },
+
+  // Si el club tiene investigado cómo se para en la realidad (ver
+  // REAL_LINEUPS en players.js), se arranca con esa formación y ese once en
+  // vez de armarlo solo por valoración. El usuario después lo acomoda a su
+  // gusto desde la pantalla de Plantel.
+  //
+  // Si algún nombre del once no aparece en el plantel, ese puesto queda vacío
+  // y lo completa el armado automático: así un error de tipeo en los datos no
+  // rompe nada, solo se pierde ese casillero.
+  applyRealLineup(club) {
+    const s = this.state;
+    const real = typeof REAL_LINEUPS !== 'undefined' && REAL_LINEUPS[club.id];
+    if (!real) { this.recomputeStartingSlots(); return; }
+
+    if (FORMATIONS.some((f) => f.id === real.formation)) s.formation = real.formation;
+    const formation = this.currentFormation();
+    const orden = this.slotOrderForFormation(formation);
+    const usados = new Set();
+    s.startingSlots = orden.map((slot, i) => {
+      const nombre = real.xi[i];
+      const jugador = nombre && s.squad.find((p) => p.name === nombre && !usados.has(p.id));
+      if (!jugador) return { slot, playerId: null };
+      usados.add(jugador.id);
+      return { slot, playerId: jugador.id };
+    });
+    // repairStartingSlots rellena los casilleros que hayan quedado vacíos.
+    this.repairStartingSlots();
   },
 
   // Qué le pide la dirigencia para esta temporada, según el nivel del club.
@@ -2100,6 +2131,14 @@ const Engine = {
   //
   // La edad ajusta el valor: un pibe con proyección cuesta más caro que un
   // veterano de la misma valoración, al que ya casi no le queda recorrido.
+  // Valor de un jugador concreto. Si tiene valor de mercado investigado se
+  // usa ese; si no, se estima con la fórmula. Así los clubes ya cargados
+  // manejan precios reales y el resto sigue funcionando igual que antes.
+  valueOf(player) {
+    if (player && player.value) return player.value;
+    return this.playerValue(player.rating, player.age);
+  },
+
   playerValue(rating, age) {
     const base = 1500000 * Math.pow(2, (rating - 70) / 6);
     let ageFactor = 1;
@@ -2151,7 +2190,7 @@ const Engine = {
   // Lo que te pagan por un jugador: un poco menos de lo que vale en el
   // mercado, que es lo que pasa cuando el que vende es el apurado.
   sellValue(player) {
-    return Math.round(this.playerValue(player.rating, player.age) * 0.75);
+    return Math.round(this.valueOf(player) * 0.75);
   },
 
   sellPlayer(squadIndex) {
