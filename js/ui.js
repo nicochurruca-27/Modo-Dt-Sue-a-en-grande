@@ -639,16 +639,28 @@ function renderDTCreate() {
   });
 }
 
+// Solo se puede arrancar una carrera en Primera. La Primera Nacional sigue
+// existiendo entera —se simula en paralelo todo el año, aparece en la Copa
+// Argentina, y si te descienden la jugás de verdad— pero no es un punto de
+// partida: el juego es sobre dirigir en Primera y pelearla para no bajar.
+// Los 36 clubes de la Nacional quedan en la base de datos para eso.
+//
+// Si algún día se quiere volver a habilitar, se agrega 'D2' acá y vuelven las
+// pestañas de división solas.
+const DIVISIONES_JUGABLES = ['D1'];
+
 function renderClubSelect() {
+  if (!DIVISIONES_JUGABLES.includes(selectDivision)) selectDivision = DIVISIONES_JUGABLES[0];
   const clubs = CLUB_TEMPLATES.filter((c) => c.division === selectDivision && c.zone === selectZone);
   app.innerHTML = `
     <div class="card">
       <h1>Elegí tu club</h1>
-      <p class="muted">Dirigís una temporada completa: liga (con playoffs si jugás en Primera), Copa Argentina, fechas FIFA y mercado de pases a mitad de año.</p>
-      <div class="tabs">
-        <button class="tab-btn ${selectDivision === 'D1' ? 'active' : ''}" data-division="D1">Primera División</button>
-        <button class="tab-btn ${selectDivision === 'D2' ? 'active' : ''}" data-division="D2">Primera Nacional</button>
-      </div>
+      <p class="muted">Dirigís una temporada completa: liga con playoffs, Copa Argentina, fechas FIFA y mercado de pases. Si te va mal y descendés, seguís la carrera en la Primera Nacional peleando por volver.</p>
+      ${DIVISIONES_JUGABLES.length > 1 ? `
+        <div class="tabs">
+          ${DIVISIONES_JUGABLES.map((d) => `<button class="tab-btn ${selectDivision === d ? 'active' : ''}" data-division="${d}">${d === 'D1' ? 'Primera División' : 'Primera Nacional'}</button>`).join('')}
+        </div>
+      ` : ''}
       <div class="tabs">
         <button class="tab-btn ${selectZone === 'A' ? 'active' : ''}" data-zone="A">Zona A</button>
         <button class="tab-btn ${selectZone === 'B' ? 'active' : ''}" data-zone="B">Zona B</button>

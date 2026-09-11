@@ -43,9 +43,12 @@ abrir seguís donde quedaste.
   zonas de 15) y 36 en la Nacional (2 zonas de 18), con la composición
   actual verificada (incluye los últimos ascensos/descensos: Colón, Godoy
   Cruz y San Martín de San Juan bajaron; Aldosivi, Estudiantes de Río Cuarto
-  y Gimnasia de Mendoza subieron). Podés arrancar tu carrera en cualquiera
-  de las dos. Las zonas se vuelven a sortear cada temporada (como en la vida
-  real) para mantener siempre ese reparto.
+  y Gimnasia de Mendoza subieron). La carrera arranca siempre en Primera: la
+  Nacional se simula entera en paralelo todo el año, aparece en la Copa
+  Argentina y se juega de verdad si te descienden, pero no es un punto de
+  partida (ver DIVISIONES_JUGABLES en `ui.js`). Las zonas se vuelven a
+  sortear cada temporada (como en la vida real) para mantener siempre ese
+  reparto.
 - **Reputación vs. presupuesto**: son dos cosas separadas a propósito. La
   reputación define el nivel del plantel en cancha; el presupuesto (`budgetTier`
   en `data.js`) refleja la situación económica real del club, que puede no
