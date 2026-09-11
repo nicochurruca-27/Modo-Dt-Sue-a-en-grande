@@ -2364,17 +2364,24 @@ const Engine = {
       return;
     }
 
-    // Las llaves se juegan todas en cancha neutral: los playoffs del Apertura
-    // y el Clausura y toda la Copa Argentina. La sede sale sorteada de los
-    // estadios provinciales grandes (ver CANCHAS_NEUTRALES en data.js), que es
-    // donde se juegan de verdad: nunca en la cancha de uno de los grandes.
-    // Como no hay local, ninguno de los dos tiene ventaja.
+    // En los playoffs (los del Apertura y el Clausura, y también el Reducido
+    // de la Nacional) es local el que terminó mejor en la fase regular, o sea
+    // el de seed más bajo, y solo la final se juega en cancha neutral.
+    //
+    // La Copa Argentina es la excepción: se juega entera en canchas neutrales.
+    //
+    // La sede neutral sale sorteada de los estadios provinciales grandes (ver
+    // CANCHAS_NEUTRALES en data.js), que son los que se usan de verdad, así
+    // que nunca es la cancha de uno de los grandes. Cuando no hay local
+    // tampoco hay ventaja de localía para ninguno de los dos.
+    const enNeutral = s.bracket.kind === 'copa' || !!s.bracket.pendingIsFinal;
+    const isHome = userEntry.seed < opponentEntry.seed;
     s.matchContext = {
       context: 'bracket',
       opponentId: opponentEntry.id,
-      isHome: false,
-      isNeutral: true,
-      sede: this.canchaNeutral(),
+      isHome,
+      isNeutral: enNeutral,
+      sede: enNeutral ? this.canchaNeutral() : this.estadioDe(isHome ? s.clubId : opponentEntry.id),
     };
     this.pickDecision();
     s.screen = 'pre-match';
