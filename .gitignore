@@ -8,3 +8,11 @@ modo-dt-sueno-en-grande.html
 node_modules/
 package.json
 package-lock.json
+
+# Andamios de las pruebas en el navegador: se arman con Playwright para una
+# prueba puntual y se borran al terminar. El juego no usa módulos (.mjs) ni
+# capturas: todo lo que corre en el navegador entra por <script> desde
+# index.html.
+*.mjs
+piloto.js
+*.png
