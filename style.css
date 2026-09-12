@@ -1173,6 +1173,20 @@ h1, h2, h3 {
   padding-left: 10px;
 }
 
+/* Cuánto lugar queda en el plantel. En ámbar mientras quedan lugares y en
+   rojo cuando ya no entra nadie más. */
+.aviso-plantel {
+  border-left: 3px solid #f59e0b;
+  padding-left: 10px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  color: #fcd34d;
+}
+.aviso-plantel.lleno {
+  border-left-color: var(--danger);
+  color: #fca5a5;
+}
+
 /* Tarjeta del partido teñida con los colores de la competición que se juega
    (ver COLORES_COMPETICIONES en data.js). Es un degradado suave sobre el
    fondo de siempre, no un bloque de color: el texto blanco tiene que

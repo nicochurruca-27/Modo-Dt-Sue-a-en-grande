@@ -131,8 +131,12 @@ const TRANSFER_ROUND_D2 = 17; // ventana de pases de la Nacional, a mitad de su 
 const TOTAL_ROUNDS = { D1: 16, D2: 35 };
 // Límites del plantel: con el máximo lleno hay que vender para poder
 // comprar, y con el mínimo no se puede vender más (si no te quedás sin
-// equipo).
-const MAX_SQUAD = 30;
+// equipo). El tope es 36 y no 30 porque los planteles de verdad son así de
+// grandes: Boca arranca con 31 contando a los pibes que suben de la Reserva,
+// y con el tope viejo no podías traer a nadie sin vender dos.
+const MAX_SQUAD = 36;
+// A partir de acá el juego empieza a avisar que te estás quedando sin lugar.
+const AVISO_PLANTEL = 3;
 const MIN_SQUAD = 14;
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];

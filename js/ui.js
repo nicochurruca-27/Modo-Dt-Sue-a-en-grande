@@ -793,6 +793,21 @@ function alBordeDeLaSuspension(squad) {
   return `<p class="muted amarillas-aviso">Amarillas acumuladas: ${lista}. A la quinta se pierde un partido.</p>`;
 }
 
+// El aviso de cuánto lugar queda en el plantel. Aparece recién cuando te
+// estás quedando corto: con lugar de sobra no dice nada, a tres o menos avisa,
+// y con el plantel lleno lo dice fuerte, porque ahí no podés fichar hasta que
+// vendas a alguien.
+function avisoDePlantel() {
+  const s = Engine.state;
+  if (!s || !s.squad) return '';
+  const libres = MAX_SQUAD - s.squad.length;
+  if (libres > AVISO_PLANTEL) return '';
+  if (libres <= 0) {
+    return `<p class="aviso-plantel lleno">Plantel lleno: ${s.squad.length} de ${MAX_SQUAD}. Para traer a alguien tenés que vender primero.</p>`;
+  }
+  return `<p class="aviso-plantel">Te ${libres === 1 ? 'queda 1 lugar' : `quedan ${libres} lugares`} en el plantel (${s.squad.length} de ${MAX_SQUAD}).</p>`;
+}
+
 function renderSquadPanel() {
   const s = Engine.state;
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
@@ -822,6 +837,7 @@ function renderSquadPanel() {
       <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       ${alBordeDeLaSuspension(s.squad)}
+      ${avisoDePlantel()}
       <h3>Suplentes</h3>
       <p class="muted">Los doce que van al banco. Tocá uno y después otro de la reserva para cambiarlos.</p>
       <div class="banco-grid">
@@ -1681,6 +1697,7 @@ function renderTransfer() {
     <div class="card">
       <h2>${windowLabel}</h2>
       <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tenés que vender.</p>
+      ${avisoDePlantel()}
       ${(s.notasMercado || []).length ? `
         <div class="mercado-acuerdos">
           <strong>Se concretaron los acuerdos que veníamos negociando</strong>
@@ -2012,6 +2029,7 @@ function renderMarketPanel() {
     <div class="card mercado-card">
       <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
       <p class="muted mercado-aviso">Podés negociar cuando quieras, pero nada se firma hasta que abra el mercado (al terminar el Apertura y en la pretemporada). Un acuerdo cerrado se concreta ahí.</p>
+      ${avisoDePlantel()}
       ${finanzasHtml()}
 
       ${acuerdos.length ? `
