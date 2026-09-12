@@ -3176,6 +3176,29 @@ const Engine = {
   // JSON-serializable (nada de objetos Date ni funciones) para que
   // sobreviva bien al save/load: la fecha se calcula con un contador de
   // días (dayCount) sobre un almanaque fijo, ver formatCalendarDate.
+  // En qué día del almanaque se juega una fecha del torneo. Una fecha es una
+  // semana (ver advanceCalendarDay), más una semana extra por cada parate FIFA
+  // que haya quedado atrás. El día 0 es el 1° de febrero, así que la fecha 0
+  // se juega el día 7.
+  //
+  // OJO: solo vale para el PRIMER torneo del año. En el Clausura el roundIndex
+  // vuelve a empezar de cero pero el almanaque sigue corriendo, así que la
+  // cuenta daría cualquier cosa. Hoy lo usa únicamente la Recopa, que se juega
+  // en las dos primeras fechas de febrero.
+  diaDeLaFechaDeLiga(roundIndex) {
+    const parates = FIFA_ROUNDS.filter((r) => r <= roundIndex).length;
+    return 7 * (roundIndex + 1 + parates);
+  },
+
+  // Los días en que se juegan la ida y la vuelta de la Recopa, para poder
+  // decir cuándo es en vez de solo "todavía no se jugó". Devuelve null si
+  // este año no hay Recopa en el calendario.
+  diasDeLaRecopa() {
+    const rondas = (this.calendarioDeCopas() || {}).recopa;
+    if (!rondas || !rondas.length) return null;
+    return rondas.map((ronda) => this.diaDeLaFechaDeLiga(ronda));
+  },
+
   startCalendarWeek(nextAction) {
     const s = this.state;
     if (!s.calendar) s.calendar = { dayCount: 0 };

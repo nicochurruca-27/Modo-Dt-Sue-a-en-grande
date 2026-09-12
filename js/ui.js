@@ -84,7 +84,7 @@ function nationFlag(code, height = 12) {
 // que sobrevive bien al save/load) en una fecha legible, sumando días
 // sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
 // navegador, para no depender de nada más que aritmética simple.
-function formatCalendarDate(dayCount, temporada) {
+function formatCalendarDate(dayCount, temporada, conAnio = true) {
   let day = CALENDAR_START_DAY + dayCount;
   let month = CALENDAR_START_MONTH;
   let anio = anioDeTemporada(temporada || (Engine.state.season && Engine.state.season.year));
@@ -96,7 +96,10 @@ function formatCalendarDate(dayCount, temporada) {
     // calendario más largo no muestre "enero" del año que ya pasó.
     if (month === 0) anio++;
   }
-  return `${day} de ${MONTH_NAMES[month]} de ${anio}`;
+  // Sin año cuando ya se sabe de qué año se habla: dos fechas seguidas del
+  // mismo año ("ida el 8 de febrero de 2026, vuelta el 15 de febrero de
+  // 2026") se leen peor que sin repetirlo.
+  return `${day} de ${MONTH_NAMES[month]}${conAnio ? ` de ${anio}` : ''}`;
 }
 
 function render() {
@@ -318,15 +321,20 @@ function ladoDeCruceHtml(club, lado) {
 
 // Un cruce: los dos escudos con el global en el medio, y abajo cómo viene o
 // cómo terminó.
-function cruceHtml(copa, cruce, esFinal) {
+function cruceHtml(copa, cruce, esFinal, cuando) {
   const s = Engine.state;
   const nombre = (id) => (copa.clubes[id] ? copa.clubes[id].nombre : 'A definir');
   const mio = cruce.a === s.clubId || cruce.b === s.clubId;
   const jugados = cruce.partidos.length;
   const marcador = jugados ? `${cruce.gA} - ${cruce.gB}` : 'vs';
+  // `cuando` son los días del almanaque de la ida y la vuelta, si se saben:
+  // saber que falta y saber para cuándo no es lo mismo.
+  const dia = (i) => (cuando && cuando[i] != null ? formatCalendarDate(cuando[i], null, false) : null);
   let detalle;
   if (cruce.ganador) detalle = `${esFinal ? 'Campeón' : 'Pasó'} ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`;
-  else if (jugados) detalle = 'Falta la vuelta';
+  else if (jugados) detalle = dia(1) ? `Falta la vuelta, el ${dia(1)}` : 'Falta la vuelta';
+  else if (dia(0) && dia(1)) detalle = `Ida el ${dia(0)}, vuelta el ${dia(1)}`;
+  else if (dia(0)) detalle = `Se juega el ${dia(0)}`;
   else detalle = 'Todavía no se jugó';
   return `<li class="cruce${mio ? ' me-line' : ''}">
     <span class="cruce-equipos">
@@ -687,9 +695,12 @@ function recopaHtml() {
   const ci = Engine.state.copasInter;
   const rec = ci && ci.recopa;
   if (!rec) return '';
+  // Las dos piernas de la Recopa son las dos primeras fechas del año, así que
+  // se puede decir el día exacto en que se juegan.
+  const cuando = Engine.diasDeLaRecopa();
   return `
     <p class="muted">La juegan los campeones del año pasado de la Libertadores y la Sudamericana.</p>
-    <ul class="llave-lista">${cruceHtml({ clubes: rec.clubes }, rec, true)}</ul>
+    <ul class="llave-lista">${cruceHtml({ clubes: rec.clubes }, rec, true, cuando)}</ul>
   `;
 }
 

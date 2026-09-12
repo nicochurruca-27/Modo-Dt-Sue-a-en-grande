@@ -48,6 +48,11 @@ body {
 
 .side-panel {
   flex: 0 0 250px;
+  /* Sin esto el panel se ensancha solo cuando lo que hay adentro no entra —un
+     cuadro de copa, un nombre de club largo— y cambiaba de ancho al pasar de
+     una pestaña a la otra. Con min-width: 0 se queda en 250 y lo de adentro
+     se acomoda o se desliza. */
+  min-width: 0;
   position: sticky;
   top: 16px;
 }
@@ -724,6 +729,31 @@ h1, h2, h3 {
   margin: 0;
   text-align: center;
   flex: 1;
+  min-width: 0;
+  /* Siempre en un renglón. Partido en dos, el panel cambiaba de alto al pasar
+     de "Copa Libertadores" a "Copa Sudamericana" y saltaba todo para abajo. */
+  white-space: nowrap;
+  font-size: 0.86rem;
+  padding: 0 2px;
+}
+
+/* Las flechitas del panel lateral van más chicas que las del resto: el ancho
+   que liberan es justo el que necesita el título más largo para entrar en un
+   renglón dentro de los 250px del panel. */
+.side-panel .panel-tab-switch .option-btn.small {
+  padding: 4px 5px;
+}
+
+/* El cambiador de adentro (el grupo, o la instancia de la llave) tiene el
+   mismo problema que el título: "Treintaidosavos de Final" se partía en dos
+   renglones y el panel saltaba al pasar de una instancia a la otra. Va en un
+   renglón, con el cuerpo justo para que entre el nombre más largo. */
+.side-panel .panel-tab-switch strong {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.8rem;
 }
 
 /* ---- Arquito de los penales ---- */
