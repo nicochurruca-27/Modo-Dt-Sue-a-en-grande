@@ -73,6 +73,8 @@ const CLUBES_INTERNACIONALES = [
   { id: "cerro-largo", nombre: "Cerro Largo", nombreCompleto: "Cerro Largo Fútbol Club", pais: "Uruguay", copa: "Libertadores", nivel: 2, apodo: "Arachanes", estadio: "Estadio Ubilla", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
   { id: "river-plate-uru", nombre: "River Plate (Uru)", nombreCompleto: "Club Atlético River Plate", pais: "Uruguay", copa: "Sudamericana", nivel: 2, apodo: "Darseneros", estadio: "Parque Federico Omar Saroldi", colores: { primario: "#FFFFFF", secundario: "#FF0000" } },
   { id: "rentistas", nombre: "Rentistas", nombreCompleto: "Club Atlético Rentistas", pais: "Uruguay", copa: "Libertadores", nivel: 1, apodo: "Bichos Colorados", estadio: "Complejo Rentistas", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
+  { id: "juventud", nombre: "Juventud", nombreCompleto: "Club Atlético Juventud de Las Piedras", pais: "Uruguay", copa: "Sudamericana", nivel: 1, apodo: "Decano", estadio: "Parque Artigas", colores: { primario: "#008000", secundario: "#FFFFFF" } },
+  { id: "montevideo-city-torque", nombre: "Montevideo City Torque", nombreCompleto: "Montevideo City Torque", pais: "Uruguay", copa: "Sudamericana", nivel: 2 },
 
   // ---- Colombia ----
   { id: "atletico-nacional", nombre: "Atlético Nacional", nombreCompleto: "Atlético Nacional S. A.", pais: "Colombia", copa: "Libertadores", nivel: 4, grande: true, apodo: "Verdolaga", estadio: "Atanasio Girardot", colores: { primario: "#008000", secundario: "#FFFFFF" }, titulos: { libertadores: 2, sudamericana: 0 } },
@@ -96,6 +98,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "audax-italiano", nombre: "Audax Italiano", nombreCompleto: "Audax Club Sportivo Italiano", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Itálicos", estadio: "Bicentenario de La Florida", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "cobreloa", nombre: "Cobreloa", nombreCompleto: "Club de Deportes Cobreloa", pais: "Chile", copa: "Libertadores", nivel: 2, apodo: "Zorros del Desierto", estadio: "Zorros del Desierto", colores: { primario: "#FF6600", secundario: "#FFFFFF" } },
   { id: "coquimbo-unido", nombre: "Coquimbo Unido", nombreCompleto: "Coquimbo Unido", pais: "Chile", copa: "Libertadores", nivel: 2, apodo: "Piratas", estadio: "Francisco Sánchez Rumoroso", colores: { primario: "#FFD700", secundario: "#000000" } },
+  { id: "o-higgins", nombre: "O'Higgins", nombreCompleto: "Club Deportivo O'Higgins", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Capo de Provincia", estadio: "El Teniente", colores: { primario: "#5FD0F5", secundario: "#FFFFFF" } },
 
   // ---- Ecuador ----
   { id: "independiente-del-valle", nombre: "Independiente del Valle", nombreCompleto: "Club de Alto Rendimiento Especializado Independiente del Valle", pais: "Ecuador", copa: "Libertadores", nivel: 5, apodo: "Negriazules", estadio: "Banco Guayaquil", colores: { primario: "#000000", secundario: "#0066CC" }, titulos: { libertadores: 0, sudamericana: 2 } },
@@ -108,6 +111,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "aucas", nombre: "Aucas", nombreCompleto: "Sociedad Deportiva Aucas", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Papá", estadio: "Gonzalo Pozo Ripalda", colores: { primario: "#FFD700", secundario: "#FF0000" } },
   { id: "delfin", nombre: "Delfín", nombreCompleto: "Delfín Sporting Club", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Cetáceos", estadio: "Jocay", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
   { id: "universidad-catolica-ecu", nombre: "Universidad Católica (Ecu)", nombreCompleto: "Club Deportivo Universidad Católica", pais: "Ecuador", copa: "Libertadores", nivel: 2, apodo: "Trencito Azul", estadio: "Olímpico Atahualpa", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "macara", nombre: "Macará", nombreCompleto: "Club Social y Deportivo Macará", pais: "Ecuador", copa: "Sudamericana", nivel: 1, apodo: "Celeste", estadio: "Bellavista", colores: { primario: "#5FD0F5", secundario: "#FFFFFF" } },
 
   // ---- Paraguay ----
   { id: "olimpia", nombre: "Olimpia", nombreCompleto: "Club Olimpia", pais: "Paraguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Decano", estadio: "Tigo Manuel Ferreira", colores: { primario: "#FFFFFF", secundario: "#000000" }, titulos: { libertadores: 3, sudamericana: 0 } },
@@ -118,6 +122,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "sportivo-luqueno", nombre: "Sportivo Luqueño", nombreCompleto: "Club Sportivo Luqueño", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "Kure Luque", estadio: "Feliciano Cáceres", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
   { id: "sol-de-america", nombre: "Sol de América", nombreCompleto: "Club Sol de América", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "Danzarín", estadio: "Luis Alfonso Giagni", colores: { primario: "#003DA5", secundario: "#FF0000" } },
   { id: "sportivo-ameliano", nombre: "Sportivo Ameliano", nombreCompleto: "Club Sportivo Ameliano", pais: "Paraguay", copa: "Sudamericana", nivel: 2, apodo: "V Azulada", estadio: "Martín Torres", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
+  { id: "recoleta", nombre: "Recoleta", nombreCompleto: "Club Atlético Recoleta", pais: "Paraguay", copa: "Sudamericana", nivel: 1 },
 
   // ---- Perú ----
   { id: "universitario", nombre: "Universitario", nombreCompleto: "Club Universitario de Deportes", pais: "Perú", copa: "Libertadores", nivel: 3, grande: true, apodo: "Cremas", estadio: "Monumental", colores: { primario: "#8B0000", secundario: "#FFFFFF" } },
@@ -131,6 +136,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "juan-aurich", nombre: "Juan Aurich", nombreCompleto: "Club Juan Aurich", pais: "Perú", copa: "Libertadores", nivel: 2, apodo: "El Ciclón del Norte", estadio: "Elías Aguirre", colores: { primario: "#C8102E", secundario: "#FFFFFF" } },
   { id: "deportivo-municipal", nombre: "Deportivo Municipal", nombreCompleto: "Club Centro Deportivo Municipal", pais: "Perú", copa: "Libertadores", nivel: 2, apodo: "La Academia", estadio: "Iván Elías Moreno", colores: { primario: "#8B0000", secundario: "#FFFFFF" } },
   { id: "binacional", nombre: "Binacional", nombreCompleto: "Deportivo Binacional Fútbol Club", pais: "Perú", copa: "Libertadores", nivel: 1, apodo: "Poderoso del Sur", estadio: "Guillermo Briceño Rosamedina", colores: { primario: "#0000FF", secundario: "#FFFFFF" } },
+  { id: "alianza-atletico", nombre: "Alianza Atlético", nombreCompleto: "Club Alianza Atlético de Sullana", pais: "Perú", copa: "Sudamericana", nivel: 1, apodo: "Churres", estadio: "Campeones del 36", colores: { primario: "#0038A8", secundario: "#FFFFFF" } },
 
   // ---- Bolivia ----
   { id: "bolivar", nombre: "Bolívar", nombreCompleto: "Club Bolívar", pais: "Bolivia", copa: "Libertadores", nivel: 4, grande: true, apodo: "La Academia", estadio: "Hernando Siles", colores: { primario: "#003DA5", secundario: "#FFFFFF" } },
@@ -143,6 +149,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "nacional-potosi", nombre: "Nacional Potosí", nombreCompleto: "Club Atlético Nacional Potosí", pais: "Bolivia", copa: "Sudamericana", nivel: 2, apodo: "Rancho Guitarras", estadio: "Víctor Agustín Ugarte", colores: { primario: "#FF0000", secundario: "#FFFFFF" } },
   { id: "san-jose", nombre: "San José", nombreCompleto: "Club Deportivo San José", pais: "Bolivia", copa: "Libertadores", nivel: 2, apodo: "El Santo", estadio: "Jesús Bermúdez", colores: { primario: "#FFD700", secundario: "#000000" } },
   { id: "real-potosi", nombre: "Real Potosí", nombreCompleto: "Club Real Potosí", pais: "Bolivia", copa: "Libertadores", nivel: 2, apodo: "El Lila", estadio: "Víctor Agustín Ugarte", colores: { primario: "#6A0DAD", secundario: "#FFFFFF" } },
+  { id: "independiente-petrolero", nombre: "Independiente Petrolero", nombreCompleto: "Club Independiente Petrolero", pais: "Bolivia", copa: "Sudamericana", nivel: 2 },
 
   // ---- Venezuela ----
   { id: "caracas", nombre: "Caracas", nombreCompleto: "Caracas Fútbol Club", pais: "Venezuela", copa: "Libertadores", nivel: 3, grande: true, apodo: "Rojos del Ávila", estadio: "Olímpico de la UCV", colores: { primario: "#FF0000", secundario: "#000000" } },
@@ -157,6 +164,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "mineros-de-guayana", nombre: "Mineros de Guayana", nombreCompleto: "Club Deportivo Mineros de Guayana", pais: "Venezuela", copa: "Libertadores", nivel: 2, apodo: "Los Negriazules", estadio: "Cachamay", colores: { primario: "#000000", secundario: "#FFFFFF" } },
   { id: "deportivo-lara", nombre: "Deportivo Lara", nombreCompleto: "Club Deportivo Lara", pais: "Venezuela", copa: "Libertadores", nivel: 2, apodo: "Los Rojinegros", estadio: "Metropolitano de Cabudare", colores: { primario: "#8B0000", secundario: "#FFFFFF" } },
   { id: "deportivo-anzoategui", nombre: "Deportivo Anzoátegui", nombreCompleto: "Deportivo Anzoátegui Sport Club", pais: "Venezuela", copa: "Sudamericana", nivel: 1, apodo: "El Aurirrojo", estadio: "José Antonio Anzoátegui", colores: { primario: "#0057B8", secundario: "#FFFFFF" } },
+  { id: "academia-puerto-cabello", nombre: "Academia Puerto Cabello", nombreCompleto: "Academia Puerto Cabello Fútbol Club", pais: "Venezuela", copa: "Sudamericana", nivel: 2 },
 ];
 
 // Cuántos cupos reparte cada país todos los años. Es lo que hace que el pozo
