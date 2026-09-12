@@ -189,6 +189,13 @@ const CUPOS_INTERNACIONALES = {
   Venezuela: { libertadoresGrupos: 2, libertadoresPrevia: 2, sudamericanaGrupos: 0, sudamericanaPrimeraFase: 4 },
 };
 
+// Con cuántos equipos arranca la fase de grupos cada copa. No es un dato
+// decorativo: son 8 grupos de 4, siempre, y un grupo de 3 no existe en
+// ninguna de las dos. Los cupos de arriba están puestos para que la cuenta dé
+// justo, pero si algún año queda un cupo sin dueño el juego lo completa antes
+// del sorteo (ver Engine.completarCuposDeGrupos).
+const CUPOS_EN_GRUPOS = { Libertadores: 32, Sudamericana: 32 };
+
 // Cómo resuelve cada copa lo que se juega ANTES de la fase de grupos.
 //
 // La Libertadores tiene tres fases encadenadas: en cada una juegan los que

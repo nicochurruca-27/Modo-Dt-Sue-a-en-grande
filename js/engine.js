@@ -1714,11 +1714,22 @@ const Engine = {
     if (!hayVigentes) s.ultimasCopas = (s.ultimasCopas || []).concat(this.sembrarCampeonesVigentes());
 
     const internacionales = this.sortearCuposInternacionales();
+    // Nadie puede jugar las dos copas el mismo año, ni siquiera cuando hay que
+    // completar cupos: acá está todo lo que ya tiene dueño.
+    const ocupados = new Set(qualification.map((q) => q.clubId)
+      .concat(internacionales.map((c) => c.id)));
+    const campeones = this.campeonesVigentes(qualification, internacionales);
+    campeones.forEach((c) => ocupados.add(c.id));
     const libertadores = this.armarCopa('Libertadores', qualification, internacionales, {
-      aGrupos: this.campeonesVigentes(qualification, internacionales),
+      aGrupos: campeones,
+      // Si sobrara un cupo, el que se va es un campeón vigente: nunca uno que
+      // se ganó el lugar en la cancha.
+      prescindibles: campeones.map((c) => c.id),
+      ocupados,
     });
     const sudamericana = this.armarCopa('Sudamericana', qualification, internacionales, {
       aGrupos: libertadores ? libertadores.bajanAGrupos : [],
+      ocupados,
     });
     if (!libertadores && !sudamericana) return;
 
@@ -1746,8 +1757,12 @@ const Engine = {
 
     const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
     const resultadoPrevia = this.jugarFasesPrevias(copa, previa, clubes);
-    const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id)
-      .concat(resultadoPrevia.pasan);
+    const enGrupos = this.completarCuposDeGrupos(
+      copa,
+      entrants.filter((e) => e.fase === 'grupos').map((e) => e.id).concat(resultadoPrevia.pasan),
+      clubes,
+      deLaOtra,
+    );
 
     return {
       copa,
@@ -1760,6 +1775,65 @@ const Engine = {
       grupos: this.sortearGruposDeCopa(enGrupos, clubes),
       bajanAGrupos: resultadoPrevia.eliminados.map((id) => ({ ...clubes[id], fase: 'grupos' })),
     };
+  },
+
+  // Las dos copas arrancan la fase de grupos con 32 equipos, siempre: 8 grupos
+  // de 4, ni uno más ni uno menos. Los cupos de cada país, los de la fase
+  // previa y los de campeón vigente están puestos para que la cuenta dé justo,
+  // pero puede haber años raros —un campeón que se quedó sin país donde buscar
+  // suplente, una previa que devolvió de más— y un grupo de tres no existe en
+  // ninguna de las dos copas. Así que la cuenta se cierra acá, antes del
+  // sorteo.
+  //
+  // Si sobra alguno, el que se va es un campeón vigente (el cupo más blando de
+  // los tres), empezando por el de menor nivel. Nunca sale uno que se ganó el
+  // lugar en la cancha.
+  //
+  // Si falta, entran por orden de mérito: primero los argentinos que quedaron
+  // próximos en la Tabla Anual del año pasado —así un argentino nunca entra de
+  // prepo, entra por cómo salió en el torneo— y después el mejor club del
+  // continente que se haya quedado afuera, empezando por los países con menos
+  // representantes para no amontonar cinco brasileños.
+  completarCuposDeGrupos(copa, enGrupos, clubes, deLaOtra) {
+    const objetivo = (typeof CUPOS_EN_GRUPOS === 'undefined' ? {} : CUPOS_EN_GRUPOS)[copa];
+    if (!objetivo) return enGrupos;
+    const lista = enGrupos.slice();
+    const dentro = new Set(lista);
+    const ocupados = (deLaOtra && deLaOtra.ocupados) || new Set();
+    const sumar = (entrant) => {
+      clubes[entrant.id] = {
+        id: entrant.id, nombre: entrant.nombre, pais: entrant.pais, nivel: entrant.nivel,
+      };
+      lista.push(entrant.id);
+      dentro.add(entrant.id);
+      ocupados.add(entrant.id);
+    };
+
+    const sobrantes = ((deLaOtra && deLaOtra.prescindibles) || [])
+      .filter((id) => dentro.has(id))
+      .sort((a, b) => clubes[a].nivel - clubes[b].nivel);
+    while (lista.length > objetivo && sobrantes.length) {
+      const fuera = sobrantes.shift();
+      lista.splice(lista.indexOf(fuera), 1);
+      dentro.delete(fuera);
+    }
+
+    const espera = (this.state.copaEspera || []).filter((id) => !dentro.has(id) && !ocupados.has(id));
+    while (lista.length < objetivo && espera.length) {
+      const suplente = this.entrantDeClub(espera.shift());
+      if (suplente) sumar(suplente);
+    }
+
+    while (lista.length < objetivo) {
+      const porPais = {};
+      lista.forEach((id) => { porPais[clubes[id].pais] = (porPais[clubes[id].pais] || 0) + 1; });
+      const candidato = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+        .filter((c) => !dentro.has(c.id) && !ocupados.has(c.id))
+        .sort((a, b) => (porPais[a.pais] || 0) - (porPais[b.pais] || 0) || b.nivel - a.nivel)[0];
+      if (!candidato) break;
+      sumar(candidato);
+    }
+    return lista;
   },
 
   // El sorteo de los 8 grupos, con las dos reglas del sorteo de verdad:
@@ -3518,6 +3592,12 @@ const Engine = {
     porTabla.slice(cuposLibertadores, cuposLibertadores + 6).forEach((row) => {
       grant(row.id, 'Sudamericana', 'Fase de grupos');
     });
+
+    // Los que quedaron en la puerta: si el año que viene alguna copa arranca
+    // con un cupo sin dueño, entran estos y por este orden, que es el de la
+    // Tabla Anual. Un argentino nunca entra a una copa por sorteo ni por
+    // relleno: entra por cómo salió en el torneo.
+    s.copaEspera = porTabla.slice(cuposLibertadores + 6).map((row) => row.id);
 
     return results;
   },
