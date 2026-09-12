@@ -344,9 +344,36 @@ function llaveHtml(copa) {
 // Las competencias que se pueden mirar en la pestaña Copas: siempre la Copa
 // Argentina (se juega desde la primera temporada) y, a partir de la segunda,
 // las dos internacionales.
+// La fase final del torneo local: la que se está jugando, o la que terminó y
+// quedó guardada para poder mirarla.
+function faseFinalDelPanel() {
+  const s = Engine.state;
+  const season = s.season;
+  if (s.bracket && s.bracket.kind !== 'copa' && (s.bracket.stageNames || []).length > 1) {
+    return { llave: s.bracket, nombre: faseFinalNombre(s.bracket.kind) };
+  }
+  const guardada = season.myD1 && season.edition && season.myD1[season.edition];
+  if (guardada && (guardada.historial || []).length) {
+    return { llave: { ...guardada, alive: [] }, nombre: faseFinalNombre(season.edition) };
+  }
+  if (season.myD2 && (season.myD2.historial || []).length) {
+    return { llave: { ...season.myD2, alive: [] }, nombre: 'Reducido' };
+  }
+  return null;
+}
+
+function faseFinalNombre(kind) {
+  if (kind === 'apertura') return 'Fase Final del Apertura';
+  if (kind === 'clausura') return 'Fase Final del Clausura';
+  if (kind === 'reducido') return 'Reducido';
+  return 'Fase Final';
+}
+
 function competenciasDelPanel() {
   const s = Engine.state;
   const lista = [];
+  const faseFinal = faseFinalDelPanel();
+  if (faseFinal) lista.push({ id: 'faseFinal', nombre: faseFinal.nombre });
   if (s.copaBracket && s.copaBracket.alive) lista.push({ id: 'copaArgentina', nombre: 'Copa Argentina' });
   // La Recopa son dos fechas de febrero: mientras se juega tiene su carpeta y
   // después desaparece.
@@ -444,7 +471,20 @@ function marcaSudamericana() {
   `;
 }
 
+// Liga Profesional: el escudito rectangular con las letras, como el de la
+// lámina de la fase final.
+function marcaLiga() {
+  return `
+    <rect x="26" y="14" width="48" height="72" rx="12" fill="none" stroke="#5FD0F5" stroke-width="5" />
+    <path d="M 40 30 C 48 24, 56 34, 64 28 L 64 48 C 56 54, 48 44, 40 50 Z" fill="#5FD0F5" />
+    <circle cx="40" cy="56" r="5" fill="#5FD0F5" />
+    <rect x="37" y="60" width="6" height="16" fill="#5FD0F5" />
+    <text x="50" y="82" text-anchor="middle" font-size="16" font-weight="800" fill="#5FD0F5" font-family="system-ui, sans-serif">LPF</text>
+  `;
+}
+
 const MARCAS_COMPETICIONES = {
+  liga: marcaLiga,
   copaArgentina: marcaCopaArgentina,
   libertadores: marcaLibertadores,
   sudamericana: marcaSudamericana,
@@ -484,7 +524,12 @@ function cuadroY(r, k, m) {
 
 // `aro` marca el escudo: verde el de tu club, dorado el del campeón.
 function cuadroEscudoSvg(clubId, x, y, aroColor, m) {
-  if (!clubId) return '';
+  const r0 = m.escudo / 2;
+  // Casillero todavía sin dueño: se dibuja igual, vacío, para que el cuadro se
+  // vea entero desde el sorteo.
+  if (!clubId) {
+    return `<circle cx="${x + r0}" cy="${y}" r="${r0}" fill="rgba(2,6,23,0.35)" stroke="${m.borde}" stroke-width="1" opacity="0.45" />`;
+  }
   const club = Engine.getClub(clubId);
   if (!club) return '';
   const crest = (typeof CLUB_CRESTS !== 'undefined' && CLUB_CRESTS[club.id]) || null;
@@ -508,14 +553,22 @@ function cuadroEscudoSvg(clubId, x, y, aroColor, m) {
 // `rondas` es una lista de rondas y cada ronda una lista de cruces en el orden
 // del cuadro. Sirve igual para los 64 de la Copa Argentina que para los 16 de
 // una llave internacional: lo único que cambia es cuántas rondas hay.
-function cuadroPorColumnas(rondas, mitad) {
+function cuadroPorColumnas(rondas, total, mitad, sorteo) {
   const columnas = [];
-  const casillerosIniciales = 2 ** rondas.length;
-  for (let r = 0; r < rondas.length; r++) {
+  const casillerosIniciales = 2 ** total;
+  for (let r = 0; r < total; r++) {
     const casilleros = casillerosIniciales >> (r + 1);
     const fila = new Array(casilleros).fill(null);
-    const desde = mitad * casilleros;
-    if (r === 0) {
+    // En la primera columna cada cruce ocupa DOS casilleros, así que la mitad
+    // derecha arranca en la mitad de los cruces, no en la mitad de los
+    // casilleros. En las demás columnas va uno por casillero.
+    const desde = r === 0 ? mitad * (casilleros / 2) : mitad * casilleros;
+    if (r === 0 && !rondas[0] && sorteo) {
+      // Todavía no se jugó la primera ronda, pero el sorteo ya está hecho: los
+      // equipos van en su casillero y el resto del cuadro queda vacío.
+      const desdeSorteo = mitad * casilleros;
+      for (let k = 0; k < casilleros; k++) fila[k] = sorteo[desdeSorteo + k] || null;
+    } else if (r === 0) {
       (rondas[0] || []).forEach((c, i) => {
         const k = (i - desde) * 2;
         if (k >= 0 && k < casilleros) { fila[k] = c.a; fila[k + 1] = c.b; }
@@ -534,9 +587,12 @@ function cuadroPorColumnas(rondas, mitad) {
 // El cuadro dibujado: las dos mitades enfrentadas y la definición en el medio,
 // como las láminas que publica CONMEBOL. `color` tiñe las líneas y el aro del
 // campeón con el color de la competencia.
+// `rondas` puede venir incompleto: las instancias que todavía no se jugaron
+// quedan como casilleros vacíos, igual que en los cuadros que publican los
+// diarios apenas se hace el sorteo.
 function cuadroSvg(rondas, opciones) {
   const op = opciones || {};
-  const columnas = rondas.length;
+  const columnas = op.columnas || rondas.length;
   if (columnas < 2) return '';
   const miClub = Engine.state.clubId;
   const comp = op.competicion && typeof COLORES_COMPETICIONES !== 'undefined'
@@ -551,7 +607,7 @@ function cuadroSvg(rondas, opciones) {
 
   let dibujo = '';
   [0, 1].forEach((mitad) => {
-    const porColumna = cuadroPorColumnas(rondas, mitad);
+    const porColumna = cuadroPorColumnas(rondas, columnas, mitad, op.sorteo);
     // La mitad derecha va en espejo: las instancias avanzan hacia el centro
     // desde los dos costados.
     const xDe = (r) => (mitad === 0
@@ -600,22 +656,38 @@ function cuadroSvg(rondas, opciones) {
 
 function cuadroDeCopaArgentinaSvg() {
   const cb = Engine.state.copaBracket;
-  const historial = (cb && cb.historial) || [];
-  if (!historial.length) return '';
-  const rondas = historial
-    .slice()
-    .sort((a, b) => a.stageIndex - b.stageIndex)
-    .map((h) => h.cruces.slice().sort((a, b) => a.pos - b.pos));
-  return cuadroSvg(rondas, { campeon: cb.champion, competicion: 'copaArgentina' });
+  if (!cb || !cb.alive) return '';
+  const total = COPA_STAGE_NAMES.length;
+  const rondas = [];
+  ((cb.historial) || []).forEach((h) => {
+    rondas[h.stageIndex] = h.cruces.slice().sort((a, b) => a.pos - b.pos);
+  });
+  // Antes de la primera ronda no hay historial, pero el sorteo ya está hecho:
+  // los 64 salen de cb.alive, que está en el orden del cuadro.
+  const sorteo = !rondas[0] && cb.alive.length === 2 ** total
+    ? cb.alive.map((e) => e.id)
+    : null;
+  return cuadroSvg(rondas, {
+    columnas: total,
+    sorteo,
+    campeon: cb.champion,
+    competicion: 'copaArgentina',
+  });
 }
 
 // El cuadro de una copa internacional, de octavos a la final. El playoff de la
 // Sudamericana queda afuera: los ocho primeros de grupo entran recién en
 // octavos, así que no cuelga de ese cuadro.
 function cuadroDeLlaveInternacionalSvg(copa) {
-  const instancias = instanciasDeLaLlave(copa).filter((i) => i.etapa !== 'playoff');
-  if (instancias.length < 2) return '';
-  return cuadroSvg(instancias.map((i) => i.cruces), {
+  const orden = ['octavos', 'cuartos', 'semis', 'final'];
+  const rondas = [];
+  instanciasDeLaLlave(copa).forEach((i) => {
+    const r = orden.indexOf(i.etapa);
+    if (r >= 0) rondas[r] = i.cruces;
+  });
+  if (!rondas[0]) return ''; // todavía se está jugando el playoff
+  return cuadroSvg(rondas, {
+    columnas: orden.length,
     campeon: copa.llave.campeon,
     competicion: copa.copa === 'Libertadores' ? 'libertadores' : 'sudamericana',
   });
@@ -628,7 +700,8 @@ function copaArgentinaHtml() {
   const vivos = (cb.alive || []).length;
 
   if (!rondas.length) {
-    return `<p class="muted">El cuadro ya está sorteado: ${vivos} equipos y seis rondas repartidas de febrero a octubre. Todavía no se jugó ninguna.</p>`;
+    return `<p class="muted">El cuadro ya está sorteado: ${vivos} equipos y seis rondas repartidas de febrero a octubre. Todavía no se jugó ninguna.</p>
+      ${cuadroDeCopaArgentinaSvg()}`;
   }
   if (copaPanelEtapa === null || copaPanelEtapa >= rondas.length) copaPanelEtapa = rondas.length - 1;
   const ronda = rondas[copaPanelEtapa];
@@ -659,7 +732,41 @@ function recopaHtml() {
 
 // El cuerpo de la carpeta de una copa: el cuadro de la Copa Argentina, el
 // cruce de la Recopa, o los grupos y después la llave de una internacional.
+function faseFinalHtml() {
+  const ff = faseFinalDelPanel();
+  if (!ff) return '';
+  const ll = ff.llave;
+  const total = (ll.stageNames || []).length;
+  const rondas = [];
+  (ll.historial || []).forEach((h) => {
+    rondas[h.stageIndex] = h.cruces.slice().sort((a, b) => a.pos - b.pos);
+  });
+  const sorteo = !rondas[0] && (ll.alive || []).length === 2 ** total
+    ? ll.alive.map((e) => e.id)
+    : null;
+  const cuadro = cuadroSvg(rondas, { columnas: total, sorteo, campeon: ll.champion, competicion: 'liga' });
+  const campeon = ll.champion
+    ? `<p class="${ll.champion === Engine.state.clubId ? 'me-line' : ''}">Campeón: <strong>${Engine.getClub(ll.champion).name}</strong>${ll.runnerUp ? ` <span class="muted">— finalista: ${Engine.getClub(ll.runnerUp).name}</span>` : ''}</p>`
+    : '<p class="muted">Cruces de eliminación directa: el que gana sigue, el que pierde se va.</p>';
+
+  const jugadas = (ll.historial || []).filter((h) => h.cruces.some((c) => c.ganador));
+  if (!jugadas.length) return `${campeon}${cuadro}`;
+  if (copaPanelEtapa === null || copaPanelEtapa >= jugadas.length) copaPanelEtapa = jugadas.length - 1;
+  const ronda = jugadas[copaPanelEtapa];
+  return `
+    ${campeon}
+    ${cuadro}
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="etapa-prev-btn">◀</button>
+      <strong>${(ll.stageNames || [])[ronda.stageIndex] || 'Ronda'}</strong>
+      <button class="option-btn small" id="etapa-next-btn">▶</button>
+    </div>
+    <ul class="llave-lista compacta">${ronda.cruces.map(cruceDeCopaArgentinaHtml).join('')}</ul>
+  `;
+}
+
 function competenciaHtml(id) {
+  if (id === 'faseFinal') return faseFinalHtml();
   if (id === 'copaArgentina') return copaArgentinaHtml();
   if (id === 'recopa') return recopaHtml();
   copaPanelCopa = id;
@@ -718,7 +825,11 @@ function engancharBotonesDeGrupos() {
     if (next) next.addEventListener('click', () => mover(1));
   };
   const elegida = tablePanelTab.startsWith('copa-') ? tablePanelTab.slice(5) : null;
-  if (elegida === 'copaArgentina') {
+  if (elegida === 'faseFinal') {
+    const ff = faseFinalDelPanel();
+    const jugadas = ff ? (ff.llave.historial || []).filter((h) => h.cruces.some((c) => c.ganador)).length : 0;
+    flechas('etapa-prev-btn', 'etapa-next-btn', jugadas, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+  } else if (elegida === 'copaArgentina') {
     const rondas = ((Engine.state.copaBracket || {}).historial || []).length;
     flechas('etapa-prev-btn', 'etapa-next-btn', rondas, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
   } else {

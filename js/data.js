@@ -353,10 +353,12 @@ const CANTERA_POR_DEFECTO = { D1: 3, D2: 2 };
 //               casi negro, así que acá van tonos oscuros: un dorado a
 //               pantalla completa sería ilegible.
 const COLORES_COMPETICIONES = {
+  // Azul marino con celeste, como la lámina de la fase final que publica la
+  // propia Liga.
   liga: {
     nombre: 'Liga Profesional',
-    oficial: { primario: null, secundario: null, acento: '#FFFFFF' },
-    ui: { fondo: '#08083A', brillo: '#141470', acento: '#7DD3FC' },
+    oficial: { primario: '#0A1A5E', secundario: '#5FD0F5', acento: '#FFFFFF' },
+    ui: { fondo: '#0A1450', brillo: '#16257F', acento: '#5FD0F5' },
   },
   // Del logo: el azul oscuro de los triangulitos, el celeste del pentágono
   // grande y el amarillo del chico.

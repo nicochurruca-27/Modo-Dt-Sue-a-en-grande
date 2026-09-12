@@ -3860,13 +3860,23 @@ const Engine = {
   // dos veces (primero los cruces que resuelve la computadora y después el
   // tuyo, cuando lo jugás), así que se van sumando al mismo registro.
   anotarRondaDeCopa(stageIndex, cruces) {
-    const cb = this.state.copaBracket;
-    if (!cb || !cruces || !cruces.length) return;
-    cb.historial = cb.historial || [];
-    const ronda = cb.historial.find((r) => r.stageIndex === stageIndex);
+    this.anotarRondaEn(this.state.copaBracket, stageIndex, cruces);
+  },
+
+  // Lo mismo para los playoffs del Apertura y del Clausura, el Reducido y la
+  // Final por el ascenso: el cuadro se guarda en la propia llave, así se puede
+  // dibujar mientras se juega y queda para mirarlo después.
+  anotarRondaDeLlave(stageIndex, cruces) {
+    this.anotarRondaEn(this.state.bracket, stageIndex, cruces);
+  },
+
+  anotarRondaEn(destino, stageIndex, cruces) {
+    if (!destino || !cruces || !cruces.length) return;
+    destino.historial = destino.historial || [];
+    const ronda = destino.historial.find((r) => r.stageIndex === stageIndex);
     if (ronda) ronda.cruces = ronda.cruces.concat(cruces);
-    else cb.historial.push({ stageIndex, cruces });
-    cb.historial.sort((a, b) => a.stageIndex - b.stageIndex);
+    else destino.historial.push({ stageIndex, cruces });
+    destino.historial.sort((a, b) => a.stageIndex - b.stageIndex);
   },
 
   // `pos` es el lugar del cruce dentro de la ronda. Sin eso el cuadro no se
@@ -3954,6 +3964,12 @@ const Engine = {
     // resto de la ronda antes de que juegues tu partido. Se guardan y se
     // anotan junto con el tuyo (ver resolveUserBracketMatch).
     s.bracket.pendingCruces = cruces;
+    // Los cuadros de playoffs arrancan dibujados desde el sorteo, así que hay
+    // que guardar quién se cruza con quién ya mismo: los resultados se
+    // completan cuando termine la ronda.
+    if (s.bracket.kind !== 'copa') {
+      this.anotarRondaDeLlave(s.bracket.stageIndex, cruces.map((c) => ({ ...c, ganador: null, golesA: null, golesB: null })));
+    }
 
     s.bracket.pendingWinners = winners;
     s.bracket.pendingIsFinal = pairs.length === 1;
@@ -4007,8 +4023,8 @@ const Engine = {
       Economia.premioCopaArgentina(this, vivosAntes, isFinal && userWon);
     }
 
-    if (isBye && s.bracket.kind === 'copa') {
-      this.anotarRondaDeCopa(s.bracket.stageIndex, s.bracket.pendingCruces || []);
+    if (isBye) {
+      if (s.bracket.kind === 'copa') this.anotarRondaDeCopa(s.bracket.stageIndex, s.bracket.pendingCruces || []);
       s.bracket.pendingCruces = null;
     }
 
@@ -4024,18 +4040,21 @@ const Engine = {
       else if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
       if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : m.extraTime ? ' (en el alargue)' : ''}.`);
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
-      if (s.bracket.kind === 'copa') {
-        this.anotarRondaDeCopa(s.bracket.stageIndex, (s.bracket.pendingCruces || []).concat([{
-          pos: s.bracket.userPos || 0,
-          a: m.home,
-          b: m.away,
-          ganador: userWon ? s.clubId : m.opponentId,
-          golesA: m.homeGoals,
-          golesB: m.awayGoals,
-          penales: !!m.shootout,
-        }]));
-        s.bracket.pendingCruces = null;
+      const cruces = (s.bracket.pendingCruces || []).concat([{
+        pos: s.bracket.userPos || 0,
+        a: m.home,
+        b: m.away,
+        ganador: userWon ? s.clubId : m.opponentId,
+        golesA: m.homeGoals,
+        golesB: m.awayGoals,
+        penales: !!m.shootout,
+      }]);
+      if (s.bracket.kind === 'copa') this.anotarRondaDeCopa(s.bracket.stageIndex, cruces);
+      else {
+        s.bracket.historial = (s.bracket.historial || []).filter((r) => r.stageIndex !== s.bracket.stageIndex);
+        this.anotarRondaDeLlave(s.bracket.stageIndex, cruces);
       }
+      s.bracket.pendingCruces = null;
     }
 
     const advancingEntry = userWon ? s.bracket.pendingUserEntry : s.bracket.pendingOpponentEntry;
@@ -4082,10 +4101,15 @@ const Engine = {
     const s = this.state;
     // La instancia se saca de cuántos siguen vivos (64 equipos = 6 rondas), así
     // no hay que llevar un contador aparte que se desincronice.
-    const etapaPorVivos = (vivos) => COPA_STAGE_NAMES.length - Math.round(Math.log2(vivos));
+    const etapas = (s.bracket.stageNames || COPA_STAGE_NAMES).length;
+    const etapaPorVivos = (vivos) => etapas - Math.round(Math.log2(vivos));
     const anotar = s.bracket.kind === 'copa'
       ? (vivos, cruces) => this.anotarRondaDeCopa(etapaPorVivos(vivos), cruces)
-      : null;
+      : (vivos, cruces) => {
+        const etapa = etapaPorVivos(vivos);
+        s.bracket.historial = (s.bracket.historial || []).filter((r) => r.stageIndex !== etapa);
+        this.anotarRondaDeLlave(etapa, cruces);
+      };
     const result = this.simulateSeedsToChampion(s.bracket.alive, anotar);
     s.bracket.champion = result.champion;
     s.bracket.runnerUp = result.runnerUp;
@@ -4100,6 +4124,10 @@ const Engine = {
     if (kind === 'apertura' || kind === 'clausura') {
       season.myD1[kind].champion = s.bracket.champion;
       season.myD1[kind].runnerUp = s.bracket.runnerUp;
+      // El cuadro de la fase final queda guardado para poder mirarlo después
+      // de que termine (s.bracket se limpia acá abajo).
+      season.myD1[kind].historial = s.bracket.historial || [];
+      season.myD1[kind].stageNames = s.bracket.stageNames;
       s.bracket = null;
       if (kind === 'apertura') this.startTransferWindow();
       else this.finishMyDivisionYear();
@@ -4118,6 +4146,9 @@ const Engine = {
 
     if (kind === 'reducido') {
       season.myD2.promotedReducido = s.bracket.champion;
+      season.myD2.historial = s.bracket.historial || [];
+      season.myD2.stageNames = s.bracket.stageNames;
+      season.myD2.champion = s.bracket.champion;
       s.bracket = null;
       this.finishMyDivisionYear();
       return;
