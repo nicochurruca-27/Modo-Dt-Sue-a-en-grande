@@ -543,6 +543,15 @@ h1, h2, h3 {
   border-bottom: 1px solid #1e293b;
 }
 .llave-lista .cruce:last-child { border-bottom: none; }
+/* El cuadro de la Copa Argentina. Son 64 equipos, así que si no entra a lo
+   ancho se desliza, igual que la cancha. */
+.cuadro-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+  padding: 0 2px 4px;
+}
+.cuadro-svg { display: block; }
+
 .cruce-equipos { font-size: 0.85rem; }
 /* El cuadro de la Copa Argentina son 32 cruces en la primera ronda, así que
    va más apretado que el de una copa internacional. */

@@ -381,6 +381,119 @@ function cruceDeCopaArgentinaHtml(cruce) {
   </li>`;
 }
 
+// ---------- El cuadro de la Copa Argentina, dibujado ----------
+//
+// Las dos mitades del cuadro enfrentadas y la final en el medio, como el
+// cuadro que publican los diarios: a la izquierda los 32 equipos de una llave,
+// a la derecha los otros 32, y cada columna es una instancia. Se dibuja con
+// escudos y no con nombres porque con 64 equipos no hay ancho que alcance.
+const CUADRO_FILA = 22;    // alto de un casillero en la primera columna
+const CUADRO_COL = 26;     // ancho de cada instancia
+const CUADRO_ESCUDO = 16;
+const CUADRO_COLUMNAS = 6; // de los 32avos al finalista
+
+// El centro vertical del casillero `k` de la columna `r`. Cada columna junta
+// de a dos los casilleros de la anterior, así que el alto se va duplicando.
+function cuadroY(r, k) {
+  const alto = 2 ** r;
+  return (k * alto + alto / 2 - 0.5) * CUADRO_FILA;
+}
+
+// `aro` marca el escudo: verde el de tu club, dorado el del campeón.
+function cuadroEscudoSvg(clubId, x, y, aroColor) {
+  if (!clubId) return '';
+  const club = Engine.getClub(clubId);
+  if (!club) return '';
+  const crest = (typeof CLUB_CRESTS !== 'undefined' && CLUB_CRESTS[club.id]) || null;
+  const r = CUADRO_ESCUDO / 2;
+  const aro = aroColor
+    ? `<circle cx="${x + r}" cy="${y}" r="${r + 1.5}" fill="none" stroke="${aroColor}" stroke-width="1.5" />`
+    : '';
+  const dibujo = crest
+    ? `<image href="${crest}" x="${x}" y="${y - r}" width="${CUADRO_ESCUDO}" height="${CUADRO_ESCUDO}" />`
+    : `<circle cx="${x + r}" cy="${y}" r="${r}" fill="#475569" stroke="#64748b" stroke-width="1" />
+       <text x="${x + r}" y="${y + 2.5}" text-anchor="middle" font-size="7" font-weight="700" fill="#f1f5f9">${clubInitials(club.name)}</text>`;
+  return `<g><title>${club.name}</title>${dibujo}${aro}</g>`;
+}
+
+// Quién ocupa cada casillero de cada columna, mitad por mitad. La columna 0 son
+// los equipos que arrancan el cuadro; de ahí en adelante, los que van pasando.
+function cuadroPorColumnas(historial, mitad) {
+  const columnas = [];
+  for (let r = 0; r < CUADRO_COLUMNAS; r++) {
+    const casilleros = 32 >> r;
+    const fila = new Array(casilleros).fill(null);
+    if (r === 0) {
+      const ronda = historial.find((h) => h.stageIndex === 0);
+      (ronda ? ronda.cruces : []).forEach((c) => {
+        const i = c.pos - mitad * 16;
+        if (i >= 0 && i < 16) { fila[i * 2] = c.a; fila[i * 2 + 1] = c.b; }
+      });
+    } else {
+      const ronda = historial.find((h) => h.stageIndex === r - 1);
+      (ronda ? ronda.cruces : []).forEach((c) => {
+        const i = c.pos - mitad * (16 >> (r - 1));
+        if (i >= 0 && i < casilleros) fila[i] = c.ganador;
+      });
+    }
+    columnas.push(fila);
+  }
+  return columnas;
+}
+
+function cuadroDeCopaArgentinaSvg() {
+  const cb = Engine.state.copaBracket;
+  const historial = (cb && cb.historial) || [];
+  if (!historial.length) return '';
+  const miClub = Engine.state.clubId;
+  const altoTotal = 32 * CUADRO_FILA;
+  const anchoMitad = CUADRO_COLUMNAS * CUADRO_COL;
+  const medio = 46;
+  const ancho = anchoMitad * 2 + medio;
+
+  let dibujo = '';
+  [0, 1].forEach((mitad) => {
+    const columnas = cuadroPorColumnas(historial, mitad);
+    // La mitad derecha se dibuja en espejo: las instancias avanzan hacia el
+    // centro desde los dos costados.
+    const xDe = (r) => (mitad === 0 ? r * CUADRO_COL : ancho - CUADRO_COL - r * CUADRO_COL + (CUADRO_COL - CUADRO_ESCUDO));
+    for (let r = 0; r < CUADRO_COLUMNAS; r++) {
+      columnas[r].forEach((id, k) => {
+        dibujo += cuadroEscudoSvg(id, xDe(r), cuadroY(r, k) + CUADRO_FILA / 2, id === miClub ? 'var(--accent)' : null);
+      });
+      if (r === CUADRO_COLUMNAS - 1) continue;
+      // Las líneas que unen cada par de casilleros con el de la instancia
+      // siguiente.
+      const signo = mitad === 0 ? 1 : -1;
+      const borde = mitad === 0 ? xDe(r) + CUADRO_ESCUDO + 2 : xDe(r) - 2;
+      const siguiente = mitad === 0 ? xDe(r + 1) - 2 : xDe(r + 1) + CUADRO_ESCUDO + 2;
+      const medioX = borde + signo * (Math.abs(siguiente - borde) / 2);
+      for (let j = 0; j < columnas[r].length / 2; j++) {
+        const y1 = cuadroY(r, 2 * j) + CUADRO_FILA / 2;
+        const y2 = cuadroY(r, 2 * j + 1) + CUADRO_FILA / 2;
+        const ym = cuadroY(r + 1, j) + CUADRO_FILA / 2;
+        dibujo += `<path d="M ${borde} ${y1} H ${medioX} V ${y2} H ${borde} M ${medioX} ${ym} H ${siguiente}" fill="none" stroke="#475569" stroke-width="1" />`;
+      }
+    }
+  });
+
+  const campeon = cb.champion
+    ? `<g><title>Campeón: ${Engine.getClub(cb.champion).name}</title>
+        ${cuadroEscudoSvg(cb.champion, ancho / 2 - CUADRO_ESCUDO / 2, altoTotal / 2, cb.champion === Engine.state.clubId ? 'var(--accent)' : '#eab308')}
+        <text x="${ancho / 2}" y="${altoTotal / 2 + 20}" text-anchor="middle" font-size="8" font-weight="700" fill="${cb.champion === Engine.state.clubId ? 'var(--accent)' : '#eab308'}">CAMPEÓN</text>
+      </g>`
+    : `<text x="${ancho / 2}" y="${altoTotal / 2}" text-anchor="middle" font-size="8" fill="#64748b">FINAL</text>`;
+
+  return `
+    <div class="cuadro-scroll">
+      <svg width="${ancho}" height="${altoTotal}" viewBox="0 0 ${ancho} ${altoTotal}" class="cuadro-svg">
+        ${dibujo}
+        ${campeon}
+      </svg>
+    </div>
+  `;
+}
+
 function copaArgentinaHtml() {
   const cb = Engine.state.copaBracket;
   if (!cb) return '';
@@ -399,6 +512,7 @@ function copaArgentinaHtml() {
   return `
     <h4>Copa Argentina</h4>
     ${campeon}
+    ${cuadroDeCopaArgentinaSvg()}
     <div class="panel-tab-switch">
       <button class="option-btn small" id="etapa-prev-btn">◀</button>
       <strong>${COPA_STAGE_NAMES[ronda.stageIndex] || 'Ronda'}</strong>

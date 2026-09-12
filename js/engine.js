@@ -3247,9 +3247,9 @@ const Engine = {
     if (!userInvolved) {
       const pairs = this.pairStage(cb.alive);
       const cruces = [];
-      cb.alive = pairs.map((pair) => {
+      cb.alive = pairs.map((pair, idx) => {
         const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
-        cruces.push(this.cruceAnotado(pair, resultado));
+        cruces.push(this.cruceAnotado(pair, resultado, idx));
         return pair.find((p) => p.id === resultado.ganador);
       });
       this.anotarRondaDeCopa(cb.stageIndex, cruces);
@@ -3861,8 +3861,12 @@ const Engine = {
     cb.historial.sort((a, b) => a.stageIndex - b.stageIndex);
   },
 
-  cruceAnotado(pair, resultado) {
+  // `pos` es el lugar del cruce dentro de la ronda. Sin eso el cuadro no se
+  // puede dibujar: los cruces no siempre se resuelven en orden (el tuyo se
+  // juega después que los demás), así que hay que saber dónde va cada uno.
+  cruceAnotado(pair, resultado, pos) {
     return {
+      pos,
       a: pair[0] ? pair[0].id : null,
       b: pair[1] ? pair[1].id : null,
       ganador: resultado.ganador,
@@ -3881,9 +3885,9 @@ const Engine = {
     while (alive.length > 1) {
       const pairs = this.pairStage(alive);
       const cruces = [];
-      const winners = pairs.map((pair) => {
+      const winners = pairs.map((pair, idx) => {
         const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
-        cruces.push(this.cruceAnotado(pair, resultado));
+        cruces.push(this.cruceAnotado(pair, resultado, idx));
         if (pairs.length === 1) {
           const loser = pair.find((p) => p.id !== resultado.ganador);
           runnerUp = loser ? loser.id : null;
@@ -3923,17 +3927,20 @@ const Engine = {
     let userEntry = null;
     let opponentEntry = null;
 
-    pairs.forEach((pair) => {
+    let userPos = 0;
+    pairs.forEach((pair, idx) => {
       const involvesUser = pair.some((p) => p.id === s.clubId);
       if (involvesUser) {
         userEntry = pair.find((p) => p.id === s.clubId);
         opponentEntry = pair.find((p) => p.id !== s.clubId);
+        userPos = idx;
         return;
       }
       const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
       winners.push(pair.find((p) => p.id === resultado.ganador));
-      cruces.push(this.cruceAnotado(pair, resultado));
+      cruces.push(this.cruceAnotado(pair, resultado, idx));
     });
+    s.bracket.userPos = userPos;
     // Los otros cruces de la ronda quedan resueltos desde ahora, pero NO se
     // anotan todavía: si se anotaran acá, el cuadro te mostraría cómo salió el
     // resto de la ronda antes de que juegues tu partido. Se guardan y se
@@ -4011,6 +4018,7 @@ const Engine = {
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
       if (s.bracket.kind === 'copa') {
         this.anotarRondaDeCopa(s.bracket.stageIndex, (s.bracket.pendingCruces || []).concat([{
+          pos: s.bracket.userPos || 0,
           a: m.home,
           b: m.away,
           ganador: userWon ? s.clubId : m.opponentId,
@@ -4023,7 +4031,13 @@ const Engine = {
     }
 
     const advancingEntry = userWon ? s.bracket.pendingUserEntry : s.bracket.pendingOpponentEntry;
-    s.bracket.alive = s.bracket.pendingWinners.concat([advancingEntry]);
+    // El que sale de tu llave vuelve a SU lugar del cuadro, no al final de la
+    // fila. Si se agregaba al final, en la ronda siguiente te tocaba siempre el
+    // ganador de la última llave en vez del de la llave de al lado, y el cuadro
+    // dejaba de ser un cuadro.
+    const avanzan = s.bracket.pendingWinners.slice();
+    avanzan.splice(s.bracket.userPos || 0, 0, advancingEntry);
+    s.bracket.alive = avanzan;
     s.pendingMatch = null;
     s.matchContext = null;
 
