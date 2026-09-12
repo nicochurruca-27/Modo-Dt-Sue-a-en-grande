@@ -45,7 +45,10 @@
 //   Un club que descendió pierde el cupo que le daba la tabla y su lugar se
 //   corre al siguiente, salvo que sea el campeón de la Copa Argentina: ese
 //   título no se pierde por descender, y es la única manera de que un club de
-//   la Nacional juegue la Libertadores.
+//   la Nacional juegue la Libertadores. Aparte de esos 12 está el cupo de
+//   campeón vigente de la Libertadores o la Sudamericana, que es de CONMEBOL
+//   y no gasta ninguno de los 6: si lo gana un argentino, el lugar que deja
+//   en la tabla se corre y entra uno más a la Sudamericana.
 // - La división en la que NO juega el usuario se simula completa e
 //   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
 //   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
@@ -1329,13 +1332,6 @@ const Engine = {
     );
     const entrants = [];
     const suplenteDe = (pais) => {
-      // Un cupo argentino que queda libre NO se reparte por prestigio: se lo
-      // lleva el que quedó próximo en la Tabla Anual, igual que todos los
-      // demás cupos argentinos. Acá nadie entra por ser grande.
-      if (pais === 'Argentina') {
-        const id = (this.state.copaEspera || []).find((x) => !yaEstan.has(x));
-        return id ? this.entrantDeClub(id) : null;
-      }
       const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
         .filter((x) => x.pais === pais && !yaEstan.has(x.id))
         .sort((a, b) => b.nivel - a.nivel)[0];
@@ -1357,11 +1353,15 @@ const Engine = {
       if (c.esRecopa || !c.championId) return;
       if (c.copa !== 'Libertadores' && c.copa !== 'Sudamericana') return;
       const campeon = this.entrantDeClub(c.championId);
-      if (!campeon || sumar(campeon)) return;
+      if (!campeon) return;
+      // Si el campeón es argentino su cupo ya se lo dio assignQualification
+      // junto con los demás cupos del país, y el corrimiento que genera ya se
+      // hizo ahí. Acá se resuelven solo los del resto del continente.
+      if (campeon.pais === 'Argentina') return;
+      if (sumar(campeon)) return;
       // El campeón ya había clasificado por su liga, así que el cupo no se
       // pierde: se lo queda el mejor club de su país que se había quedado
-      // afuera. Si el campeón es argentino, el suplente sale de Primera; si es
-      // de afuera, del pozo del continente. Así la copa entra siempre con 32.
+      // afuera del pozo del continente. Así la copa entra siempre con 32.
       const suplente = suplenteDe(campeon.pais);
       if (suplente) sumar(suplente);
     });
@@ -3567,21 +3567,30 @@ const Engine = {
 
   // Argentina tiene 6 cupos a la Libertadores y 6 a la Sudamericana.
   //
+  // Reparte los 12 cupos internacionales de Argentina: 6 a la Libertadores y
+  // 6 a la Sudamericana, todos los años, pase lo que pase.
+  //
   // Los tres títulos del año —Apertura, Clausura y Copa Argentina— dan
-  // Libertadores directo, y un campeón que además descendió conserva igual su
-  // cupo. Los cupos de Libertadores que queden (porque un mismo club ganó más
-  // de un título) se completan corriendo la Tabla Anual, y el último de esos
-  // 6 entra por fase previa en vez de fase de grupos. Después de eso, los 6
-  // siguientes de la Tabla Anual van a la Sudamericana.
-  // Un club que descendió pierde el cupo internacional aunque lo haya ganado
-  // en la cancha: si el campeón del Apertura o del Clausura se va a la
-  // Nacional, no juega la Libertadores y su lugar se corre al siguiente de la
-  // Tabla Anual.
-  assignQualification(d1Data, relegated) {
+  // Libertadores directo y ocupan uno de esos 6. Los que sobren se completan
+  // corriendo la Tabla Anual, y el último de los 6 entra por fase previa en
+  // vez de fase de grupos. Después de eso, los 6 siguientes de la Tabla Anual
+  // van a la Sudamericana.
+  //
+  // Aparte de esos 12 está el cupo de campeón vigente: el que ganó la
+  // Libertadores o la Sudamericana el año pasado juega la próxima
+  // Libertadores por ese título. Ese cupo NO es de la liga, es de CONMEBOL,
+  // así que no gasta ninguno de los 6 — y ahí está lo importante: si al
+  // campeón además le alcanzaba la tabla, el lugar que deja se corre hacia
+  // abajo y termina entrando uno más a la Sudamericana. La cuenta de 6 y 6
+  // no se mueve nunca; lo que cambia es quiénes son.
+  assignQualification(d1Data, relegated, copasDelAnio) {
     const s = this.state;
     const bajaron = new Set(relegated || []);
     const assigned = new Set();
     const results = [];
+    // Cuántos de los 6 cupos de liga se llevan usados. Los cupos de campeón
+    // vigente no suman acá: por eso el corrimiento.
+    let deLaLiga = 0;
     // El que se fue a la Nacional pierde el cupo que había ganado por tabla:
     // no puede ir a la Libertadores por haber salido quinto en una categoría
     // en la que el año que viene no juega. La excepción es el campeón de la
@@ -3590,19 +3599,27 @@ const Engine = {
     // a la Libertadores, y pasó de verdad: Patronato ganó la Copa Argentina
     // 2022, descendió ese mismo año y jugó la Libertadores 2023 desde la
     // Nacional.
-    const grant = (clubId, comp, stage, peseAlDescenso) => {
+    const grant = (clubId, comp, stage, opciones) => {
+      const { peseAlDescenso, fueraDeCupo } = opciones || {};
       if (!clubId || assigned.has(clubId)) return;
       if (bajaron.has(clubId) && !peseAlDescenso) return;
+      if (!this.state.clubs.some((c) => c.id === clubId)) return;
       assigned.add(clubId);
+      if (!fueraDeCupo) deLaLiga++;
       results.push({ clubId, name: this.getClub(clubId).name, comp, stage });
     };
 
+    // Primero los campeones vigentes, porque su cupo es aparte: al sacarlos
+    // de la fila, la Tabla Anual se corre y entra uno más a la Sudamericana.
+    ((copasDelAnio || []).filter((c) => !c.esRecopa && (c.copa === 'Libertadores' || c.copa === 'Sudamericana')))
+      .forEach((c) => grant(c.championId, 'Libertadores', 'Fase de grupos', { fueraDeCupo: true }));
+
     grant(d1Data.aperturaChampion, 'Libertadores', 'Fase de grupos');
     grant(d1Data.clausuraChampion, 'Libertadores', 'Fase de grupos');
-    grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos', true);
+    grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos', { peseAlDescenso: true });
 
     const porTabla = d1Data.tablaAnualYear.filter((row) => !assigned.has(row.id) && !bajaron.has(row.id));
-    const cuposLibertadores = Math.max(0, 6 - results.length);
+    const cuposLibertadores = Math.max(0, 6 - deLaLiga);
     porTabla.slice(0, cuposLibertadores).forEach((row, i) => {
       grant(row.id, 'Libertadores', i === cuposLibertadores - 1 ? 'Fase previa' : 'Fase de grupos');
     });
@@ -3682,7 +3699,7 @@ const Engine = {
     const copasDelAnio = this.simulateCopasDelAnio(s.copaQualification)
       .concat(this.simularTitulosNacionales(d1Data));
 
-    const qualification = this.assignQualification(d1Data, relegated);
+    const qualification = this.assignQualification(d1Data, relegated, copasDelAnio);
     // Estos dos sobreviven al cambio de temporada (a diferencia de
     // lastSeasonSummary, que se limpia): son los que alimentan la pestaña
     // "Copas" del panel durante todo el año siguiente.
