@@ -5,6 +5,8 @@ argentino. No se juegan los partidos: se resuelven solos según tu plantel y
 las decisiones que vas tomando (táctica, prensa, vestuario, fichajes). De vez
 en cuando aparece un penal donde elegís quién patea y hacia dónde.
 
+Lo que todavía falta por hacer está en [PENDIENTES.md](PENDIENTES.md).
+
 ## Cómo jugarlo
 
 No hace falta instalar nada ni tener cuenta. Abrí el archivo `index.html` con
