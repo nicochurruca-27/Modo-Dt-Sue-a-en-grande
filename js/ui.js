@@ -173,7 +173,7 @@ function anualRowZone(index, total) {
 function tableRowHtml(row, index, zone) {
   const s = Engine.state;
   const classes = [row.id === s.clubId ? 'me' : '', zone ? `zone-${zone}` : ''].filter(Boolean).join(' ');
-  return `<tr class="${classes}"><td>${index + 1}</td><td><span class="table-club">${clubCrest(row, 18)}${row.name}</span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
+  return `<tr class="${classes}"><td>${index + 1}</td><td class="col-club"><span class="table-club">${clubCrest(row, 18)}<span class="table-club-texto">${row.name}</span></span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
 }
 
 function tableLegend(items) {
@@ -189,7 +189,7 @@ function anualTableBody() {
     <p class="muted">Suma la fase de zonas del Apertura y la del Clausura. Los playoffs no suman puntos.</p>
     <div class="table-wrap">
       <table class="table compact">
-        <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+        <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th></tr></thead>
         <tbody>
           ${table.map((r, i) => tableRowHtml(r, i, anualRowZone(i, table.length))).join('')}
         </tbody>
@@ -285,13 +285,17 @@ function copaDelPanel() {
   return copa;
 }
 
-// Una fila de tabla de grupo. Es igual a la de la liga pero con el país al
-// lado del nombre: en un grupo continental, saber que el rival es paraguayo o
+// Una fila de tabla de grupo. Es igual a la de la liga pero con el país abajo
+// del nombre: en un grupo continental, saber que el rival es paraguayo o
 // boliviano dice bastante más que en la tabla de la zona.
+//
+// El país va abajo y no al lado porque al lado, con un nombre largo que se
+// parte en dos líneas ("Estudiantes de La Plata"), quedaba flotando en el
+// medio y descolocaba toda la fila.
 function filaDeGrupoHtml(row, index, zone, pais) {
   const s = Engine.state;
   const classes = [row.id === s.clubId ? 'me' : '', `zone-${zone}`].filter(Boolean).join(' ');
-  return `<tr class="${classes}"><td>${index + 1}</td><td><span class="table-club">${clubCrest(row, 18)}${row.name}<span class="muted grupo-pais">${pais}</span></span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
+  return `<tr class="${classes}"><td>${index + 1}</td><td class="col-club"><span class="table-club">${clubCrest(row, 18)}<span class="table-club-texto">${row.name}<span class="muted grupo-pais">${pais}</span></span></span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
 }
 
 // Las instancias de una llave que ya se pueden mirar: las que terminaron más
@@ -303,7 +307,17 @@ function instanciasDeLaLlave(copa) {
   return (ll.historial || []).concat([{ etapa: ll.campeon ? 'final' : ll.etapa, cruces: ll.cruces }]);
 }
 
-// Un cruce: el global, y abajo cómo viene o cómo terminó.
+// Un lado de un cruce: el escudo y el nombre. Los clubes de una copa vienen
+// como { id, nombre, pais, nivel } y clubCrest() espera un club del juego, así
+// que se traduce acá. Vale para los dos: el escudo real de un club argentino y
+// el genérico de iniciales de uno del continente.
+function ladoDeCruceHtml(club, lado) {
+  if (!club) return `<span class="cruce-lado ${lado}">A definir</span>`;
+  return `<span class="cruce-lado ${lado}">${clubCrest({ id: club.id, name: club.nombre }, 18)}<span>${club.nombre}</span></span>`;
+}
+
+// Un cruce: los dos escudos con el global en el medio, y abajo cómo viene o
+// cómo terminó.
 function cruceHtml(copa, cruce, esFinal) {
   const s = Engine.state;
   const nombre = (id) => (copa.clubes[id] ? copa.clubes[id].nombre : 'A definir');
@@ -315,7 +329,11 @@ function cruceHtml(copa, cruce, esFinal) {
   else if (jugados) detalle = 'Falta la vuelta';
   else detalle = 'Todavía no se jugó';
   return `<li class="cruce${mio ? ' me-line' : ''}">
-    <span class="cruce-equipos">${nombre(cruce.a)} <strong>${marcador}</strong> ${nombre(cruce.b)}</span>
+    <span class="cruce-equipos">
+      ${ladoDeCruceHtml(copa.clubes[cruce.a], 'izquierda')}
+      <strong>${marcador}</strong>
+      ${ladoDeCruceHtml(copa.clubes[cruce.b], 'derecha')}
+    </span>
     <span class="muted cruce-detalle">${detalle}</span>
   </li>`;
 }
@@ -748,7 +766,7 @@ function faseDeGruposHtml() {
     <p class="muted">${avance}</p>
     <div class="table-wrap">
       <table class="table compact">
-        <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+        <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th></tr></thead>
         <tbody>
           ${filas.map((r, i) => filaDeGrupoHtml(r, i, zonaDeGrupo(copa.copa, i), copa.clubes[r.id].pais)).join('')}
         </tbody>
@@ -852,7 +870,7 @@ function renderTablePanel() {
     body = `
       <div class="table-wrap">
         <table class="table compact">
-          <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+          <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th></tr></thead>
           <tbody>
             ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1, table.length))).join('')}
           </tbody>
@@ -2246,7 +2264,7 @@ function renderSeasonEnd() {
       ${bloque('Tabla de tu zona', `
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
+            <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
             <tbody>
               ${sum.myZoneTable.map((r, i) => `
                 <tr class="${r.id === s.clubId ? 'me' : ''}">

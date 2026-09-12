@@ -235,10 +235,21 @@ h1, h2, h3 {
   gap: 8px;
 }
 
+/* La celda del club va alineada a la izquierda, aunque el resto de la tabla
+   vaya centrada: con todo centrado, cada fila arrancaba el escudo en un lugar
+   distinto según lo largo que fuera el nombre, y las filas quedaban
+   desparejas. Así los escudos caen todos en la misma vertical. */
+.table th.col-club, .table td.col-club { text-align: left; }
 .table-club {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+}
+/* El escudo no se achica aunque el nombre ocupe dos líneas. */
+.table-club .club-crest { flex: 0 0 auto; }
+.table-club-texto {
+  min-width: 0;
+  line-height: 1.25;
 }
 
 .match-rival {
@@ -483,10 +494,95 @@ h1, h2, h3 {
   background: #64748b;
 }
 
-/* El país, al lado del nombre en la tabla de un grupo. */
+/* El banco de suplentes: los doce dibujados como los de la cancha, en tres
+   filas de cuatro. Cuatro columnas fijas para que siempre queden tres filas
+   parejas, también en el celular. */
+.banco-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  margin: 6px 0 4px;
+}
+.banco-card {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+}
+.banco-card.unavailable { opacity: 0.45; }
+.banco-svg { display: block; max-width: 100%; height: auto; }
+.banco-out {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  font-size: 0.58rem;
+  padding: 0 3px;
+}
+
+/* Los cruces de una llave de copa: arriba el cruce con los dos escudos y el
+   global en el medio, abajo cómo viene o cómo terminó. */
+.llave-lista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.llave-lista .cruce {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1e293b;
+}
+.llave-lista .cruce:last-child { border-bottom: none; }
+.cruce-equipos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+/* Cada lado con su escudo pegado al nombre. El de la derecha va al revés para
+   que los dos escudos queden por fuera y los nombres miren al resultado. */
+.cruce-lado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.cruce-lado.derecha { flex-direction: row-reverse; }
+.cruce-equipos strong { margin: 0 2px; }
+/* El cuadro de la Copa Argentina son 32 cruces en la primera ronda, así que
+   va más apretado que el de una copa internacional. */
+.llave-lista.compacta .cruce { padding: 4px 0; }
+.cruce-marcador { color: var(--muted); margin: 0 3px; }
+.cruce-detalle { font-size: 0.74rem; }
+
+/* Los cuadros dibujados (Copa Argentina, las copas, la fase final). Son
+   anchos, así que si no entran se deslizan, igual que la cancha. */
+.cuadro-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+  padding: 0 2px 4px;
+}
+.cuadro-svg { display: block; }
+
+/* El final de la carrera: descendiste de la Nacional y no hay división más
+   abajo. Se marca fuerte porque es lo único que cierra una partida. */
+.carrera-terminada {
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  background: rgba(239, 68, 68, 0.08);
+}
+.carrera-terminada h2 { margin: 0 0 6px; color: #fca5a5; }
+.carrera-terminada p { margin: 4px 0; }
+
+/* El país, en su propio renglón abajo del nombre del club. */
 .grupo-pais {
-  margin-left: 6px;
-  font-size: 0.72rem;
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.1;
 }
 
 .legend-dot.zone-champ { background: #22c55e; }
