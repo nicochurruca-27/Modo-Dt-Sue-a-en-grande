@@ -59,6 +59,10 @@ const Noticias = {
       titular,
       bajada: bajada || '',
       dia: s.calendar ? s.calendar.dayCount : 0,
+      // El día se cuenta desde el 1° de febrero y se reinicia cada
+      // temporada, así que sin la temporada una noticia vieja mostraría el
+      // año equivocado cuando quedan en el feed de un año para el otro.
+      temporada: s.season ? s.season.year : 1,
       clubId: op.clubId || null,
       destacada: !!op.destacada,
     });

@@ -8,6 +8,17 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 // jugador (ver Engine.startCalendarWeek/advanceCalendarDay).
 const CALENDAR_START_MONTH = 1; // 0 = enero
 const CALENDAR_START_DAY = 1;
+// El año real de la primera temporada de una carrera. Adentro del juego las
+// temporadas se cuentan 1, 2, 3... (season.year), que es lo que se guarda en
+// la partida; esto solo traduce ese número al año del almanaque para
+// mostrarlo. Si algún día se mueve, las partidas viejas siguen andando: el
+// año no se guarda, se calcula.
+const ANIO_INICIAL = 2026;
+
+// El año del almanaque de una temporada: la 1 es 2026, la 2 es 2027, etc.
+function anioDeTemporada(temporada) {
+  return ANIO_INICIAL + (temporada || 1) - 1;
+}
 
 // division: 'D1' (Primera División) | 'D2' (Primera Nacional)
 // zone: 'A' | 'B' — D1 se juega en 2 zonas de 15 equipos, D2 en 2 zonas de 18.

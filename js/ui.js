@@ -84,14 +84,19 @@ function nationFlag(code, height = 12) {
 // que sobrevive bien al save/load) en una fecha legible, sumando días
 // sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
 // navegador, para no depender de nada más que aritmética simple.
-function formatCalendarDate(dayCount) {
+function formatCalendarDate(dayCount, temporada) {
   let day = CALENDAR_START_DAY + dayCount;
   let month = CALENDAR_START_MONTH;
+  let anio = anioDeTemporada(temporada || (Engine.state.season && Engine.state.season.year));
   while (day > DAYS_IN_MONTH[month]) {
     day -= DAYS_IN_MONTH[month];
     month = (month + 1) % 12;
+    // Una temporada arranca el 1° de febrero y termina en octubre, así que
+    // esto no debería pasar nunca; queda por las dudas, para que un
+    // calendario más largo no muestre "enero" del año que ya pasó.
+    if (month === 0) anio++;
   }
-  return `${day} de ${MONTH_NAMES[month]}`;
+  return `${day} de ${MONTH_NAMES[month]} de ${anio}`;
 }
 
 function render() {
@@ -1448,7 +1453,7 @@ function noticiaHeroHtml(n) {
   return `
     ${noticiaEscudo(n.clubId, 40)}
     <div class="noticia-hero-texto">
-      <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia)}</span></div>
+      <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia, n.temporada)}</span></div>
       <h3>${n.titular}</h3>
       <p class="muted">${n.bajada}</p>
     </div>
@@ -1460,7 +1465,7 @@ function noticiaItemHtml(n) {
     <li class="noticia-item">
       ${noticiaEscudo(n.clubId, 26)}
       <div class="noticia-item-texto">
-        <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia)}</span></div>
+        <div class="noticia-item-cabecera">${noticiaPill(n.cat)}<span class="noticia-fecha">${formatCalendarDate(n.dia, n.temporada)}</span></div>
         <strong>${n.titular}</strong>
         <p class="muted">${n.bajada}</p>
       </div>
@@ -2219,7 +2224,7 @@ function renderSeasonEnd() {
 
   app.innerHTML = `
     <div class="card">
-      <h1>${sum.carreraTerminada ? 'Fin de la carrera' : 'Fin de temporada'} — Año ${s.season.year}</h1>
+      <h1>${sum.carreraTerminada ? 'Fin de la carrera' : 'Fin de temporada'} — ${anioDeTemporada(s.season.year)}</h1>
       ${sum.carreraTerminada ? `
         <div class="carrera-terminada">
           <h2>Se terminó</h2>
