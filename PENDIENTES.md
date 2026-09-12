@@ -41,6 +41,16 @@ escudo genérico de iniciales, que se nota sobre todo en el cuadro de la Copa
 Argentina. Se regeneran con `tools/generar-escudos.py` a partir de una carpeta
 con los PNG.
 
+### Escudos de los clubes del continente
+
+Los 103 clubes de `js/internacional.js` —Flamengo, Peñarol, Nacional, Colo
+Colo, todos— hoy se dibujan con el escudo genérico de iniciales. Se nota en la
+fase de grupos y sobre todo en el cuadro de la Libertadores, donde la mitad de
+los escudos son reales (los argentinos) y la otra mitad no.
+
+Se cargan igual que los de Primera: una carpeta con los PNG y
+`tools/generar-escudos.py`. Son 103, así que conviene hacerlos por país.
+
 ### La edición actual de la Copa Argentina
 
 Los 32 cruces de los treintaidosavos, en el orden de arriba hacia abajo del
@@ -96,7 +106,22 @@ semana, el desgaste pesa.
 
 ---
 
-## 4. Detalles pendientes
+## 4. Camisetas con los colores de cada club
+
+En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy
+es siempre la misma: toma los colores del club del usuario. La idea es que cada
+club tenga la suya —la franja de River, el amarillo y azul de Boca, la de
+Racing— y que se vea en todos lados donde aparece un jugador: el once, el
+banco, la reserva y el mercado de pases.
+
+Los colores ya están cargados en `data.js` (`colors` de cada club) y en
+`internacional.js`, así que es trabajo de dibujo, no de datos: hay que darle a
+`benchJerseySvg` y al dibujo del once una forma de camiseta por club (lisa,
+a rayas verticales, con banda cruzada, con franja horizontal).
+
+---
+
+## 5. Detalles pendientes
 
 - **El usuario gana demasiadas copas.** En 45 temporadas de prueba con clubes
   grandes salió campeón 8 veces de 42 copas jugadas. La fuerza del plantel del
