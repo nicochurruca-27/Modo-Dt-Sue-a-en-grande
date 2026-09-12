@@ -86,6 +86,16 @@ const COPA_INTER_ROUNDS = [3, 5, 9, 10, 12, 13];
 //
 // El playoff de octavos es solo de la Sudamericana: ahí el segundo de cada
 // grupo se cruza con un tercero de la Libertadores.
+// La Recopa Sudamericana abre el año: la juegan los campeones del año pasado,
+// el de la Libertadores contra el de la Sudamericana, y va en febrero, antes
+// de que arranquen las copas nuevas. Es ida y vuelta: primero en la cancha del
+// campeón de la Sudamericana y la vuelta en la del campeón de la Libertadores,
+// que es el que cierra en casa. Manda el global, sin gol de visitante, y si
+// queda igualado hay alargue y penales.
+//
+// No reparte nada: el que la gana se lleva el título y la plata, y listo. No
+// clasifica a ninguna copa.
+const RECOPA_ROUNDS = [0, 1];
 const COPA_INTER_LLAVES = [
   { etapa: 'playoff', nombre: 'Playoff de Octavos', alcanzado: 'el playoff de octavos', soloSudamericana: true, D1: [0, 1], D2: [17, 18] },
   { etapa: 'octavos', nombre: 'Octavos de Final', alcanzado: 'los octavos de final', D1: [2, 3], D2: [20, 21] },
@@ -1532,7 +1542,122 @@ const Engine = {
     }));
   },
 
+  // El cruce de la Recopa de este año, con los campeones del año pasado. `a`
+  // es el campeón de la Libertadores, que juega la vuelta de local; `b` el de
+  // la Sudamericana, que abre en su cancha.
+  armarRecopa() {
+    const campeonDe = (copa) => {
+      const r = (this.state.ultimasCopas || [])
+        .find((c) => !c.esRecopa && c.copa === copa && c.championId);
+      return r ? this.entrantDeClub(r.championId) : null;
+    };
+    const deLaLibertadores = campeonDe('Libertadores');
+    const deLaSudamericana = campeonDe('Sudamericana');
+    if (!deLaLibertadores || !deLaSudamericana || deLaLibertadores.id === deLaSudamericana.id) return null;
+    return {
+      ...this.nuevoCruce(deLaLibertadores.id, deLaSudamericana.id),
+      clubes: { [deLaLibertadores.id]: deLaLibertadores, [deLaSudamericana.id]: deLaSudamericana },
+    };
+  },
+
+  // Un partido de la Recopa. Si no la juega tu club se resuelve solo; si la
+  // jugás vos, se abre la pantalla de partido como cualquier otra llave.
+  avanzarRecopa(pierna) {
+    const s = this.state;
+    const rec = s.copasInter.recopa;
+    const cuando = {
+      etapa: { etapa: 'recopa', nombre: 'Recopa Sudamericana' },
+      pierna,
+      piernas: RECOPA_ROUNDS.length,
+    };
+
+    if (rec.a !== s.clubId && rec.b !== s.clubId) {
+      this.jugarPartidoDeLlave({ clubes: rec.clubes }, rec, cuando);
+      if (pierna === cuando.piernas - 1) this.cerrarRecopa();
+      this.enterEditionRound();
+      return;
+    }
+
+    const soyA = rec.a === s.clubId;
+    const rivalId = soyA ? rec.b : rec.a;
+    const soyLocal = this.localDelCruce(rec, cuando) === s.clubId;
+    s.matchContext = {
+      context: 'copa-inter',
+      copa: 'Recopa',
+      opponentId: rivalId,
+      isHome: soyLocal,
+      sede: this.estadioDe(soyLocal ? s.clubId : rivalId),
+      llave: {
+        etapa: 'recopa',
+        nombre: cuando.etapa.nombre,
+        pierna,
+        piernas: cuando.piernas,
+        decisiva: pierna === cuando.piernas - 1,
+        globalMio: soyA ? rec.gA : rec.gB,
+        globalRival: soyA ? rec.gB : rec.gA,
+      },
+    };
+    this.pickDecision();
+    s.screen = 'pre-match';
+    this.save();
+  },
+
+  resolverRecopaDelUsuario() {
+    const s = this.state;
+    const m = s.pendingMatch;
+    const ctx = s.matchContext;
+    const rec = s.copasInter.recopa;
+    this.anotarPartidoDeLlave(rec, m.home, m.away, m.homeGoals, m.awayGoals);
+    if (m.shootout) {
+      rec.ganador = m.shootout.userWon ? s.clubId : ctx.opponentId;
+      rec.penales = rec.ganador;
+    }
+    s.log.unshift(`Recopa Sudamericana: ${this.getClub(m.home).name} ${m.homeGoals}-${m.awayGoals} ${this.getClub(m.away).name}${m.shootout ? ' (por penales)' : ''}`);
+    if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
+    s.pendingMatch = null;
+    s.matchContext = null;
+    if (ctx.llave.decisiva) this.cerrarRecopa();
+    this.enterEditionRound();
+  },
+
+  cerrarRecopa() {
+    const rec = this.state.copasInter.recopa;
+    if (!rec || rec.ganador) return;
+    if (rec.gA > rec.gB) rec.ganador = rec.a;
+    else if (rec.gB > rec.gA) rec.ganador = rec.b;
+    else {
+      rec.ganador = this.copaTieWinner(rec.a, rec.b, rec.clubes);
+      rec.penales = rec.ganador;
+    }
+    this.state.log.unshift(`Recopa Sudamericana: la ganó ${rec.clubes[rec.ganador].nombre}.`);
+  },
+
+  // El resumen de la Recopa para la partida. Lo normal es que se haya jugado
+  // durante el año; el camino de abajo queda para una partida que llegue a fin
+  // de año sin tenerla armada.
   simularRecopa() {
+    const jugada = this.state.copasInter && this.state.copasInter.recopa;
+    if (jugada) {
+      if (!jugada.ganador) this.cerrarRecopa();
+      const perdedor = jugada.ganador === jugada.a ? jugada.b : jugada.a;
+      const jugaste = jugada.a === this.state.clubId || jugada.b === this.state.clubId;
+      return {
+        copa: 'Recopa Sudamericana',
+        esRecopa: true,
+        nombrePropio: true,
+        articulo: 'la',
+        championId: jugada.ganador,
+        championName: jugada.clubes[jugada.ganador].nombre,
+        championPais: jugada.clubes[jugada.ganador].pais,
+        runnerUpName: jugada.clubes[perdedor].nombre,
+        userWon: jugada.ganador === this.state.clubId,
+        userStage: jugaste ? 'la final' : null,
+      };
+    }
+    return this.simularRecopaDeUnaVez();
+  },
+
+  simularRecopaDeUnaVez() {
     const ultimas = (this.state && this.state.ultimasCopas) || [];
     const campeonDe = (copa) => {
       const r = ultimas.find((c) => c.copa === copa && c.championId);
@@ -1775,6 +1900,7 @@ const Engine = {
       year: s.season.year,
       fecha: 0,
       copas: { Libertadores: limpia(libertadores), Sudamericana: limpia(sudamericana) },
+      recopa: this.armarRecopa(),
     };
   },
 
@@ -2714,6 +2840,15 @@ const Engine = {
     };
     s.bracket = null;
     s.lastSeasonSummary = null;
+    // El almanaque arranca de nuevo cada temporada. El año futbolero va de
+    // febrero a noviembre y todo el calendario de copas está programado sobre
+    // esos meses: la Recopa en febrero, la fase de grupos entre marzo y mayo,
+    // las llaves de agosto a noviembre. El contador de días seguía de largo de
+    // una temporada a la otra, así que cada año se corría unos tres meses y a
+    // la tercera temporada la segunda fecha del Apertura caía en diciembre.
+    // De paso, esto también arregla los contratos: Mercado calcula los meses
+    // que faltan hasta fin de año sobre este mismo contador.
+    if (s.calendar) s.calendar.dayCount = 0;
     Economia.nuevaTemporada(s);
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
@@ -2916,6 +3051,15 @@ const Engine = {
     if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copaBracket.alive.length > 1) {
       season.copaShown.push(season.roundIndex);
       this.advanceCopaBracket();
+      return;
+    }
+
+    // La Recopa abre el año, en febrero, antes que todo lo demás.
+    if (copaEditionOk && s.copasInter && s.copasInter.recopa && !s.copasInter.recopa.ganador
+      && RECOPA_ROUNDS.includes(season.roundIndex)
+      && !(season.copaInterShown || []).includes(`r${season.roundIndex}`)) {
+      season.copaInterShown = (season.copaInterShown || []).concat([`r${season.roundIndex}`]);
+      this.avanzarRecopa(RECOPA_ROUNDS.indexOf(season.roundIndex));
       return;
     }
 
@@ -3471,6 +3615,8 @@ const Engine = {
       s.matchContext = null;
       s.season.roundIndex++;
       this.enterEditionRound();
+    } else if (m.context === 'copa-inter' && s.matchContext.copa === 'Recopa') {
+      this.resolverRecopaDelUsuario();
     } else if (m.context === 'copa-inter' && s.matchContext.llave) {
       this.resolverLlaveDelUsuario();
     } else if (m.context === 'copa-inter') {

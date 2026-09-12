@@ -373,6 +373,15 @@ const COLORES_COMPETICIONES = {
     oficial: { primario: '#000000', secundario: '#FFFFFF', acento: null },
     ui: { fondo: '#080808', brillo: '#1C1F22', acento: '#8C9298' },
   },
+  // De la Recopa no hay paleta documentada, así que el `ui` es una decisión
+  // nuestra: un bronce que no se confunda ni con el dorado de la Libertadores
+  // ni con el gris de la Sudamericana, que son justo los dos equipos que la
+  // juegan.
+  recopa: {
+    nombre: 'Recopa Sudamericana',
+    oficial: { primario: null, secundario: null, acento: null },
+    ui: { fondo: '#140D07', brillo: '#2E1D0D', acento: '#C8813C' },
+  },
 };
 
 // La cancha de cada club, para decir dónde se juega en vez de solo si sos

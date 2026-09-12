@@ -300,14 +300,14 @@ function instanciasDeLaLlave(copa) {
 }
 
 // Un cruce: el global, y abajo cómo viene o cómo terminó.
-function cruceHtml(copa, cruce) {
+function cruceHtml(copa, cruce, esFinal) {
   const s = Engine.state;
   const nombre = (id) => (copa.clubes[id] ? copa.clubes[id].nombre : 'A definir');
   const mio = cruce.a === s.clubId || cruce.b === s.clubId;
   const jugados = cruce.partidos.length;
   const marcador = jugados ? `${cruce.gA} - ${cruce.gB}` : 'vs';
   let detalle;
-  if (cruce.ganador) detalle = `Pasó ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`;
+  if (cruce.ganador) detalle = `${esFinal ? 'Campeón' : 'Pasó'} ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`;
   else if (jugados) detalle = 'Falta la vuelta';
   else detalle = 'Todavía no se jugó';
   return `<li class="cruce${mio ? ' me-line' : ''}">
@@ -333,7 +333,20 @@ function llaveHtml(copa) {
       <strong>${def.nombre}</strong>
       <button class="option-btn small" id="etapa-next-btn">▶</button>
     </div>
-    <ul class="llave-lista">${inst.cruces.map((c) => cruceHtml(copa, c)).join('')}</ul>
+    <ul class="llave-lista">${inst.cruces.map((c) => cruceHtml(copa, c, inst.etapa === 'final')).join('')}</ul>
+  `;
+}
+
+// La Recopa va arriba de todo mientras se juega: son dos fechas de febrero y
+// después desaparece de la vista principal.
+function recopaHtml() {
+  const ci = Engine.state.copasInter;
+  const rec = ci && ci.recopa;
+  if (!rec) return '';
+  return `
+    <h4>Recopa Sudamericana</h4>
+    <p class="muted">La juegan los campeones del año pasado de la Libertadores y la Sudamericana.</p>
+    <ul class="llave-lista">${cruceHtml({ clubes: rec.clubes }, rec, true)}</ul>
   `;
 }
 
@@ -455,7 +468,12 @@ function renderTablePanel() {
     // más en este panel —con ver los grupos ya se sabe quiénes están— y queda
     // donde sirve de verdad: en la pantalla de fin de temporada, que es cuando
     // se definen los cupos del año que viene.
-    const enJuego = faseDeGruposHtml();
+    // La Recopa se juega en febrero, antes de la primera fecha de grupos, así
+    // que se muestra solo en ese rato: después el panel vuelve a ser de las
+    // dos copas del año.
+    const ci = s.copasInter;
+    const recopa = ci && ci.fecha === 0 ? recopaHtml() : '';
+    const enJuego = recopa + faseDeGruposHtml();
     // Lo del año pasado va plegado: son siete títulos y, mientras estás
     // jugando la copa de este año, lo único que querés ver arriba es tu grupo
     // o tu llave.
@@ -948,7 +966,9 @@ function competitionLabel() {
     return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
   }
   if (ctx.context === 'bracket') return Engine.bracketStageLabel();
-  if (ctx.context === 'copa-inter') return `Copa ${ctx.copa} — ${etiquetaDeCopa(ctx)}`;
+  if (ctx.context === 'copa-inter') {
+    return ctx.copa === 'Recopa' ? etiquetaDeCopa(ctx) : `Copa ${ctx.copa} — ${etiquetaDeCopa(ctx)}`;
+  }
   return '';
 }
 
@@ -1283,7 +1303,10 @@ function competicionDelPartido() {
   const ctx = s && s.matchContext;
   if (!ctx) return null;
   if (ctx.context === 'league') return 'liga';
-  if (ctx.context === 'copa-inter') return ctx.copa === 'Libertadores' ? 'libertadores' : 'sudamericana';
+  if (ctx.context === 'copa-inter') {
+    if (ctx.copa === 'Recopa') return 'recopa';
+    return ctx.copa === 'Libertadores' ? 'libertadores' : 'sudamericana';
+  }
   const kind = s.bracket && s.bracket.kind;
   if (kind === 'copa') return 'copaArgentina';
   return 'liga';
