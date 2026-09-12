@@ -42,8 +42,10 @@
 //   campeón Clausura, campeón Copa Argentina, y los mejores de la Tabla
 //   Anual que no hayan clasificado ya, el último de ellos a fase previa) y
 //   6 a Sudamericana (los 6 siguientes de la Anual que no hayan clasificado).
-//   Un club que descendió pierde el cupo aunque lo haya ganado en la cancha,
-//   y su lugar se corre al siguiente.
+//   Un club que descendió pierde el cupo que le daba la tabla y su lugar se
+//   corre al siguiente, salvo que sea el campeón de la Copa Argentina: ese
+//   título no se pierde por descender, y es la única manera de que un club de
+//   la Nacional juegue la Libertadores.
 // - La división en la que NO juega el usuario se simula completa e
 //   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
 //   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
@@ -1300,7 +1302,12 @@ const Engine = {
   // Un club, en el formato mínimo que usan las copas. Sirve tanto para los
   // argentinos (que salen de s.clubs) como para el resto del continente.
   entrantDeClub(id) {
-    const propio = this.getClub(id);
+    // OJO: acá se busca en s.clubs a mano y NO con getClub(), porque getClub()
+    // también resuelve clubes del resto del continente (ver clubInternacional)
+    // y entonces todos saldrían marcados como argentinos. Justamente lo que
+    // decide esta función es de qué país es cada uno, que es lo que después
+    // impide que dos compatriotas caigan en el mismo grupo.
+    const propio = (this.state.clubs || []).find((c) => c.id === id);
     if (propio) return { id, nombre: propio.name, pais: 'Argentina', nivel: propio.reputation };
     const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
       .find((c) => c.id === id);
@@ -1322,11 +1329,12 @@ const Engine = {
     );
     const entrants = [];
     const suplenteDe = (pais) => {
+      // Un cupo argentino que queda libre NO se reparte por prestigio: se lo
+      // lleva el que quedó próximo en la Tabla Anual, igual que todos los
+      // demás cupos argentinos. Acá nadie entra por ser grande.
       if (pais === 'Argentina') {
-        const club = this.state.clubs
-          .filter((c) => c.division === 'D1' && !yaEstan.has(c.id))
-          .sort((a, b) => b.reputation - a.reputation)[0];
-        return club ? this.entrantDeClub(club.id) : null;
+        const id = (this.state.copaEspera || []).find((x) => !yaEstan.has(x));
+        return id ? this.entrantDeClub(id) : null;
       }
       const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
         .filter((x) => x.pais === pais && !yaEstan.has(x.id))
@@ -3574,15 +3582,24 @@ const Engine = {
     const bajaron = new Set(relegated || []);
     const assigned = new Set();
     const results = [];
-    const grant = (clubId, comp, stage) => {
-      if (!clubId || assigned.has(clubId) || bajaron.has(clubId)) return;
+    // El que se fue a la Nacional pierde el cupo que había ganado por tabla:
+    // no puede ir a la Libertadores por haber salido quinto en una categoría
+    // en la que el año que viene no juega. La excepción es el campeón de la
+    // Copa Argentina, que se llevó un título y el título no se pierde por
+    // descender. Es la única puerta por la que un equipo de la Nacional entra
+    // a la Libertadores, y pasó de verdad: Patronato ganó la Copa Argentina
+    // 2022, descendió ese mismo año y jugó la Libertadores 2023 desde la
+    // Nacional.
+    const grant = (clubId, comp, stage, peseAlDescenso) => {
+      if (!clubId || assigned.has(clubId)) return;
+      if (bajaron.has(clubId) && !peseAlDescenso) return;
       assigned.add(clubId);
       results.push({ clubId, name: this.getClub(clubId).name, comp, stage });
     };
 
     grant(d1Data.aperturaChampion, 'Libertadores', 'Fase de grupos');
     grant(d1Data.clausuraChampion, 'Libertadores', 'Fase de grupos');
-    grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos');
+    grant(s.copaBracket.champion, 'Libertadores', 'Fase de grupos', true);
 
     const porTabla = d1Data.tablaAnualYear.filter((row) => !assigned.has(row.id) && !bajaron.has(row.id));
     const cuposLibertadores = Math.max(0, 6 - results.length);
