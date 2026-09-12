@@ -584,6 +584,52 @@ h1, h2, h3 {
 }
 .cuadro-svg { display: block; }
 
+/* El botón para abrir el cuadro en grande, abajo del cuadro chico. */
+.cuadro-abrir {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+/* El cuadro abierto en grande: tapa toda la ventana. Es la única pantalla del
+   juego que se superpone a lo demás, porque un cuadro de 64 equipos no entra
+   en ningún panel por ancho que sea. */
+.cuadro-grande {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: auto;
+  padding: 0 16px 24px;
+  background: var(--bg);
+}
+
+/* La barra con el nombre y el botón de cerrar queda pegada arriba mientras
+   bajás por el cuadro: en la Copa Argentina hay mucho que scrollear y sin
+   esto había que volver hasta arriba de todo para salir. */
+.cuadro-grande-barra {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0 10px;
+  background: var(--bg);
+}
+.cuadro-grande-barra strong { font-size: 1.05rem; }
+
+/* El cuadro va centrado con márgenes automáticos y NO con justify-content: en
+   el celular el cuadro es más ancho que la pantalla, y centrando con flex se
+   corta la mitad izquierda al arrastrar. */
+.cuadro-grande .cuadro-scroll {
+  overflow: visible;
+  width: max-content;
+  margin: 0 auto;
+}
+
+/* Con el cuadro abierto, lo de atrás no se mueve. */
+body.sin-scroll { overflow: hidden; }
+
 /* El final de la carrera: descendiste de la Nacional y no hay división más
    abajo. Se marca fuerte porque es lo único que cierra una partida. */
 .carrera-terminada {

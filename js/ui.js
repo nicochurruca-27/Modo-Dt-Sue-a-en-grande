@@ -442,7 +442,15 @@ function cruceDeCopaArgentinaHtml(cruce) {
 //
 // Si todavía no se pintó —en el celular el panel arranca escondido— se cae a
 // un ancho conservador, el del panel angosto.
+// Cuando el cuadro se abre en grande se dibuja con el ancho de la PANTALLA y
+// no con el del panel. En vez de pasar el ancho por los cinco lugares que
+// arman un cuadro, se fija acá mientras dura el dibujo y cuadroMedidas lo
+// toma de acá. Vuelve a null apenas termina.
+let anchoDeDibujoForzado = null;
+let altoDeDibujoForzado = null;
+
 function anchoParaDibujar() {
+  if (anchoDeDibujoForzado) return anchoDeDibujoForzado;
   const panel = document.getElementById('table-panel');
   const ancho = panel ? panel.clientWidth : 0;
   return ancho > 80 ? ancho - 44 : 210;
@@ -464,7 +472,20 @@ function anchoParaDibujar() {
 // equipos en vertical, así que cada píxel de más se multiplica por 32.
 function cuadroMedidas(columnas, ancho) {
   const disponible = ancho || anchoParaDibujar();
-  const col = Math.max(25, Math.min(38, Math.floor(disponible / (columnas * 2 + 1.2))));
+  const porAncho = disponible / (columnas * 2 + 1.2);
+  // En el panel manda el ancho y listo. Abierto en grande también manda el
+  // ALTO, porque los cuadros son de distinto porte: la Copa Argentina son 32
+  // filas y si se agranda por ancho termina midiendo tres pantallas de alto,
+  // mientras que una llave de 16 son 8 filas y le sobra lugar para escudos
+  // mucho más grandes.
+  //
+  // Se le permite al cuadro ocupar hasta 1.6 pantallas de alto: un poco de
+  // scroll está bien, tres pantallas no.
+  const porAlto = altoDeDibujoForzado
+    ? (altoDeDibujoForzado * 1.6 / (2 ** columnas / 2) - 6) / 0.66
+    : Infinity;
+  const tope = anchoDeDibujoForzado ? 97 : 38;
+  const col = Math.max(25, Math.min(tope, Math.floor(Math.min(porAncho, porAlto))));
   const escudo = Math.round(col * 0.66);
   return { fila: escudo + 6, col, escudo };
 }
@@ -641,6 +662,7 @@ function cuadroSvg(rondas, opciones) {
         ${centro}
       </svg>
     </div>
+    ${anchoDeDibujoForzado || !op.competicion ? '' : `<button class="option-btn small cuadro-abrir" data-cuadro="${op.competicion}">Ver el cuadro en grande</button>`}
   `;
 }
 
@@ -725,6 +747,23 @@ function recopaHtml() {
 
 // El cuerpo de la carpeta de una copa: el cuadro de la Copa Argentina, el
 // cruce de la Recopa, o los grupos y después la llave de una internacional.
+// El cuadro de la fase final del torneo local (los playoffs del Apertura o del
+// Clausura, o el Reducido de la Nacional).
+function cuadroDeFaseFinalSvg() {
+  const ff = faseFinalDelPanel();
+  if (!ff) return '';
+  const ll = ff.llave;
+  const total = (ll.stageNames || []).length;
+  const rondas = [];
+  (ll.historial || []).forEach((h) => {
+    rondas[h.stageIndex] = h.cruces.slice().sort((a, b) => a.pos - b.pos);
+  });
+  const sorteo = !rondas[0] && (ll.alive || []).length === 2 ** total
+    ? ll.alive.map((e) => e.id)
+    : null;
+  return cuadroSvg(rondas, { columnas: total, sorteo, campeon: ll.champion, competicion: 'liga' });
+}
+
 function faseFinalHtml() {
   const ff = faseFinalDelPanel();
   if (!ff) return '';
@@ -737,7 +776,7 @@ function faseFinalHtml() {
   const sorteo = !rondas[0] && (ll.alive || []).length === 2 ** total
     ? ll.alive.map((e) => e.id)
     : null;
-  const cuadro = cuadroSvg(rondas, { columnas: total, sorteo, campeon: ll.champion, competicion: 'liga' });
+  const cuadro = cuadroDeFaseFinalSvg();
   const campeon = ll.champion
     ? `<p class="${ll.champion === Engine.state.clubId ? 'me-line' : ''}">Campeón: <strong>${Engine.getClub(ll.champion).name}</strong>${ll.runnerUp ? ` <span class="muted">— finalista: ${Engine.getClub(ll.runnerUp).name}</span>` : ''}</p>`
     : '<p class="muted">Cruces de eliminación directa: el que gana sigue, el que pierde se va.</p>';
@@ -757,6 +796,80 @@ function faseFinalHtml() {
     <ul class="llave-lista compacta">${ronda.cruces.map(cruceDeCopaArgentinaHtml).join('')}</ul>
   `;
 }
+
+// ---------- El cuadro abierto en grande ----------
+//
+// En el panel el cuadro entra, pero apretado: son 64 equipos en una columna de
+// 500px como mucho. Abierto en grande ocupa toda la pantalla y los escudos
+// pasan de 20 a 40px, que es cuando se reconocen de un vistazo.
+//
+// Es el MISMO dibujo, no otro: se vuelve a armar el cuadro de esa competencia
+// con anchoDeDibujoForzado puesto, así no hay dos versiones que se puedan ir
+// quedando desincronizadas.
+
+const NOMBRES_DE_CUADRO = {
+  copaArgentina: 'Copa Argentina',
+  libertadores: 'Copa Libertadores',
+  sudamericana: 'Copa Sudamericana',
+  liga: 'Fase Final',
+};
+
+function cuadroDeCompeticionSvg(id) {
+  if (id === 'copaArgentina') return cuadroDeCopaArgentinaSvg();
+  if (id === 'liga') return cuadroDeFaseFinalSvg();
+  const copa = copasEnCurso().find((c) => c.copa.toLowerCase() === id);
+  return copa ? cuadroDeLlaveInternacionalSvg(copa) : '';
+}
+
+function cerrarCuadroGrande() {
+  const abierto = document.querySelector('.cuadro-grande');
+  if (abierto) abierto.remove();
+  document.body.classList.remove('sin-scroll');
+}
+
+function abrirCuadroGrande(id) {
+  cerrarCuadroGrande();
+  // El ancho de la pantalla menos el margen. El alto no se limita: con 64
+  // equipos el cuadro es alto sí o sí y se baja scrolleando, como cualquier
+  // página.
+  //
+  // El piso de 620px es para el celular: si el cuadro se achicara hasta entrar
+  // en una pantalla de 400px, los escudos volverían a quedar de 18px y abrirlo
+  // en grande no serviría de nada. Se dibuja a un tamaño que se lee y se
+  // arrastra para los costados.
+  anchoDeDibujoForzado = Math.max(620, window.innerWidth - 48);
+  altoDeDibujoForzado = Math.max(420, window.innerHeight - 90);
+  let cuadro = '';
+  try {
+    cuadro = cuadroDeCompeticionSvg(id);
+  } finally {
+    anchoDeDibujoForzado = null;
+    altoDeDibujoForzado = null;
+  }
+  if (!cuadro) return;
+
+  const caja = document.createElement('div');
+  caja.className = 'cuadro-grande';
+  caja.innerHTML = `
+    <div class="cuadro-grande-barra">
+      <strong>${NOMBRES_DE_CUADRO[id] || 'Cuadro'}</strong>
+      <button class="option-btn small" id="cuadro-grande-cerrar">Cerrar ✕</button>
+    </div>
+    <div class="cuadro-grande-cuerpo">${cuadro}</div>
+  `;
+  document.body.appendChild(caja);
+  document.body.classList.add('sin-scroll');
+
+  caja.querySelector('#cuadro-grande-cerrar').addEventListener('click', cerrarCuadroGrande);
+  // Tocar el fondo cierra; tocar el cuadro no.
+  caja.addEventListener('click', (ev) => { if (ev.target === caja) cerrarCuadroGrande(); });
+}
+
+// Escape cierra, como cualquier ventana. Se engancha una sola vez, en el
+// documento, y no cada vez que se abre: si no, quedarían oyentes colgados.
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') cerrarCuadroGrande();
+});
 
 function competenciaHtml(id) {
   if (id === 'faseFinal') return faseFinalHtml();
@@ -817,6 +930,9 @@ function engancharBotonesDeGrupos() {
     if (prev) prev.addEventListener('click', () => mover(-1));
     if (next) next.addEventListener('click', () => mover(1));
   };
+  const abrir = document.querySelector('.cuadro-abrir');
+  if (abrir) abrir.addEventListener('click', () => abrirCuadroGrande(abrir.dataset.cuadro));
+
   const elegida = tablePanelTab.startsWith('copa-') ? tablePanelTab.slice(5) : null;
   if (elegida === 'faseFinal') {
     const ff = faseFinalDelPanel();
