@@ -59,6 +59,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "coritiba", nombre: "Coritiba", nombreCompleto: "Coritiba Foot Ball Club", pais: "Brasil", copa: "Sudamericana", nivel: 2, apodo: "Coxa", estadio: "Couto Pereira", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "chapecoense", nombre: "Chapecoense", nombreCompleto: "Associação Chapecoense de Futebol", pais: "Brasil", copa: "Sudamericana", nivel: 2, apodo: "Verdão do Oeste", estadio: "Arena Condá", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "ceara", nombre: "Ceará", nombreCompleto: "Ceará Sporting Club", pais: "Brasil", copa: "Sudamericana", nivel: 2, apodo: "Vovô", estadio: "Arena Castelão", colores: { primario: "#000000", secundario: "#FFFFFF" } },
+  { id: "mirassol", nombre: "Mirassol", nombreCompleto: "Mirassol Futebol Clube", pais: "Brasil", copa: "Libertadores", nivel: 2, apodo: "Leão", estadio: "Maião", colores: { primario: "#FFD700", secundario: "#008000" } },
 
   // ---- Uruguay ----
   { id: "penarol", nombre: "Peñarol", nombreCompleto: "Club Atlético Peñarol", pais: "Uruguay", copa: "Libertadores", nivel: 5, grande: true, apodo: "Carbonero", estadio: "Campeón del Siglo", colores: { primario: "#000000", secundario: "#FFD700" }, titulos: { libertadores: 5, sudamericana: 0 } },
@@ -94,6 +95,7 @@ const CLUBES_INTERNACIONALES = [
   { id: "everton-chi", nombre: "Everton (Chi)", nombreCompleto: "Everton de Viña del Mar", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Ruleteros", estadio: "Sausalito", colores: { primario: "#003DA5", secundario: "#FFD700" } },
   { id: "audax-italiano", nombre: "Audax Italiano", nombreCompleto: "Audax Club Sportivo Italiano", pais: "Chile", copa: "Sudamericana", nivel: 2, apodo: "Itálicos", estadio: "Bicentenario de La Florida", colores: { primario: "#008000", secundario: "#FFFFFF" } },
   { id: "cobreloa", nombre: "Cobreloa", nombreCompleto: "Club de Deportes Cobreloa", pais: "Chile", copa: "Libertadores", nivel: 2, apodo: "Zorros del Desierto", estadio: "Zorros del Desierto", colores: { primario: "#FF6600", secundario: "#FFFFFF" } },
+  { id: "coquimbo-unido", nombre: "Coquimbo Unido", nombreCompleto: "Coquimbo Unido", pais: "Chile", copa: "Libertadores", nivel: 2, apodo: "Piratas", estadio: "Francisco Sánchez Rumoroso", colores: { primario: "#FFD700", secundario: "#000000" } },
 
   // ---- Ecuador ----
   { id: "independiente-del-valle", nombre: "Independiente del Valle", nombreCompleto: "Club de Alto Rendimiento Especializado Independiente del Valle", pais: "Ecuador", copa: "Libertadores", nivel: 5, apodo: "Negriazules", estadio: "Banco Guayaquil", colores: { primario: "#000000", secundario: "#0066CC" }, titulos: { libertadores: 0, sudamericana: 2 } },
