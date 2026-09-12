@@ -504,6 +504,24 @@ h1, h2, h3 {
   color: #06210f;
   font-weight: 600;
 }
+/* Los cruces de una llave de copa. */
+.llave-lista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.llave-lista .cruce {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1e293b;
+}
+.llave-lista .cruce:last-child { border-bottom: none; }
+.cruce-equipos { font-size: 0.85rem; }
+.cruce-equipos strong { margin: 0 4px; }
+.cruce-detalle { font-size: 0.74rem; }
+
 /* El país, al lado del nombre en la tabla de un grupo. */
 .grupo-pais {
   margin-left: 6px;

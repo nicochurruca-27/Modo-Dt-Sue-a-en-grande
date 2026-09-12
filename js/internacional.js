@@ -196,6 +196,23 @@ const CUPOS_INTERNACIONALES = {
 // del sorteo (ver Engine.completarCuposDeGrupos).
 const CUPOS_EN_GRUPOS = { Libertadores: 32, Sudamericana: 32 };
 
+// Las finales de las dos copas son a partido único y en una sede que CONMEBOL
+// define con meses de anticipación, siempre en un estadio grande del
+// continente y nunca en la cancha de ninguno de los dos finalistas. Estas son
+// las que se usaron en las últimas ediciones.
+const SEDES_FINALES_CONMEBOL = [
+  'el Monumental (Buenos Aires)',
+  'el Maracaná (Río de Janeiro)',
+  'el Centenario (Montevideo)',
+  'el Mineirão (Belo Horizonte)',
+  'el Defensores del Chaco (Asunción)',
+  'el Nacional de Lima',
+  'el Metropolitano de Barranquilla',
+  'el Rodrigo Paz Delgado (Quito)',
+  'el Monumental Banco Pichincha (Guayaquil)',
+  'el Mario Alberto Kempes (Córdoba)',
+];
+
 // Cómo resuelve cada copa lo que se juega ANTES de la fase de grupos.
 //
 // La Libertadores tiene tres fases encadenadas: en cada una juegan los que

@@ -14,6 +14,9 @@ let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
 // usuario la primera vez que se abre.
 let copaPanelCopa = null;
 let copaPanelGrupo = null;
+// Qué instancia de la llave se está mirando (octavos, cuartos...). null =
+// la que se está jugando ahora.
+let copaPanelEtapa = null;
 let selectedPlayerId = null; // jugador tocado en la cancha/banco, esperando el segundo toque para cambiarlo
 
 function money(n) {
@@ -287,19 +290,70 @@ function filaDeGrupoHtml(row, index, zone, pais) {
   return `<tr class="${classes}"><td>${index + 1}</td><td><span class="table-club">${clubCrest(row, 18)}${row.name}<span class="muted grupo-pais">${pais}</span></span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
 }
 
+// Las instancias de una llave que ya se pueden mirar: las que terminaron más
+// la que se está jugando.
+function instanciasDeLaLlave(copa) {
+  const ll = copa.llave;
+  // El historial guarda las instancias ya cerradas; la que se está jugando —o
+  // la final, que se cierra sin pasar por el historial— va al final.
+  return (ll.historial || []).concat([{ etapa: ll.campeon ? 'final' : ll.etapa, cruces: ll.cruces }]);
+}
+
+// Un cruce: el global, y abajo cómo viene o cómo terminó.
+function cruceHtml(copa, cruce) {
+  const s = Engine.state;
+  const nombre = (id) => (copa.clubes[id] ? copa.clubes[id].nombre : 'A definir');
+  const mio = cruce.a === s.clubId || cruce.b === s.clubId;
+  const jugados = cruce.partidos.length;
+  const marcador = jugados ? `${cruce.gA} - ${cruce.gB}` : 'vs';
+  let detalle;
+  if (cruce.ganador) detalle = `Pasó ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`;
+  else if (jugados) detalle = 'Falta la vuelta';
+  else detalle = 'Todavía no se jugó';
+  return `<li class="cruce${mio ? ' me-line' : ''}">
+    <span class="cruce-equipos">${nombre(cruce.a)} <strong>${marcador}</strong> ${nombre(cruce.b)}</span>
+    <span class="muted cruce-detalle">${detalle}</span>
+  </li>`;
+}
+
+function llaveHtml(copa) {
+  const ll = copa.llave;
+  const instancias = instanciasDeLaLlave(copa);
+  if (!instancias.length) return '';
+  if (copaPanelEtapa === null || copaPanelEtapa >= instancias.length) copaPanelEtapa = instancias.length - 1;
+  const inst = instancias[copaPanelEtapa];
+  const def = COPA_INTER_LLAVES.find((e) => e.etapa === inst.etapa) || { nombre: inst.etapa };
+  const campeon = ll.campeon
+    ? `<p class="me-line">Campeón: <strong>${copa.clubes[ll.campeon].nombre}</strong>${ll.subcampeon ? ` <span class="muted">— finalista: ${copa.clubes[ll.subcampeon].nombre}</span>` : ''}</p>`
+    : '';
+  return `
+    ${campeon}
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="etapa-prev-btn">◀</button>
+      <strong>${def.nombre}</strong>
+      <button class="option-btn small" id="etapa-next-btn">▶</button>
+    </div>
+    <ul class="llave-lista">${inst.cruces.map((c) => cruceHtml(copa, c)).join('')}</ul>
+  `;
+}
+
 function faseDeGruposHtml() {
   const copa = copaDelPanel();
   if (!copa) return '';
   const ci = Engine.state.copasInter;
   const copas = copasEnCurso();
+  const selectorDeCopa = copas.length > 1
+    ? `<div class="copa-switch">${copas.map((c) => `<button class="option-btn small copa-switch-btn${c.copa === copaPanelCopa ? ' activo' : ''}" data-copa="${c.copa}">${c.copa}</button>`).join('')}</div>`
+    : '';
+  // Cuando la fase de grupos terminó, lo que interesa es el cuadro.
+  if (copa.llave) {
+    return `<h4>Copa ${copa.copa}</h4>${selectorDeCopa}${llaveHtml(copa)}`;
+  }
   const grupo = copa.grupos[copaPanelGrupo];
   const esMiGrupo = grupo.ids.includes(Engine.state.clubId);
   const filas = Engine.posicionesDeGrupo(grupo)
     .map((r) => ({ ...r, name: Engine.getClub(r.id).name }));
 
-  const selector = copas.length > 1
-    ? `<div class="copa-switch">${copas.map((c) => `<button class="option-btn small copa-switch-btn${c.copa === copaPanelCopa ? ' activo' : ''}" data-copa="${c.copa}">${c.copa}</button>`).join('')}</div>`
-    : '';
   const jugadas = Math.min(ci.fecha, FECHAS_DE_GRUPOS);
   const avance = jugadas === 0
     ? `Los grupos ya están sorteados. Las ${FECHAS_DE_GRUPOS} fechas se juegan entre marzo y mayo.`
@@ -309,7 +363,7 @@ function faseDeGruposHtml() {
 
   return `
     <h4>Copa ${copa.copa} — Fase de grupos</h4>
-    ${selector}
+    ${selectorDeCopa}
     <div class="panel-tab-switch">
       <button class="option-btn small" id="grupo-prev-btn">◀</button>
       <strong>Grupo ${grupo.letra}${esMiGrupo ? ' · el tuyo' : ''}</strong>
@@ -333,19 +387,22 @@ function faseDeGruposHtml() {
 function engancharBotonesDeGrupos() {
   const copa = copaDelPanel();
   if (!copa) return;
-  const total = copa.grupos.length;
-  const mover = (paso) => {
-    copaPanelGrupo = (copaPanelGrupo + paso + total) % total;
-    renderTablePanel();
+  const flechas = (idPrev, idNext, total, leer, escribir) => {
+    const mover = (paso) => { escribir((leer() + paso + total) % total); renderTablePanel(); };
+    const prev = document.getElementById(idPrev);
+    const next = document.getElementById(idNext);
+    if (prev) prev.addEventListener('click', () => mover(-1));
+    if (next) next.addEventListener('click', () => mover(1));
   };
-  const prev = document.getElementById('grupo-prev-btn');
-  const next = document.getElementById('grupo-next-btn');
-  if (prev) prev.addEventListener('click', () => mover(-1));
-  if (next) next.addEventListener('click', () => mover(1));
+  flechas('grupo-prev-btn', 'grupo-next-btn', copa.grupos.length, () => copaPanelGrupo, (v) => { copaPanelGrupo = v; });
+  if (copa.llave) {
+    flechas('etapa-prev-btn', 'etapa-next-btn', instanciasDeLaLlave(copa).length, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+  }
   document.querySelectorAll('.copa-switch-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       copaPanelCopa = btn.dataset.copa;
       copaPanelGrupo = null;
+      copaPanelEtapa = null;
       renderTablePanel();
     });
   });
@@ -893,13 +950,17 @@ function competitionLabel() {
     return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
   }
   if (ctx.context === 'bracket') return Engine.bracketStageLabel();
-  if (ctx.context === 'copa-inter') return `Copa ${ctx.copa} — ${etiquetaDeGrupo(ctx)}`;
+  if (ctx.context === 'copa-inter') return `Copa ${ctx.copa} — ${etiquetaDeCopa(ctx)}`;
   return '';
 }
 
-// "Grupo C · Fecha 3 de 6": la instancia de un partido de fase de grupos.
-function etiquetaDeGrupo(ctx) {
-  return `Grupo ${ctx.grupo} · Fecha ${ctx.fechaDeGrupos} de ${FECHAS_DE_GRUPOS}`;
+// La instancia de un partido de copa internacional: "Grupo C · Fecha 3 de 6"
+// en la fase de grupos, "Octavos de Final · Vuelta" en una llave. La final no
+// lleva ida ni vuelta porque es a partido único.
+function etiquetaDeCopa(ctx) {
+  if (!ctx.llave) return `Grupo ${ctx.grupo} · Fecha ${ctx.fechaDeGrupos} de ${FECHAS_DE_GRUPOS}`;
+  if (ctx.llave.piernas === 1) return ctx.llave.nombre;
+  return `${ctx.llave.nombre} · ${ctx.llave.pierna === 0 ? 'Ida' : 'Vuelta'}`;
 }
 
 function header() {
@@ -1144,10 +1205,15 @@ function proximoCompromiso() {
   const ctx = s.matchContext;
   if (ctx) {
     const localia = ctx.isNeutral ? 'Cancha neutral' : ctx.isHome ? 'De local' : 'De visitante';
+    // En la vuelta de una llave lo que importa es cómo viene el global, así
+    // que va ahí mismo: sabés si te alcanza con empatar o tenés que ganar.
+    const global = ctx.llave && ctx.llave.pierna > 0
+      ? ` · Global ${ctx.llave.globalMio}-${ctx.llave.globalRival}`
+      : '';
     return {
       competicion: competicionDelPartido(),
       titulo: tituloDelCompromiso(),
-      detalle: `${localia} vs ${Engine.getClub(ctx.opponentId).name}`,
+      detalle: `${localia} vs ${Engine.getClub(ctx.opponentId).name}${global}`,
     };
   }
 
@@ -1195,7 +1261,7 @@ function tituloDelCompromiso() {
   const s = Engine.state;
   const ctx = s.matchContext;
   if (ctx && ctx.context === 'bracket') return etiquetaDeLlave();
-  if (ctx && ctx.context === 'copa-inter') return etiquetaDeGrupo(ctx);
+  if (ctx && ctx.context === 'copa-inter') return etiquetaDeCopa(ctx);
   const extra = ctx && ctx.clasico ? ' · Clásico' : ctx && ctx.interzonal ? ' · Interzonal' : '';
   return `Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
 }

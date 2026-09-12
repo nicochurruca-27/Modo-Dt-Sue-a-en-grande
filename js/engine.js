@@ -28,8 +28,12 @@
 //   mismo país en un grupo. Las 6 fechas de la fase de grupos se juegan
 //   DURANTE el año, entre marzo y mayo, intercaladas con las fechas de la
 //   liga: si tu club está en una copa, las jugás vos; si no, se simulan
-//   solas, pero las tablas se pueden mirar igual. De octavos en adelante la
-//   copa se resuelve al cierre de la temporada, partiendo de esas tablas.
+//   solas, pero las tablas se pueden mirar igual. Las llaves —de octavos a la
+//   final, con el playoff previo en la Sudamericana— se juegan en el Clausura,
+//   que es cuando van de verdad (agosto a noviembre): cada instancia es ida y
+//   vuelta, define el global y después los penales, y la final es a partido
+//   único en una sede neutral del continente. En la Nacional, que tiene un
+//   solo torneo de 35 fechas, todo eso entra en las mismas semanas del año.
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
 // - Descienden 2 de Primera por año: el último de la tabla de PROMEDIOS
@@ -71,6 +75,24 @@ const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 
 // seguidas de abril y mayo no son un descuido: CONMEBOL programa la fase de
 // grupos justo así, en pares de semanas consecutivas con un hueco en el medio.
 const COPA_INTER_ROUNDS = [3, 5, 9, 10, 12, 13];
+// Y de octavos a la final se juega en el Clausura, que es cuando se juega de
+// verdad: agosto a noviembre. Cada instancia son dos fechas —ida y vuelta—
+// con un hueco en el medio, menos la final, que es a partido único en una
+// sede neutral que no es la cancha de ninguno de los dos.
+//
+// `D1` son las fechas del Clausura. En la Nacional no hay dos torneos, así que
+// las mismas instancias caen en la segunda mitad de su único torneo de 35,
+// que es la misma época del año.
+//
+// El playoff de octavos es solo de la Sudamericana: ahí el segundo de cada
+// grupo se cruza con un tercero de la Libertadores.
+const COPA_INTER_LLAVES = [
+  { etapa: 'playoff', nombre: 'Playoff de Octavos', alcanzado: 'el playoff de octavos', soloSudamericana: true, D1: [0, 1], D2: [17, 18] },
+  { etapa: 'octavos', nombre: 'Octavos de Final', alcanzado: 'los octavos de final', D1: [2, 3], D2: [20, 21] },
+  { etapa: 'cuartos', nombre: 'Cuartos de Final', alcanzado: 'los cuartos de final', D1: [6, 7], D2: [24, 25] },
+  { etapa: 'semis', nombre: 'Semifinal', alcanzado: 'las semifinales', D1: [10, 11], D2: [28, 29] },
+  { etapa: 'final', nombre: 'Final', alcanzado: 'la final', neutral: true, D1: [14], D2: [33] },
+];
 const FECHAS_DE_GRUPOS = 6;
 const GRUPOS_POR_COPA = 8;
 const LETRAS_DE_GRUPO = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -1602,6 +1624,8 @@ const Engine = {
     const deLaOtra = desdeLaOtraCopa || {};
     const alPlayoff = deLaOtra.alPlayoff || [];
     const enCurso = this.copaEnCurso(copa);
+    // Lo normal: la copa se jugó durante el año y ya tiene campeón.
+    if (enCurso && enCurso.llave) return this.resumenDeCopaJugada(enCurso);
     const fase = enCurso
       ? this.cerrarFaseDeGrupos(enCurso)
       : this.simularFaseDeGrupos(copa, qualification, internacionales, deLaOtra);
@@ -2077,6 +2101,7 @@ const Engine = {
     if (!mio) {
       this.simularFechaDeCopas(ci.fecha, null);
       ci.fecha++;
+      if (ci.fecha >= FECHAS_DE_GRUPOS) this.cerrarLasDosFasesDeGrupos();
       this.enterEditionRound();
       return;
     }
@@ -2095,6 +2120,385 @@ const Engine = {
     this.pickDecision();
     s.screen = 'pre-match';
     this.save();
+  },
+
+  // ---------- Copas internacionales: de octavos a la final ----------
+
+  // Las instancias que juega cada copa. La Libertadores entra derecho a
+  // octavos con los dos primeros de cada grupo; la Sudamericana tiene antes el
+  // playoff, donde los ocho segundos se cruzan con los ocho terceros de la
+  // Libertadores.
+  etapasDeLaCopa(copa) {
+    return COPA_INTER_LLAVES.filter((e) => !e.soloSudamericana || copa === 'Sudamericana');
+  },
+
+  // Qué partido de llave toca en esta fecha del torneo local, si toca alguno.
+  // En Primera las llaves van en el Clausura; en la Nacional, que tiene un
+  // solo torneo, en su segunda mitad.
+  llaveQueTocaEstaFecha() {
+    const season = this.state.season;
+    const esNacional = season.myDivision === 'D2';
+    if (!esNacional && season.edition !== 'clausura') return null;
+    const clave = esNacional ? 'D2' : 'D1';
+    for (const etapa of COPA_INTER_LLAVES) {
+      const pierna = etapa[clave].indexOf(season.roundIndex);
+      if (pierna >= 0) return { etapa, pierna, piernas: etapa[clave].length };
+    }
+    return null;
+  },
+
+  // Cierra la fase de grupos de las dos copas y arma con eso la primera
+  // instancia de cada llave. Se llama apenas se juega la sexta fecha.
+  cerrarLasDosFasesDeGrupos() {
+    const ci = this.state.copasInter;
+    if (!ci || ci.gruposCerrados) return;
+    ci.gruposCerrados = true;
+
+    const libertadores = ci.copas.Libertadores;
+    const sudamericana = ci.copas.Sudamericana;
+    const cierre = {};
+    [libertadores, sudamericana].filter(Boolean).forEach((copa) => {
+      cierre[copa.copa] = this.cerrarFaseDeGrupos(copa);
+    });
+
+    // Los terceros de la Libertadores no quedan eliminados: se van al playoff
+    // de la Sudamericana, numerados de mejor a peor campaña.
+    const porCampania = (filas) => filas.slice()
+      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    const terceros = libertadores ? porCampania(cierre.Libertadores.terceros) : [];
+
+    if (libertadores) this.armarLlaveInicial(libertadores, cierre.Libertadores, []);
+    if (sudamericana) this.armarLlaveInicial(sudamericana, cierre.Sudamericana, terceros, libertadores);
+    this.save();
+  },
+
+  // La primera instancia de una copa. En la Libertadores son los octavos
+  // directo; en la Sudamericana, el playoff, y los primeros de grupo esperan
+  // en octavos.
+  armarLlaveInicial(copa, cierre, tercerosDeLaOtra, laOtraCopa) {
+    const porCampania = (filas) => filas.slice()
+      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    const grupoDe = {};
+    copa.grupos.forEach((g) => g.ids.forEach((id) => { grupoDe[id] = g.letra; }));
+
+    const llave = {
+      etapa: null,
+      cruces: [],
+      seeds: {},
+      grupoDe,
+      alcanzado: { ...cierre.reached },
+      campeon: null,
+      subcampeon: null,
+    };
+    copa.llave = llave;
+
+    const primeros = porCampania(cierre.primeros).map((r) => r.id);
+    const segundos = porCampania(cierre.segundos).map((r) => r.id);
+
+    if (copa.copa === 'Sudamericana' && tercerosDeLaOtra.length) {
+      // Los terceros de la Libertadores llegan de la otra copa, así que hay
+      // que meterlos en el padrón de esta antes de poder jugarles.
+      tercerosDeLaOtra.forEach((fila) => {
+        const club = (laOtraCopa && laOtraCopa.clubes[fila.id]) || this.entrantDeClub(fila.id);
+        if (club) copa.clubes[fila.id] = { ...club };
+      });
+      // Los cruces del playoff no se sortean: van por campaña. Los segundos de
+      // la Sudamericana son del 9º al 16º y los terceros de la Libertadores del
+      // 17º al 24º, y se cruzan 9º-24º, 10º-23º, y así hasta 16º-17º. Al que
+      // mejor le fue le toca el rival más flojo.
+      const deAfuera = tercerosDeLaOtra.map((r) => r.id);
+      llave.esperanEnOctavos = primeros;
+      llave.cruces = segundos.map((id, i) => this.nuevoCruce(id, deAfuera[deAfuera.length - 1 - i]))
+        .filter((c) => c.a && c.b);
+      segundos.forEach((id, i) => { llave.seeds[id] = 9 + i; });
+      deAfuera.forEach((id, i) => { llave.seeds[id] = 17 + i; });
+      primeros.forEach((id, i) => { llave.seeds[id] = 1 + i; });
+      this.empezarEtapaDeLlave(copa, 'playoff');
+      return;
+    }
+
+    primeros.forEach((id, i) => { llave.seeds[id] = 1 + i; });
+    segundos.forEach((id, i) => { llave.seeds[id] = 9 + i; });
+    llave.cruces = this.sortearOctavos(primeros, segundos, grupoDe);
+    this.empezarEtapaDeLlave(copa, 'octavos');
+  },
+
+  nuevoCruce(a, b) {
+    return { a, b, gA: 0, gB: 0, partidos: [], penales: null, ganador: null };
+  },
+
+  // El sorteo de los octavos: cada primero de grupo contra un segundo, y nunca
+  // contra uno de su propio grupo. El primero es el mejor sembrado del cruce,
+  // así que define la llave de local en la vuelta.
+  //
+  // Los cruces salen ordenados al azar en el cuadro, y de ahí en adelante el
+  // cuadro es fijo: los ganadores de los cruces 1 y 2 se enfrentan en cuartos,
+  // los de 3 y 4, y así. Es lo que pasa de verdad: se sortean los octavos y
+  // después ya está todo definido hasta la final.
+  sortearOctavos(cabezas, resto, grupoDe) {
+    const usados = new Set();
+    const cruces = [];
+    const repartir = (k, conRestriccion) => {
+      if (k >= cabezas.length) return true;
+      const candidatos = this.shuffled(resto.filter((id) => !usados.has(id)
+        && (!conRestriccion || !grupoDe || grupoDe[id] !== grupoDe[cabezas[k]])));
+      for (const id of candidatos) {
+        usados.add(id);
+        cruces[k] = this.nuevoCruce(cabezas[k], id);
+        if (repartir(k + 1, conRestriccion)) return true;
+        usados.delete(id);
+      }
+      return false;
+    };
+    if (!repartir(0, true)) repartir(0, false);
+    return this.shuffled(cruces.filter(Boolean));
+  },
+
+  // Deja la copa parada en una instancia y anota que todos los que la juegan
+  // llegaron hasta ahí (es lo que después define hasta dónde llegaste vos y
+  // cuánto se cobra).
+  empezarEtapaDeLlave(copa, etapa) {
+    const llave = copa.llave;
+    llave.etapa = etapa;
+    const definicion = COPA_INTER_LLAVES.find((e) => e.etapa === etapa);
+    llave.cruces.forEach((cruce) => {
+      llave.alcanzado[cruce.a] = definicion.alcanzado;
+      llave.alcanzado[cruce.b] = definicion.alcanzado;
+    });
+  },
+
+  // El cruce del usuario en la instancia que se juega ahora, si está vivo.
+  cruceDelUsuario(cuando) {
+    const s = this.state;
+    const ci = s.copasInter;
+    if (!ci) return null;
+    for (const copa of Object.values(ci.copas).filter(Boolean)) {
+      const llave = copa.llave;
+      if (!llave || llave.campeon || llave.etapa !== cuando.etapa.etapa) continue;
+      const cruce = llave.cruces.find((c) => !c.ganador && (c.a === s.clubId || c.b === s.clubId));
+      if (cruce) return { copa, cruce };
+    }
+    return null;
+  },
+
+  // Quién juega de local en este partido del cruce. En la ida es el peor
+  // sembrado y en la vuelta el mejor (por eso el que ganó su grupo define en
+  // casa); en la final no hay local, se juega en cancha neutral.
+  localDelCruce(cruce, cuando) {
+    if (cuando.etapa.neutral) return null;
+    return cuando.pierna === 0 ? cruce.b : cruce.a;
+  },
+
+  sedeDeFinalContinental() {
+    const sedes = typeof SEDES_FINALES_CONMEBOL === 'undefined' ? [] : SEDES_FINALES_CONMEBOL;
+    return sedes.length ? sedes[Math.floor(Math.random() * sedes.length)] : this.canchaNeutral();
+  },
+
+  // Simula un partido de un cruce y lo suma al global.
+  jugarPartidoDeLlave(copa, cruce, cuando) {
+    const local = this.localDelCruce(cruce, cuando);
+    const esLocalA = local === cruce.a || (!local && Math.random() < 0.5);
+    const idLocal = local || (esLocalA ? cruce.a : cruce.b);
+    const idVisitante = idLocal === cruce.a ? cruce.b : cruce.a;
+    const score = this.simulateScore(
+      this.copaStrength(copa.clubes[idLocal]),
+      this.copaStrength(copa.clubes[idVisitante]),
+      local ? 4 : 0,
+    );
+    this.anotarPartidoDeLlave(cruce, idLocal, idVisitante, score.homeGoals, score.awayGoals);
+  },
+
+  anotarPartidoDeLlave(cruce, local, visitante, golesLocal, golesVisitante) {
+    if (local === cruce.a) { cruce.gA += golesLocal; cruce.gB += golesVisitante; }
+    else { cruce.gB += golesLocal; cruce.gA += golesVisitante; }
+    cruce.partidos.push({ local, visitante, golesLocal, golesVisitante });
+  },
+
+  // Todos los partidos de esta fecha de llaves, en las dos copas. `excepto` es
+  // el cruce del usuario, que se resuelve aparte.
+  simularPartidosDeLlave(cuando, excepto) {
+    const ci = this.state.copasInter;
+    Object.values(ci.copas).filter(Boolean).forEach((copa) => {
+      const llave = copa.llave;
+      if (!llave || llave.campeon || llave.etapa !== cuando.etapa.etapa) return;
+      llave.cruces.forEach((cruce) => {
+        if (cruce.ganador || cruce === excepto) return;
+        this.jugarPartidoDeLlave(copa, cruce, cuando);
+      });
+    });
+  },
+
+  // Cierra la instancia cuando ya se jugaron sus partidos: define cada cruce
+  // (global, y si quedó igualado, penales) y arma la instancia siguiente.
+  cerrarEtapaDeLlave(copa) {
+    const llave = copa.llave;
+    llave.cruces.forEach((cruce) => {
+      if (cruce.ganador) return;
+      if (cruce.gA > cruce.gB) cruce.ganador = cruce.a;
+      else if (cruce.gB > cruce.gA) cruce.ganador = cruce.b;
+      else {
+        cruce.ganador = this.copaTieWinner(cruce.a, cruce.b, copa.clubes);
+        cruce.penales = cruce.ganador;
+      }
+    });
+
+    const etapas = this.etapasDeLaCopa(copa.copa);
+    const actual = etapas.findIndex((e) => e.etapa === llave.etapa);
+    const ganadores = llave.cruces.map((c) => c.ganador);
+
+    if (llave.etapa === 'final') {
+      const cruce = llave.cruces[0];
+      llave.campeon = cruce.ganador;
+      llave.subcampeon = cruce.ganador === cruce.a ? cruce.b : cruce.a;
+      llave.alcanzado[llave.campeon] = 'el título';
+      this.state.log.unshift(`Copa ${copa.copa}: salió campeón ${copa.clubes[llave.campeon].nombre}.`);
+      return;
+    }
+
+    const siguiente = etapas[actual + 1];
+    llave.historial = (llave.historial || []).concat([{ etapa: llave.etapa, cruces: llave.cruces }]);
+
+    if (siguiente.etapa === 'octavos' && llave.esperanEnOctavos) {
+      // Los ocho primeros de grupo entran recién ahora, contra los que ganaron
+      // el playoff.
+      llave.cruces = this.sortearOctavos(llave.esperanEnOctavos, ganadores, llave.grupoDe);
+      llave.esperanEnOctavos = null;
+    } else {
+      llave.cruces = [];
+      for (let i = 0; i < ganadores.length; i += 2) {
+        const x = ganadores[i];
+        const y = ganadores[i + 1];
+        if (!y) { llave.cruces.push(this.nuevoCruce(x, null)); continue; }
+        llave.cruces.push((llave.seeds[x] || 99) <= (llave.seeds[y] || 99)
+          ? this.nuevoCruce(x, y)
+          : this.nuevoCruce(y, x));
+      }
+    }
+    this.empezarEtapaDeLlave(copa, siguiente.etapa);
+  },
+
+  // Un checkpoint de llave: se juega el partido que toca. Si el usuario no está
+  // vivo en ninguna de las dos copas, la fecha se resuelve sola.
+  avanzarLlaveDeCopas(cuando) {
+    const s = this.state;
+    this.cerrarLasDosFasesDeGrupos();
+    const mio = this.cruceDelUsuario(cuando);
+
+    if (!mio) {
+      this.simularPartidosDeLlave(cuando, null);
+      this.cerrarLoQueTermino(cuando);
+      this.enterEditionRound();
+      return;
+    }
+
+    const cruce = mio.cruce;
+    const soyA = cruce.a === s.clubId;
+    const rivalId = soyA ? cruce.b : cruce.a;
+    const neutral = !!cuando.etapa.neutral;
+    const soyLocal = !neutral && this.localDelCruce(cruce, cuando) === s.clubId;
+    s.matchContext = {
+      context: 'copa-inter',
+      copa: mio.copa.copa,
+      opponentId: rivalId,
+      isHome: soyLocal,
+      isNeutral: neutral,
+      sede: neutral ? this.sedeDeFinalContinental() : this.estadioDe(soyLocal ? s.clubId : rivalId),
+      llave: {
+        etapa: cuando.etapa.etapa,
+        nombre: cuando.etapa.nombre,
+        pierna: cuando.pierna,
+        piernas: cuando.piernas,
+        // Solo el último partido del cruce se puede ir al alargue y a los
+        // penales, y solo si el global quedó igualado.
+        decisiva: cuando.pierna === cuando.piernas - 1,
+        globalMio: soyA ? cruce.gA : cruce.gB,
+        globalRival: soyA ? cruce.gB : cruce.gA,
+      },
+    };
+    this.pickDecision();
+    s.screen = 'pre-match';
+    this.save();
+  },
+
+  // Después del partido del usuario: se anota su resultado, se juega el resto
+  // de la fecha y, si era el último partido de la instancia, se cierra.
+  resolverLlaveDelUsuario() {
+    const s = this.state;
+    const m = s.pendingMatch;
+    const ctx = s.matchContext;
+    const copa = s.copasInter.copas[ctx.copa];
+    const cruce = copa.llave.cruces.find((c) => c.a === s.clubId || c.b === s.clubId);
+    this.anotarPartidoDeLlave(cruce, m.home, m.away, m.homeGoals, m.awayGoals);
+    if (m.shootout) {
+      cruce.ganador = m.shootout.userWon ? s.clubId : ctx.opponentId;
+      cruce.penales = cruce.ganador;
+    }
+    const etiqueta = `Copa ${ctx.copa} — ${ctx.llave.nombre}`;
+    s.log.unshift(`${etiqueta}: ${this.getClub(m.home).name} ${m.homeGoals}-${m.awayGoals} ${this.getClub(m.away).name}${m.shootout ? ' (por penales)' : ''}`);
+    if (ctx.isNeutral) Economia.cobrarPartidoNeutral(this, ctx.opponentId, cruce.ganador === s.clubId);
+    else if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
+
+    const cuando = { etapa: COPA_INTER_LLAVES.find((e) => e.etapa === ctx.llave.etapa), pierna: ctx.llave.pierna, piernas: ctx.llave.piernas };
+    this.simularPartidosDeLlave(cuando, cruce);
+    s.pendingMatch = null;
+    s.matchContext = null;
+    this.cerrarLoQueTermino(cuando);
+    this.enterEditionRound();
+  },
+
+  cerrarLoQueTermino(cuando) {
+    if (cuando.pierna !== cuando.piernas - 1) return;
+    Object.values(this.state.copasInter.copas).filter(Boolean).forEach((copa) => {
+      if (copa.llave && !copa.llave.campeon && copa.llave.etapa === cuando.etapa.etapa) {
+        this.cerrarEtapaDeLlave(copa);
+      }
+    });
+  },
+
+  // Termina sola una copa que quedó a medio jugar. No debería hacer falta —las
+  // llaves entran enteras en el calendario— pero si una partida vieja llega a
+  // fin de año con la copa abierta, el campeón sale igual.
+  terminarLlaveSimulando(copa) {
+    let vueltas = 0;
+    while (copa.llave && !copa.llave.campeon && vueltas++ < 10) {
+      const etapa = COPA_INTER_LLAVES.find((e) => e.etapa === copa.llave.etapa);
+      const piernas = etapa.D1.length;
+      for (let pierna = 0; pierna < piernas; pierna++) {
+        copa.llave.cruces.forEach((cruce) => {
+          if (!cruce.ganador && cruce.b) this.jugarPartidoDeLlave(copa, cruce, { etapa, pierna });
+        });
+      }
+      this.cerrarEtapaDeLlave(copa);
+    }
+  },
+
+  // El resumen de una copa que ya se jugó entera, en el mismo formato que
+  // devuelve simulateCopa: es lo que se guarda en la partida y lo que lee la
+  // pantalla de fin de temporada.
+  resumenDeCopaJugada(copa) {
+    const s = this.state;
+    if (!copa.llave) return null;
+    if (!copa.llave.campeon) this.terminarLlaveSimulando(copa);
+    const llave = copa.llave;
+    const campeon = llave.campeon;
+    if (!campeon) return null;
+    const victorias = copa.grupos.reduce((total, grupo) => total + grupo.partidos.filter((p) => (
+      (p.local === s.clubId && p.golesLocal > p.golesVisitante)
+      || (p.visitante === s.clubId && p.golesVisitante > p.golesLocal)
+    )).length, 0);
+    return {
+      copa: copa.copa,
+      championId: campeon,
+      championName: copa.clubes[campeon].nombre,
+      championPais: copa.clubes[campeon].pais,
+      runnerUpName: llave.subcampeon ? copa.clubes[llave.subcampeon].nombre : null,
+      userWon: campeon === s.clubId,
+      userStage: llave.alcanzado[s.clubId] || null,
+      userExtras: {
+        victoriasEnGrupos: victorias,
+        previa: copa.previa.camino && copa.previa.camino.fases.length ? copa.previa.camino : null,
+      },
+    };
   },
 
   // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
@@ -2526,6 +2930,14 @@ const Engine = {
       return;
     }
 
+    // Y de octavos a la final, que van en el Clausura.
+    const llaveDeCopa = s.copasInter ? this.llaveQueTocaEstaFecha() : null;
+    if (llaveDeCopa && !(season.copaInterShown || []).includes(`k${season.roundIndex}`)) {
+      season.copaInterShown = (season.copaInterShown || []).concat([`k${season.roundIndex}`]);
+      this.avanzarLlaveDeCopas(llaveDeCopa);
+      return;
+    }
+
     if (season.myDivision === 'D2' && season.roundIndex === TRANSFER_ROUND_D2 && !season.transferShown) {
       season.transferShown = true;
       season.transferReason = 'mid-edition';
@@ -2785,10 +3197,7 @@ const Engine = {
     // el gol y la serie se cierra ahí. La Copa Argentina es la excepción: no
     // tiene alargue, del empate se va derecho a los penales.
     const sinAlargue = !!(s.matchContext && s.matchContext.sinAlargue);
-    // La fase de grupos de las copas internacionales admite empate igual que
-    // la liga: ahí no hay alargue ni penales, el empate suma un punto.
-    const admiteEmpate = m.context === 'league' || m.context === 'copa-inter';
-    if (!admiteEmpate && !sinAlargue && m.homeGoals === m.awayGoals) {
+    if (this.empateSinResolver(m) && !sinAlargue) {
       const enAlargue = this.simulateExtraTime(m);
       if (enAlargue.homeGoals || enAlargue.awayGoals) {
         m.homeGoals += enAlargue.homeGoals;
@@ -2796,7 +3205,7 @@ const Engine = {
         m.extraTime = enAlargue;
       }
     }
-    if (!admiteEmpate && m.homeGoals === m.awayGoals) {
+    if (this.empateSinResolver(m)) {
       const myStrength = this.squadStrength();
       const oppStrength = this.clubStrength(m.opponentId);
       const userIsHomeSide = m.isHome;
@@ -2816,6 +3225,26 @@ const Engine = {
     Noticias.trasElParteMedico(this, s.lastAvailabilityNotes);
     s.screen = 'match-result';
     this.save();
+  },
+
+  // ¿El partido quedó sin ganador y hay que definirlo ahí mismo?
+  //
+  // En la liga y en la fase de grupos de las copas, no: el empate es empate y
+  // suma un punto. En una llave de ida y vuelta tampoco alcanza con mirar el
+  // partido, porque lo que define es el global: la ida puede terminar empatada
+  // sin que pase nada, y solo el último partido del cruce se va al alargue y a
+  // los penales, y únicamente si el global quedó igualado. (CONMEBOL sacó la
+  // ventaja del gol de visitante en 2022: hoy es global, alargue y penales.)
+  empateSinResolver(m) {
+    const llave = this.state.matchContext && this.state.matchContext.llave;
+    if (llave) {
+      if (!llave.decisiva) return false;
+      const mios = (m.isHome ? m.homeGoals : m.awayGoals) + llave.globalMio;
+      const suyos = (m.isHome ? m.awayGoals : m.homeGoals) + llave.globalRival;
+      return mios === suyos;
+    }
+    if (m.context === 'league' || m.context === 'copa-inter') return false;
+    return m.homeGoals === m.awayGoals;
   },
 
   // ---------- Bajas: lesiones y suspensiones ----------
@@ -3042,6 +3471,8 @@ const Engine = {
       s.matchContext = null;
       s.season.roundIndex++;
       this.enterEditionRound();
+    } else if (m.context === 'copa-inter' && s.matchContext.llave) {
+      this.resolverLlaveDelUsuario();
     } else if (m.context === 'copa-inter') {
       // Fase de grupos: el partido se anota en la tabla del grupo y el resto
       // de la fecha (los otros 15 partidos de esa copa, más los de la otra)
@@ -3058,6 +3489,7 @@ const Engine = {
       ci.fecha++;
       s.pendingMatch = null;
       s.matchContext = null;
+      if (ci.fecha >= FECHAS_DE_GRUPOS) this.cerrarLasDosFasesDeGrupos();
       this.enterEditionRound();
     } else if (m.context === 'bracket') {
       this.resolveUserBracketMatch(userWon, false);
