@@ -21,6 +21,15 @@
 //   (dieciseisavos a la final). El resto del cuadro se resuelve solo según
 //   la fuerza de cada club; si no la ganás vos, sale campeón el que gane esa
 //   simulación (no queda "vacante").
+// - Copas internacionales (Libertadores y Sudamericana): se arman al empezar
+//   el año con los clasificados de la temporada anterior. La fase previa se
+//   resuelve ahí mismo (en la realidad se juega en enero y febrero) y los 8
+//   grupos de cada copa se sortean con bombos por nivel y sin dos clubes del
+//   mismo país en un grupo. Las 6 fechas de la fase de grupos se juegan
+//   DURANTE el año, entre marzo y mayo, intercaladas con las fechas de la
+//   liga: si tu club está en una copa, las jugás vos; si no, se simulan
+//   solas, pero las tablas se pueden mirar igual. De octavos en adelante la
+//   copa se resuelve al cierre de la temporada, partiendo de esas tablas.
 // - Fechas FIFA: pausan la liga y muestran si algún jugador destacado fue
 //   convocado a su selección.
 // - Descienden 2 de Primera por año: el último de la tabla de PROMEDIOS
@@ -46,6 +55,20 @@ const FIFA_ROUNDS = [5, 11];
 // rondas y necesita seis fechas repartidas a lo largo de la edición.
 const COPA_ROUNDS = [2, 4, 6, 8, 11, 14];
 const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
+// Las copas internacionales no se resuelven de un saque a fin de año: se
+// juegan DURANTE la temporada, como en la realidad. La fase de grupos son 6
+// fechas entre marzo y mayo (dos por mes) metidas entre las fechas del
+// Apertura, igual que la Copa Argentina, pero en semanas distintas a las de
+// COPA_ROUNDS para no amontonar tres partidos en la misma semana.
+//
+// Con una fecha por semana arrancando el 1º de febrero, estas seis caen el 1
+// y el 15 de marzo, el 12 y el 19 de abril, y el 3 y el 10 de mayo. Las dos
+// seguidas de abril y mayo no son un descuido: CONMEBOL programa la fase de
+// grupos justo así, en pares de semanas consecutivas con un hueco en el medio.
+const COPA_INTER_ROUNDS = [3, 5, 9, 10, 12, 13];
+const FECHAS_DE_GRUPOS = 6;
+const GRUPOS_POR_COPA = 8;
+const LETRAS_DE_GRUPO = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const TRANSFER_ROUND_D2 = 17; // ventana de pases de la Nacional, a mitad de su único torneo
 // Primera juega 16 fechas: las 15 del fixture de su zona (14 partidos contra
 // su zona + el interzonal de emparejamiento en la fecha que le tocaría estar
@@ -116,7 +139,13 @@ const Engine = {
   // La cancha de un club, o null si todavía no está cargada (los de la
   // Primera Nacional). Quien la muestre tiene que bancarse el null.
   estadioDe(clubId) {
-    return (typeof ESTADIOS === 'undefined' ? null : ESTADIOS[clubId]) || null;
+    const propio = (typeof ESTADIOS === 'undefined' ? null : ESTADIOS[clubId]);
+    if (propio) return propio;
+    // Cuando el partido es de copa, el rival puede ser de afuera: su estadio
+    // viene cargado en el propio club (ver CLUBES_INTERNACIONALES).
+    const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .find((c) => c.id === clubId);
+    return (deAfuera && deAfuera.estadio) || null;
   },
 
   // Una cancha neutral al azar para las llaves (playoffs y Copa Argentina).
@@ -126,7 +155,26 @@ const Engine = {
   },
 
   getClub(id) {
-    return this.state.clubs.find((c) => c.id === id);
+    return this.state.clubs.find((c) => c.id === id) || this.clubInternacional(id);
+  },
+
+  // Los clubes del resto del continente no están en s.clubs (no se puede
+  // dirigir a ninguno), pero desde que las copas se juegan de verdad aparecen
+  // como rivales en la pantalla de partido, en la tabla del grupo y en el
+  // historial. Para que todo eso funcione sin tocar nada más, se los devuelve
+  // con la misma forma que un club argentino: su `nivel` hace de reputación.
+  clubInternacional(id) {
+    const c = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .find((x) => x.id === id);
+    if (!c) return undefined;
+    return {
+      id: c.id,
+      name: c.nombre,
+      reputation: c.nivel,
+      pais: c.pais,
+      internacional: true,
+      colors: c.colores ? [c.colores.primario, c.colores.secundario] : ['#888888', '#ffffff'],
+    };
   },
 
   rollNation() {
@@ -1225,14 +1273,21 @@ const Engine = {
   // Por eso un club puede aparecer en las dos copas el mismo año, y cobrar
   // premio en las dos.
   simulateCopasDelAnio(qualification) {
-    if (!qualification || !qualification.length) return [];
-    const internacionales = this.sortearCuposInternacionales();
+    // Lo normal es que las copas se hayan ido jugando durante el año: ahí el
+    // sorteo de cupos, las fases previas y los grupos ya están hechos y lo
+    // único que falta resolver son las eliminatorias. El camino de abajo (con
+    // sorteo acá mismo) queda para una partida que no llegó a armarlas.
+    const enCurso = !!this.copaEnCurso('Libertadores') || !!this.copaEnCurso('Sudamericana');
+    if (!enCurso && (!qualification || !qualification.length)) return [];
+    const internacionales = enCurso ? null : this.sortearCuposInternacionales();
     const recopa = this.simularRecopa();
-    const libertadores = this.simulateCopa('Libertadores', qualification, internacionales, {
+    const libertadores = this.simulateCopa('Libertadores', qualification, internacionales, enCurso ? {} : {
       aGrupos: this.campeonesVigentes(qualification, internacionales),
     });
     const sudamericana = this.simulateCopa('Sudamericana', qualification, internacionales, {
-      aGrupos: libertadores ? libertadores.bajanAGrupos : [],
+      // Los que bajan de la previa de la Libertadores ya entraron a los grupos
+      // de la Sudamericana cuando se armó la copa, en febrero.
+      aGrupos: enCurso || !libertadores ? [] : libertadores.bajanAGrupos,
       alPlayoff: libertadores ? libertadores.bajanAlPlayoff : [],
     });
     // Los que bajan son para armar la otra copa, no para guardarlos en la
@@ -1266,20 +1321,41 @@ const Engine = {
       (qualification || []).map((q) => q.clubId).concat((internacionales || []).map((c) => c.id)),
     );
     const entrants = [];
+    const suplenteDe = (pais) => {
+      if (pais === 'Argentina') {
+        const club = this.state.clubs
+          .filter((c) => c.division === 'D1' && !yaEstan.has(c.id))
+          .sort((a, b) => b.reputation - a.reputation)[0];
+        return club ? this.entrantDeClub(club.id) : null;
+      }
+      const deAfuera = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+        .filter((x) => x.pais === pais && !yaEstan.has(x.id))
+        .sort((a, b) => b.nivel - a.nivel)[0];
+      return deAfuera
+        ? { id: deAfuera.id, nombre: deAfuera.nombre, pais: deAfuera.pais, nivel: deAfuera.nivel }
+        : null;
+    };
     const sumar = (club) => {
       if (!club || yaEstan.has(club.id)) return false;
       yaEstan.add(club.id);
       entrants.push({ ...club, fase: 'grupos' });
       return true;
     };
+    // Solo las dos copas internacionales reparten cupo de campeón vigente. Los
+    // títulos nacionales (Trofeo de Campeones, Supercopa Argentina y demás)
+    // también pasan por acá y no dan nada: sin este filtro, el campeón de la
+    // Supercopa se metía en los grupos de la Libertadores por la ventana.
     ((this.state && this.state.ultimasCopas) || []).forEach((c) => {
       if (c.esRecopa || !c.championId) return;
+      if (c.copa !== 'Libertadores' && c.copa !== 'Sudamericana') return;
       const campeon = this.entrantDeClub(c.championId);
       if (!campeon || sumar(campeon)) return;
-      const suplente = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
-        .filter((x) => x.pais === campeon.pais && !yaEstan.has(x.id))
-        .sort((a, b) => b.nivel - a.nivel)[0];
-      if (suplente) sumar({ id: suplente.id, nombre: suplente.nombre, pais: suplente.pais, nivel: suplente.nivel });
+      // El campeón ya había clasificado por su liga, así que el cupo no se
+      // pierde: se lo queda el mejor club de su país que se había quedado
+      // afuera. Si el campeón es argentino, el suplente sale de Primera; si es
+      // de afuera, del pozo del continente. Así la copa entra siempre con 32.
+      const suplente = suplenteDe(campeon.pais);
+      if (suplente) sumar(suplente);
     });
     return entrants;
   },
@@ -1396,6 +1472,36 @@ const Engine = {
 
   // La Recopa: los dos campeones del año pasado, ida y vuelta. Se juega antes
   // que las copas nuevas, como en la realidad.
+  // Una carrera no empieza con el fútbol recién inventado: cuando arrancás, las
+  // copas del año anterior ya se jugaron y sus campeones tienen su cupo en la
+  // próxima edición. Sin esto, la primera Libertadores de la carrera entraba
+  // con 30 equipos y dos grupos quedaban de a tres. Es la misma idea que
+  // sembrarHistorialDePromedios con la tabla de promedios.
+  //
+  // De paso, el primer año que se juegan las copas también se juega la Recopa
+  // entre estos dos, como corresponde.
+  sembrarCampeonesVigentes() {
+    const pozo = (typeof CLUBES_INTERNACIONALES === 'undefined' ? [] : CLUBES_INTERNACIONALES)
+      .filter((c) => c.nivel >= 4);
+    if (pozo.length < 2) return [];
+    const alAzar = (candidatos) => candidatos[Math.floor(Math.random() * candidatos.length)];
+    const deLaLibertadores = alAzar(pozo);
+    const deLaSudamericana = alAzar(pozo.filter((c) => c.pais !== deLaLibertadores.pais));
+    if (!deLaSudamericana) return [];
+    return [
+      { copa: 'Libertadores', club: deLaLibertadores },
+      { copa: 'Sudamericana', club: deLaSudamericana },
+    ].map(({ copa, club }) => ({
+      copa,
+      championId: club.id,
+      championName: club.nombre,
+      championPais: club.pais,
+      runnerUpName: null,
+      userWon: false,
+      userStage: null,
+    }));
+  },
+
   simularRecopa() {
     const ultimas = (this.state && this.state.ultimasCopas) || [];
     const campeonDe = (copa) => {
@@ -1424,11 +1530,12 @@ const Engine = {
     };
   },
 
-  simulateCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
-    const deLaOtra = desdeLaOtraCopa || {};
-    const alPlayoff = deLaOtra.alPlayoff || [];
+  // La fase de grupos resuelta de una, sin pasar por el calendario. Es el
+  // camino viejo: hoy solo lo usa una partida que todavía no tiene copas
+  // armadas para el año en curso.
+  simularFaseDeGrupos(copa, qualification, internacionales, deLaOtra) {
     const entrants = this.copaEntrants(copa, qualification, internacionales)
-      .concat(deLaOtra.aGrupos || [], alPlayoff);
+      .concat(deLaOtra.aGrupos || [], deLaOtra.alPlayoff || []);
     if (entrants.length < 4) return null;
     const byId = Object.fromEntries(entrants.map((e) => [e.id, e]));
     // Hasta dónde llegó cada club: se pisa en cada instancia que juega, así
@@ -1442,43 +1549,66 @@ const Engine = {
     const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id)
       .concat(resultadoPrevia.pasan);
 
-    // 8 grupos como en las dos copas reales.
     mark(enGrupos, 'la fase de grupos');
-    const sorteo = this.shuffled(enGrupos);
-    const cantGrupos = Math.max(1, Math.min(8, Math.floor(sorteo.length / 2)));
-    const grupos = Array.from({ length: cantGrupos }, () => []);
-    sorteo.forEach((id, i) => grupos[i % cantGrupos].push(id));
-
-    // De mejor a peor campaña, que es como CONMEBOL numera a los que
-    // terminaron en la misma posición de sus grupos.
-    const porCampania = (filas) => filas.slice()
-      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    const grupos = this.sortearGruposDeCopa(enGrupos, byId);
 
     const primeros = [];
     const segundos = [];
     const terceros = [];
     let victoriasDelUsuario = 0;
     grupos.forEach((grupo) => {
-      const table = Object.fromEntries(grupo.map((id) => [id, this.emptyTableRow()]));
-      const partidos = [];
-      for (let i = 0; i < grupo.length; i++) {
-        for (let j = i + 1; j < grupo.length; j++) {
-          const score = this.simulateScore(this.copaStrength(byId[grupo[i]]), this.copaStrength(byId[grupo[j]]), 4);
-          this.updateTableRow(table, grupo[i], score.homeGoals, score.awayGoals);
-          this.updateTableRow(table, grupo[j], score.awayGoals, score.homeGoals);
-          partidos.push({ local: grupo[i], visitante: grupo[j], golesLocal: score.homeGoals, golesVisitante: score.awayGoals });
-          if (grupo[i] === this.state.clubId && score.homeGoals > score.awayGoals) victoriasDelUsuario++;
-          if (grupo[j] === this.state.clubId && score.awayGoals > score.homeGoals) victoriasDelUsuario++;
-        }
-      }
-      const orden = this.ordenarGrupo(
-        Object.entries(table).map(([id, row]) => ({ id, ...row })),
-        partidos,
-      );
+      grupo.fixture.forEach((fecha) => {
+        fecha.forEach((p) => {
+          const score = this.simulateScore(this.copaStrength(byId[p.local]), this.copaStrength(byId[p.visitante]), 4);
+          this.anotarEnGrupo(grupo, p.local, p.visitante, score.homeGoals, score.awayGoals);
+          if (p.local === this.state.clubId && score.homeGoals > score.awayGoals) victoriasDelUsuario++;
+          if (p.visitante === this.state.clubId && score.awayGoals > score.homeGoals) victoriasDelUsuario++;
+        });
+      });
+      const orden = this.posicionesDeGrupo(grupo);
       if (orden[0]) primeros.push(orden[0]);
       if (orden[1]) segundos.push(orden[1]);
       if (orden[2]) terceros.push(orden[2]);
     });
+
+    return {
+      byId,
+      reached,
+      primeros,
+      segundos,
+      terceros,
+      victoriasDelUsuario,
+      camino: resultadoPrevia.camino,
+      eliminadosPrevia: resultadoPrevia.eliminados,
+    };
+  },
+
+  // Una copa internacional, de la fase de grupos en adelante.
+  //
+  // La fase de grupos puede llegar acá de dos maneras: si la temporada la fue
+  // jugando fecha a fecha (que es lo normal desde que las copas son jugables,
+  // ver armarCopasInternacionales) se leen esas tablas tal como quedaron; si
+  // no hay copa en curso, se simula entera de una. De octavos en adelante el
+  // camino es el mismo para las dos.
+  simulateCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
+    const deLaOtra = desdeLaOtraCopa || {};
+    const alPlayoff = deLaOtra.alPlayoff || [];
+    const enCurso = this.copaEnCurso(copa);
+    const fase = enCurso
+      ? this.cerrarFaseDeGrupos(enCurso)
+      : this.simularFaseDeGrupos(copa, qualification, internacionales, deLaOtra);
+    if (!fase) return null;
+
+    const { byId, reached, primeros, segundos, terceros } = fase;
+    // Los terceros de la Libertadores llegan a la Sudamericana recién en el
+    // playoff, así que no están en ninguno de sus grupos: hay que sumarlos al
+    // padrón para poder jugarles la llave.
+    alPlayoff.forEach((e) => { byId[e.id] = e; });
+    const mark = (ids, etapa) => ids.forEach((id) => { if (id) reached[id] = etapa; });
+    // De mejor a peor campaña, que es como CONMEBOL numera a los que
+    // terminaron en la misma posición de sus grupos.
+    const porCampania = (filas) => filas.slice()
+      .sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
 
     // En la Sudamericana el primero de cada grupo se mete derecho en octavos y
     // el segundo tiene que ganar el playoff contra un tercero de la
@@ -1534,8 +1664,8 @@ const Engine = {
       // partido ganado en la fase de grupos se paga aparte, y la previa
       // depende de qué fases jugó y de si le tocó de local.
       userExtras: {
-        victoriasEnGrupos: victoriasDelUsuario,
-        previa: resultadoPrevia.camino && resultadoPrevia.camino.fases.length ? resultadoPrevia.camino : null,
+        victoriasEnGrupos: fase.victoriasDelUsuario,
+        previa: fase.camino && fase.camino.fases.length ? fase.camino : null,
       },
       // Los que se van de esta copa pero siguen en la otra (ver
       // simulateCopasDelAnio). Solo los usa la Libertadores para alimentar a
@@ -1543,9 +1673,346 @@ const Engine = {
       //
       // Los terceros van ordenados de mejor a peor campaña (el 17º primero y
       // el 24º último), porque así es como se arman los cruces del playoff.
-      bajanAGrupos: resultadoPrevia.eliminados.map((id) => ({ ...byId[id], fase: 'grupos' })),
+      bajanAGrupos: fase.eliminadosPrevia.map((id) => ({ ...byId[id], fase: 'grupos' })),
       bajanAlPlayoff: porCampania(terceros).map((r) => ({ ...byId[r.id], fase: 'playoff' })),
     };
+  },
+
+  // ---------- Copas internacionales: armado y fase de grupos en vivo ----------
+
+  // La copa que se está jugando este año, si es que hay una. Devuelve null
+  // cuando la temporada no tiene copas armadas (la primera de una carrera,
+  // que todavía no tiene clasificados de nadie).
+  copaEnCurso(copa) {
+    const ci = this.state.copasInter;
+    return (ci && ci.copas && ci.copas[copa]) || null;
+  },
+
+  // Arma las dos copas del año enteras al empezar la temporada: sortea los
+  // cupos del continente, resuelve las fases previas —que en la realidad se
+  // juegan en enero y febrero, antes de que arranque el torneo local— y
+  // sortea los 8 grupos de cada copa con su fixture de 6 fechas.
+  //
+  // Las dos se arman de una sola vez y con UN solo sorteo de cupos, porque la
+  // Libertadores le da de comer a la Sudamericana: los que pierden su última
+  // fase previa caen a los grupos de la otra copa.
+  //
+  // A partir de acá la fase de grupos se juega fecha a fecha durante el año
+  // (ver COPA_INTER_ROUNDS). Lo que va de octavos en adelante se sigue
+  // resolviendo al cierre de la temporada, pero ya partiendo de estas tablas.
+  armarCopasInternacionales() {
+    const s = this.state;
+    s.copasInter = null;
+    const qualification = s.copaQualification;
+    if (!qualification || !qualification.length) return;
+
+    // El primer año que se juegan las copas todavía no hay campeones del año
+    // anterior, porque esa edición nunca existió en la partida. Se siembran
+    // dos: una carrera no arranca con el continente en blanco.
+    const hayVigentes = (s.ultimasCopas || [])
+      .some((c) => !c.esRecopa && (c.copa === 'Libertadores' || c.copa === 'Sudamericana'));
+    if (!hayVigentes) s.ultimasCopas = (s.ultimasCopas || []).concat(this.sembrarCampeonesVigentes());
+
+    const internacionales = this.sortearCuposInternacionales();
+    const libertadores = this.armarCopa('Libertadores', qualification, internacionales, {
+      aGrupos: this.campeonesVigentes(qualification, internacionales),
+    });
+    const sudamericana = this.armarCopa('Sudamericana', qualification, internacionales, {
+      aGrupos: libertadores ? libertadores.bajanAGrupos : [],
+    });
+    if (!libertadores && !sudamericana) return;
+
+    // `bajanAGrupos` era solo para armar la otra copa: no se guarda.
+    const limpia = (copa) => {
+      if (!copa) return null;
+      const { bajanAGrupos, ...resto } = copa;
+      return resto;
+    };
+    s.copasInter = {
+      year: s.season.year,
+      fecha: 0,
+      copas: { Libertadores: limpia(libertadores), Sudamericana: limpia(sudamericana) },
+    };
+  },
+
+  armarCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
+    const deLaOtra = desdeLaOtraCopa || {};
+    const entrants = this.copaEntrants(copa, qualification, internacionales)
+      .concat(deLaOtra.aGrupos || []);
+    if (entrants.length < 8) return null;
+    const clubes = Object.fromEntries(entrants.map((e) => [
+      e.id, { id: e.id, nombre: e.nombre, pais: e.pais, nivel: e.nivel },
+    ]));
+
+    const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
+    const resultadoPrevia = this.jugarFasesPrevias(copa, previa, clubes);
+    const enGrupos = entrants.filter((e) => e.fase === 'grupos').map((e) => e.id)
+      .concat(resultadoPrevia.pasan);
+
+    return {
+      copa,
+      clubes,
+      previa: {
+        jugaron: previa,
+        camino: resultadoPrevia.camino,
+        eliminados: resultadoPrevia.eliminados,
+      },
+      grupos: this.sortearGruposDeCopa(enGrupos, clubes),
+      bajanAGrupos: resultadoPrevia.eliminados.map((id) => ({ ...clubes[id], fase: 'grupos' })),
+    };
+  },
+
+  // El sorteo de los 8 grupos, con las dos reglas del sorteo de verdad:
+  //
+  //   - Bombos. Los equipos se ordenan por nivel y se parten en cuatro bombos
+  //     de ocho. De cada bombo sale uno por grupo, así que ningún grupo junta
+  //     a los cuatro mejores del continente ni a los cuatro más flojos.
+  //   - No puede haber dos del mismo país en un mismo grupo. Vale para todos:
+  //     Brasil y Argentina incluidos.
+  //
+  // La restricción de país se resuelve con backtracking, bombo por bombo: se
+  // prueba a quién mandar a cada grupo y se vuelve atrás si el reparto se
+  // traba. Si por los cupos de ese año no hubiera forma de repartir un bombo
+  // sin repetir país (con los cupos reales no pasa, pero más vale no colgar
+  // el juego), ese bombo se reparte sin la restricción.
+  sortearGruposDeCopa(ids, clubes) {
+    const cantGrupos = Math.max(1, Math.min(GRUPOS_POR_COPA, Math.floor(ids.length / 2)));
+    const grupos = Array.from({ length: cantGrupos }, (_, i) => ({
+      letra: LETRAS_DE_GRUPO[i] || String(i + 1),
+      ids: [],
+      tabla: {},
+      partidos: [],
+      fixture: [],
+    }));
+    const ordenados = ids.slice().sort((a, b) => clubes[b].nivel - clubes[a].nivel);
+
+    for (let desde = 0; desde < ordenados.length; desde += cantGrupos) {
+      const bombo = this.shuffled(ordenados.slice(desde, desde + cantGrupos));
+      // El último bombo puede venir incompleto si ese año entraron menos
+      // equipos de los que esperan los ocho grupos: los que haya van a grupos
+      // sorteados, no siempre a los primeros.
+      const destinos = this.shuffled(grupos.map((_, i) => i)).slice(0, bombo.length);
+      const usados = new Set();
+      const repartir = (k, conRestriccion) => {
+        if (k >= destinos.length) return true;
+        const grupo = grupos[destinos[k]];
+        const candidatos = bombo.filter((id) => !usados.has(id)
+          && (!conRestriccion || !grupo.ids.some((otro) => clubes[otro].pais === clubes[id].pais)));
+        for (const id of candidatos) {
+          usados.add(id);
+          grupo.ids.push(id);
+          if (repartir(k + 1, conRestriccion)) return true;
+          usados.delete(id);
+          grupo.ids.pop();
+        }
+        return false;
+      };
+      if (!repartir(0, true)) repartir(0, false);
+    }
+
+    grupos.forEach((grupo) => {
+      grupo.tabla = Object.fromEntries(grupo.ids.map((id) => [id, this.emptyTableRow()]));
+      grupo.fixture = this.fixtureDeGrupo(grupo.ids);
+    });
+    return grupos;
+  },
+
+  // Las 6 fechas de un grupo: la rueda de ida y la de vuelta. Cada equipo
+  // termina con 3 de local y 3 de visitante, pero el orden importa: si se
+  // juega la ida entera y después la vuelta entera, a alguno le tocan los
+  // tres de local seguidos y después los tres de visitante, que no es como se
+  // juega una copa.
+  //
+  // Así que se prueban todos los órdenes posibles de la ida y de la vuelta y
+  // se elige el que mejor reparte la localía: nadie con más de dos partidos
+  // seguidos del mismo lado, y siempre al menos dos fechas entre un partido y
+  // su revancha. Son tres rondas, así que probarlas todas sale gratis.
+  fixtureDeGrupo(ids) {
+    const rondas = this.buildSchedule(ids);
+    const invertida = (ronda) => ronda.map((m) => ({ home: m.away, away: m.home }));
+    const ordenes = this.permutaciones(rondas.map((_, i) => i));
+    // Cada cruce se juega dos veces, una de cada lado, así que dar vuelta la
+    // ida de cualquiera de ellos siempre es legal: lo único que cambia es cuál
+    // de las dos fechas es la de local. Con grupos de 3 o 4 son 8 o 64
+    // combinaciones, así que se prueban todas.
+    const partidos = rondas.reduce((total, ronda) => total + ronda.length, 0);
+    const vueltas = partidos <= 12
+      ? this.shuffled(Array.from({ length: 1 << partidos }, (_, m) => m))
+      : [0];
+    let mejor = null;
+    for (const mask of vueltas) {
+      let n = 0;
+      const base = rondas.map((ronda) => ronda.map((m) => (((mask >> n++) & 1)
+        ? { home: m.away, away: m.home }
+        : m)));
+      for (const ida of ordenes) {
+        for (const vuelta of ordenes) {
+          // La revancha no puede caer pegada a la ida: entre un partido y el
+          // de vuelta contra el mismo rival tienen que pasar al menos dos
+          // fechas, como en las copas de verdad.
+          const separacion = Math.min(...ida.map((r, k) => rondas.length + vuelta.indexOf(r) - k));
+          if (separacion < 2) continue;
+          const fechas = ida.map((i) => base[i]).concat(vuelta.map((i) => invertida(base[i])));
+          const peor = this.peorRachaDeLocalia(ids, fechas);
+          if (!mejor || peor < mejor.peor) mejor = { fechas, peor };
+        }
+      }
+      // Dos partidos seguidos del mismo lado es lo mejor a lo que se puede
+      // llegar en un grupo de cuatro: cuando aparece, no hace falta seguir.
+      if (mejor && mejor.peor <= 2) break;
+    }
+    const fechas = mejor ? mejor.fechas : rondas.concat(rondas.map(invertida));
+    return fechas.map((ronda) => ronda.map((m) => ({ local: m.home, visitante: m.away })));
+  },
+
+  permutaciones(arr) {
+    if (arr.length <= 1) return [arr];
+    return arr.flatMap((x, i) => this
+      .permutaciones(arr.slice(0, i).concat(arr.slice(i + 1)))
+      .map((resto) => [x].concat(resto)));
+  },
+
+  // La racha más larga de partidos seguidos del mismo lado (todos de local o
+  // todos de visitante) que le toca al equipo peor parado del grupo. Cuanto
+  // más chica, mejor repartido está el fixture.
+  peorRachaDeLocalia(ids, fechas) {
+    return Math.max(...ids.map((id) => {
+      let racha = 0;
+      let peor = 0;
+      let anterior = null;
+      fechas.forEach((ronda) => {
+        const m = ronda.find((x) => x.home === id || x.away === id);
+        if (!m) return;
+        const lado = m.home === id ? 'L' : 'V';
+        racha = lado === anterior ? racha + 1 : 1;
+        anterior = lado;
+        peor = Math.max(peor, racha);
+      });
+      return peor;
+    }));
+  },
+
+  anotarEnGrupo(grupo, local, visitante, golesLocal, golesVisitante) {
+    this.updateTableRow(grupo.tabla, local, golesLocal, golesVisitante);
+    this.updateTableRow(grupo.tabla, visitante, golesVisitante, golesLocal);
+    grupo.partidos.push({ local, visitante, golesLocal, golesVisitante });
+  },
+
+  // Las posiciones de un grupo, con los desempates de CONMEBOL (ver
+  // ordenarGrupo). Es lo que usan tanto la tabla que se ve en el panel como
+  // el cierre de la fase.
+  posicionesDeGrupo(grupo) {
+    return this.ordenarGrupo(
+      Object.entries(grupo.tabla).map(([id, row]) => ({ id, ...row })),
+      grupo.partidos,
+    );
+  },
+
+  // Cierra la fase de grupos de una copa que se jugó fecha a fecha y la deja
+  // en la misma forma que devuelve simularFaseDeGrupos, para que de octavos
+  // en adelante sea todo el mismo código.
+  cerrarFaseDeGrupos(enCurso) {
+    const byId = {};
+    Object.entries(enCurso.clubes).forEach(([id, c]) => { byId[id] = { ...c }; });
+    const reached = {};
+    const mark = (ids, etapa) => ids.forEach((id) => { if (id) reached[id] = etapa; });
+    mark(enCurso.previa.jugaron || [], 'la fase previa');
+
+    const primeros = [];
+    const segundos = [];
+    const terceros = [];
+    let victoriasDelUsuario = 0;
+    enCurso.grupos.forEach((grupo) => {
+      mark(grupo.ids, 'la fase de grupos');
+      grupo.partidos.forEach((p) => {
+        if (p.local === this.state.clubId && p.golesLocal > p.golesVisitante) victoriasDelUsuario++;
+        if (p.visitante === this.state.clubId && p.golesVisitante > p.golesLocal) victoriasDelUsuario++;
+      });
+      const orden = this.posicionesDeGrupo(grupo);
+      if (orden[0]) primeros.push(orden[0]);
+      if (orden[1]) segundos.push(orden[1]);
+      if (orden[2]) terceros.push(orden[2]);
+    });
+
+    return {
+      byId,
+      reached,
+      primeros,
+      segundos,
+      terceros,
+      victoriasDelUsuario,
+      camino: enCurso.previa.camino,
+      eliminadosPrevia: enCurso.previa.eliminados || [],
+    };
+  },
+
+  // ¿El usuario juega esta fecha de grupos? Puede estar en una sola de las dos
+  // copas, así que apenas aparece el partido se devuelve.
+  partidoDeCopaDelUsuario(fecha) {
+    const s = this.state;
+    const ci = s.copasInter;
+    if (!ci) return null;
+    const copas = Object.values(ci.copas).filter(Boolean);
+    for (const copa of copas) {
+      for (const grupo of copa.grupos) {
+        const partido = (grupo.fixture[fecha] || [])
+          .find((p) => p.local === s.clubId || p.visitante === s.clubId);
+        if (partido) return { copa: copa.copa, grupo, partido };
+      }
+    }
+    return null;
+  },
+
+  // Simula de una todos los partidos de una fecha de grupos, en las dos copas.
+  // `excepto` es el partido que jugó el usuario, que ya quedó anotado.
+  simularFechaDeCopas(fecha, excepto) {
+    const ci = this.state.copasInter;
+    if (!ci) return;
+    Object.values(ci.copas).filter(Boolean).forEach((copa) => {
+      copa.grupos.forEach((grupo) => {
+        (grupo.fixture[fecha] || []).forEach((p) => {
+          if (excepto && p.local === excepto.home && p.visitante === excepto.away) return;
+          const score = this.simulateScore(
+            this.copaStrength(copa.clubes[p.local]),
+            this.copaStrength(copa.clubes[p.visitante]),
+            4,
+          );
+          this.anotarEnGrupo(grupo, p.local, p.visitante, score.homeGoals, score.awayGoals);
+        });
+      });
+    });
+  },
+
+  // Un checkpoint de copa internacional: se juega la fecha de grupos que toca.
+  // Si el usuario no está en ninguna de las dos copas (o está en la Nacional),
+  // la fecha se resuelve sola y el año sigue; si juega, se abre la pantalla de
+  // partido y el resto de la fecha se simula cuando termine el suyo.
+  avanzarFechaDeCopas() {
+    const s = this.state;
+    const ci = s.copasInter;
+    const mio = this.partidoDeCopaDelUsuario(ci.fecha);
+
+    if (!mio) {
+      this.simularFechaDeCopas(ci.fecha, null);
+      ci.fecha++;
+      this.enterEditionRound();
+      return;
+    }
+
+    const isHome = mio.partido.local === s.clubId;
+    const rivalId = isHome ? mio.partido.visitante : mio.partido.local;
+    s.matchContext = {
+      context: 'copa-inter',
+      copa: mio.copa,
+      grupo: mio.grupo.letra,
+      fechaDeGrupos: ci.fecha + 1,
+      opponentId: rivalId,
+      isHome,
+      sede: this.estadioDe(isHome ? s.clubId : rivalId),
+    };
+    this.pickDecision();
+    s.screen = 'pre-match';
+    this.save();
   },
 
   // ---------- Simulación instantánea de la división en la que NO juega el usuario ----------
@@ -1628,6 +2095,7 @@ const Engine = {
       season: null,
       calendar: null,
       copaBracket: null,
+      copasInter: null,
       bracket: null,
       matchContext: null,
       currentDecision: null,
@@ -1750,6 +2218,7 @@ const Engine = {
       totalRounds: TOTAL_ROUNDS[club.division],
       fifaShown: [],
       copaShown: [],
+      copaInterShown: [],
       transferShown: false,
       transferReason: null,
       zones: {},
@@ -1763,6 +2232,10 @@ const Engine = {
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
     this.setupCopaBracket();
+    // Las copas internacionales de este año se arman ahora, con los
+    // clasificados que salieron de la temporada pasada: la fase previa queda
+    // resuelta y los grupos sorteados, listos para jugarse fecha a fecha.
+    this.armarCopasInternacionales();
 
     if (careerStart) this.startFirstEdition();
     else this.startTransferWindow('pre-season');
@@ -1822,6 +2295,7 @@ const Engine = {
     this.limpiarAmarillas();
     season.fifaShown = [];
     season.copaShown = [];
+    season.copaInterShown = [];
 
     const zoneAId = `${club.division}-A`;
     const zoneBId = `${club.division}-B`;
@@ -1956,6 +2430,17 @@ const Engine = {
     if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copaBracket.alive.length > 1) {
       season.copaShown.push(season.roundIndex);
       this.advanceCopaBracket();
+      return;
+    }
+
+    // Las copas internacionales corren en paralelo a la liga: seis fechas de
+    // grupos entre marzo y mayo, en semanas distintas a las de la Copa
+    // Argentina para no amontonar partidos.
+    if (copaEditionOk && s.copasInter && s.copasInter.fecha < FECHAS_DE_GRUPOS
+      && COPA_INTER_ROUNDS.includes(season.roundIndex)
+      && !(season.copaInterShown || []).includes(season.roundIndex)) {
+      season.copaInterShown = (season.copaInterShown || []).concat([season.roundIndex]);
+      this.avanzarFechaDeCopas();
       return;
     }
 
@@ -2218,7 +2703,10 @@ const Engine = {
     // el gol y la serie se cierra ahí. La Copa Argentina es la excepción: no
     // tiene alargue, del empate se va derecho a los penales.
     const sinAlargue = !!(s.matchContext && s.matchContext.sinAlargue);
-    if (m.context !== 'league' && !sinAlargue && m.homeGoals === m.awayGoals) {
+    // La fase de grupos de las copas internacionales admite empate igual que
+    // la liga: ahí no hay alargue ni penales, el empate suma un punto.
+    const admiteEmpate = m.context === 'league' || m.context === 'copa-inter';
+    if (!admiteEmpate && !sinAlargue && m.homeGoals === m.awayGoals) {
       const enAlargue = this.simulateExtraTime(m);
       if (enAlargue.homeGoals || enAlargue.awayGoals) {
         m.homeGoals += enAlargue.homeGoals;
@@ -2226,7 +2714,7 @@ const Engine = {
         m.extraTime = enAlargue;
       }
     }
-    if (m.context !== 'league' && m.homeGoals === m.awayGoals) {
+    if (!admiteEmpate && m.homeGoals === m.awayGoals) {
       const myStrength = this.squadStrength();
       const oppStrength = this.clubStrength(m.opponentId);
       const userIsHomeSide = m.isHome;
@@ -2441,7 +2929,7 @@ const Engine = {
     // Salvaguarda: una instancia de eliminación directa nunca puede terminar
     // sin ganador. Si por algún motivo no se calculó el shootout, se decide
     // acá al azar en vez de dejar el partido sin resolver.
-    if (m.context !== 'league') return Math.random() < 0.5 ? m.home : m.away;
+    if (m.context !== 'league' && m.context !== 'copa-inter') return Math.random() < 0.5 ? m.home : m.away;
     return null;
   },
 
@@ -2471,6 +2959,23 @@ const Engine = {
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
+      this.enterEditionRound();
+    } else if (m.context === 'copa-inter') {
+      // Fase de grupos: el partido se anota en la tabla del grupo y el resto
+      // de la fecha (los otros 15 partidos de esa copa, más los de la otra)
+      // se simula recién ahora, para que la tabla se mueva con tu resultado
+      // ya puesto.
+      const ctx = s.matchContext;
+      const ci = s.copasInter;
+      const copa = ci.copas[ctx.copa];
+      const grupo = copa.grupos.find((g) => g.ids.includes(s.clubId));
+      this.anotarEnGrupo(grupo, m.home, m.away, m.homeGoals, m.awayGoals);
+      s.log.unshift(`Copa ${ctx.copa} — Grupo ${grupo.letra}: ${clubName(m.home)} ${m.homeGoals}-${m.awayGoals} ${clubName(m.away)}`);
+      if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
+      this.simularFechaDeCopas(ci.fecha, m);
+      ci.fecha++;
+      s.pendingMatch = null;
+      s.matchContext = null;
       this.enterEditionRound();
     } else if (m.context === 'bracket') {
       this.resolveUserBracketMatch(userWon, false);

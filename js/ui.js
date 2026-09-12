@@ -9,6 +9,11 @@ const squadPanel = document.getElementById('squad-panel');
 let selectDivision = 'D1';
 let selectZone = 'A';
 let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
+// Qué grupo de qué copa internacional se está mirando en la pestaña "Copas".
+// Arrancan en null para que el panel elija solo la copa y el grupo del
+// usuario la primera vez que se abre.
+let copaPanelCopa = null;
+let copaPanelGrupo = null;
 let selectedPlayerId = null; // jugador tocado en la cancha/banco, esperando el segundo toque para cambiarlo
 
 function money(n) {
@@ -218,6 +223,134 @@ function enLaCopa(c) {
   return `En ${articuloDe(c)} ${nombreDeCopa(c)}`;
 }
 
+// ---------- La fase de grupos de las copas internacionales ----------
+
+// Los colores de una tabla de grupo, que son los que el reglamento de cada
+// copa le da a cada puesto. En la Libertadores pasan los dos primeros, el
+// tercero no queda eliminado (se va al playoff de octavos de la Sudamericana)
+// y el cuarto sí. En la Sudamericana pasa derecho el primero, el segundo
+// tiene que ganar ese mismo playoff contra un tercero de la Libertadores, y
+// los otros dos se van.
+function zonaDeGrupo(copa, index) {
+  if (copa === 'Libertadores') return index < 2 ? 'champ' : index === 2 ? 'suda' : 'desc';
+  return index === 0 ? 'champ' : index === 1 ? 'playoff' : 'desc';
+}
+
+function leyendaDeGrupo(copa) {
+  if (copa === 'Libertadores') {
+    return tableLegend([
+      { zone: 'champ', text: 'Pasan a los octavos de final' },
+      { zone: 'suda', text: 'Se va a la Copa Sudamericana (playoff de octavos)' },
+      { zone: 'desc', text: 'Queda eliminado' },
+    ]);
+  }
+  return tableLegend([
+    { zone: 'champ', text: 'Pasa derecho a los octavos de final' },
+    { zone: 'playoff', text: 'Juega el playoff contra un tercero de la Libertadores' },
+    { zone: 'desc', text: 'Queda eliminado' },
+  ]);
+}
+
+function copasEnCurso() {
+  const ci = Engine.state.copasInter;
+  if (!ci || !ci.copas) return [];
+  return Object.values(ci.copas).filter(Boolean);
+}
+
+function grupoDelUsuario(copa) {
+  return copa.grupos.findIndex((g) => g.ids.includes(Engine.state.clubId));
+}
+
+// La copa que está mirando el panel, con el grupo ya acotado a los que
+// existen. La primera vez cae en la copa y el grupo del usuario: es lo que
+// querés ver de entrada, y el resto de los grupos quedan a una flechita.
+function copaDelPanel() {
+  const copas = copasEnCurso();
+  if (!copas.length) return null;
+  if (!copas.some((c) => c.copa === copaPanelCopa)) {
+    const mia = copas.find((c) => grupoDelUsuario(c) >= 0);
+    copaPanelCopa = (mia || copas[0]).copa;
+    copaPanelGrupo = null;
+  }
+  const copa = copas.find((c) => c.copa === copaPanelCopa);
+  if (copaPanelGrupo === null) copaPanelGrupo = Math.max(0, grupoDelUsuario(copa));
+  copaPanelGrupo = Math.min(Math.max(0, copaPanelGrupo), copa.grupos.length - 1);
+  return copa;
+}
+
+// Una fila de tabla de grupo. Es igual a la de la liga pero con el país al
+// lado del nombre: en un grupo continental, saber que el rival es paraguayo o
+// boliviano dice bastante más que en la tabla de la zona.
+function filaDeGrupoHtml(row, index, zone, pais) {
+  const s = Engine.state;
+  const classes = [row.id === s.clubId ? 'me' : '', `zone-${zone}`].filter(Boolean).join(' ');
+  return `<tr class="${classes}"><td>${index + 1}</td><td><span class="table-club">${clubCrest(row, 18)}${row.name}<span class="muted grupo-pais">${pais}</span></span></td><td>${row.played}</td><td>${row.pts}</td></tr>`;
+}
+
+function faseDeGruposHtml() {
+  const copa = copaDelPanel();
+  if (!copa) return '';
+  const ci = Engine.state.copasInter;
+  const copas = copasEnCurso();
+  const grupo = copa.grupos[copaPanelGrupo];
+  const esMiGrupo = grupo.ids.includes(Engine.state.clubId);
+  const filas = Engine.posicionesDeGrupo(grupo)
+    .map((r) => ({ ...r, name: Engine.getClub(r.id).name }));
+
+  const selector = copas.length > 1
+    ? `<div class="copa-switch">${copas.map((c) => `<button class="option-btn small copa-switch-btn${c.copa === copaPanelCopa ? ' activo' : ''}" data-copa="${c.copa}">${c.copa}</button>`).join('')}</div>`
+    : '';
+  const jugadas = Math.min(ci.fecha, FECHAS_DE_GRUPOS);
+  const avance = jugadas === 0
+    ? `Los grupos ya están sorteados. Las ${FECHAS_DE_GRUPOS} fechas se juegan entre marzo y mayo.`
+    : jugadas >= FECHAS_DE_GRUPOS
+      ? 'Fase de grupos terminada.'
+      : `Van ${jugadas} de ${FECHAS_DE_GRUPOS} fechas.`;
+
+  return `
+    <h4>Copa ${copa.copa} — Fase de grupos</h4>
+    ${selector}
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="grupo-prev-btn">◀</button>
+      <strong>Grupo ${grupo.letra}${esMiGrupo ? ' · el tuyo' : ''}</strong>
+      <button class="option-btn small" id="grupo-next-btn">▶</button>
+    </div>
+    <p class="muted">${avance}</p>
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
+        <tbody>
+          ${filas.map((r, i) => filaDeGrupoHtml(r, i, zonaDeGrupo(copa.copa, i), copa.clubes[r.id].pais)).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${leyendaDeGrupo(copa.copa)}
+  `;
+}
+
+// Los botones de la fase de grupos. Se enganchan después de pintar el panel,
+// igual que las flechas de las pestañas.
+function engancharBotonesDeGrupos() {
+  const copa = copaDelPanel();
+  if (!copa) return;
+  const total = copa.grupos.length;
+  const mover = (paso) => {
+    copaPanelGrupo = (copaPanelGrupo + paso + total) % total;
+    renderTablePanel();
+  };
+  const prev = document.getElementById('grupo-prev-btn');
+  const next = document.getElementById('grupo-next-btn');
+  if (prev) prev.addEventListener('click', () => mover(-1));
+  if (next) next.addEventListener('click', () => mover(1));
+  document.querySelectorAll('.copa-switch-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      copaPanelCopa = btn.dataset.copa;
+      copaPanelGrupo = null;
+      renderTablePanel();
+    });
+  });
+}
+
 function copasResultHtml(copas) {
   if (!copas || !copas.length) {
     return '<p class="muted">Las copas internacionales se juegan a partir del año que viene, con los clasificados de esta temporada.</p>';
@@ -268,6 +401,7 @@ function renderTablePanel() {
       body = '<p class="muted">Todavía no se definió ninguna clasificación a copas internacionales: se sabe recién a fin de temporada.</p>';
     } else {
       body = `
+        ${faseDeGruposHtml()}
         <h4>Clasificados argentinos</h4>
         <p class="muted">Los que están jugando las copas de este año:</p>
         <ul>
@@ -315,6 +449,7 @@ function renderTablePanel() {
   `;
   document.getElementById('table-prev-btn').addEventListener('click', () => { tablePanelTab = prevTab.id; renderTablePanel(); });
   document.getElementById('table-next-btn').addEventListener('click', () => { tablePanelTab = nextTab.id; renderTablePanel(); });
+  if (tablePanelTab === 'copas') engancharBotonesDeGrupos();
 }
 
 // Escudo del club. Si está cargado (ver CLUB_CRESTS en escudos.js) se
@@ -758,7 +893,13 @@ function competitionLabel() {
     return `${editionLabel}Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
   }
   if (ctx.context === 'bracket') return Engine.bracketStageLabel();
+  if (ctx.context === 'copa-inter') return `Copa ${ctx.copa} — ${etiquetaDeGrupo(ctx)}`;
   return '';
+}
+
+// "Grupo C · Fecha 3 de 6": la instancia de un partido de fase de grupos.
+function etiquetaDeGrupo(ctx) {
+  return `Grupo ${ctx.grupo} · Fecha ${ctx.fechaDeGrupos} de ${FECHAS_DE_GRUPOS}`;
 }
 
 function header() {
@@ -1054,6 +1195,7 @@ function tituloDelCompromiso() {
   const s = Engine.state;
   const ctx = s.matchContext;
   if (ctx && ctx.context === 'bracket') return etiquetaDeLlave();
+  if (ctx && ctx.context === 'copa-inter') return etiquetaDeGrupo(ctx);
   const extra = ctx && ctx.clasico ? ' · Clásico' : ctx && ctx.interzonal ? ' · Interzonal' : '';
   return `Fecha ${s.season.roundIndex + 1} de ${s.season.totalRounds}${extra}`;
 }
@@ -1069,16 +1211,15 @@ function compromisoHtml() {
   return `<div class="proximo-compromiso">${chip}<span class="compromiso-titulo">${c.titulo}</span><span class="compromiso-detalle">${c.detalle}</span></div>`;
 }
 
-// En qué competición se juega el partido que tenés delante. Hoy se juegan la
-// liga, sus playoffs, la Copa Argentina y las llaves de la Nacional; las dos
-// copas internacionales se resuelven solas al cierre de temporada, así que
-// todavía no tienen pantalla de partido, pero sus colores ya están cargados
-// para cuando la tengan.
+// En qué competición se juega el partido que tenés delante: la liga y sus
+// playoffs, la Copa Argentina, las llaves de la Nacional y —desde que la fase
+// de grupos se juega de verdad— la Libertadores y la Sudamericana.
 function competicionDelPartido() {
   const s = Engine.state;
   const ctx = s && s.matchContext;
   if (!ctx) return null;
   if (ctx.context === 'league') return 'liga';
+  if (ctx.context === 'copa-inter') return ctx.copa === 'Libertadores' ? 'libertadores' : 'sudamericana';
   const kind = s.bracket && s.bracket.kind;
   if (kind === 'copa') return 'copaArgentina';
   return 'liga';

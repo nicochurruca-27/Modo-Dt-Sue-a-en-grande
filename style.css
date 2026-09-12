@@ -483,6 +483,33 @@ h1, h2, h3 {
   background: #64748b;
 }
 
+/* Las dos copas internacionales, arriba de la tabla del grupo. La que estás
+   mirando queda encendida con el color de acento. */
+.copa-switch {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.copa-switch .copa-switch-btn {
+  flex: 1 1 0;
+  padding: 5px 6px;
+  font-size: 0.78rem;
+  background: transparent;
+  border: 1px solid #334155;
+  color: var(--muted);
+}
+.copa-switch .copa-switch-btn.activo {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06210f;
+  font-weight: 600;
+}
+/* El país, al lado del nombre en la tabla de un grupo. */
+.grupo-pais {
+  margin-left: 6px;
+  font-size: 0.72rem;
+}
+
 .legend-dot.zone-champ { background: #22c55e; }
 .legend-dot.zone-lib { background: #eab308; }
 .legend-dot.zone-repechaje { background: #a1731a; }
