@@ -118,10 +118,15 @@ abrir seguís donde quedaste.
   temporada según el nivel de cada club más una buena dosis de azar, así que
   no clasifican siempre los mismos: los grandes van casi todos los años y los
   chicos se cuelan de vez en cuando. El campeón de cada copa y hasta dónde llegó tu club
-  quedan en la pestaña "Copas" del panel. La primera temporada de una carrera
-  todavía no tiene copas: se juegan desde el año siguiente. Es una versión
-  simplificada: las llaves son a partido único y los grupos se sortean sin
-  bombos por país.
+  quedan en la pestaña "Copas" del panel.
+- **La primera temporada arranca con las copas en curso**: como los cupos de
+  un año salen de la temporada anterior, el año 1 de una carrera no tendría
+  copas. Así que arranca con el sorteo real, cargado a mano en
+  `SIEMBRA_PRIMERA_TEMPORADA` (`js/internacional.js`): los 8 grupos de cada
+  copa tal cual salieron, y los dos campeones vigentes para la Recopa de
+  febrero. Los resultados no vienen cargados —los grupos empiezan en cero—,
+  así que lo que pase depende de vos. De la temporada 2 en adelante sale todo
+  del sorteo automático.
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
   Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
   Copa Argentina, y los 3 mejores de la Tabla Anual que no hayan clasificado
@@ -334,7 +339,8 @@ index.html    → esqueleto de la página
 style.css     → estilos visuales
 js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
-js/internacional.js → clubes del resto de Sudamérica para las copas
+js/internacional.js → clubes del resto de Sudamérica para las copas, y el
+                sorteo real con el que arranca la primera temporada
 js/escudos.js → escudos reales embebidos como data URI
 js/marcas.js  → logos oficiales de cada torneo, embebidos igual que los
                 escudos: van de marca de agua atrás de cada cuadro

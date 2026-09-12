@@ -167,6 +167,74 @@ const CLUBES_INTERNACIONALES = [
   { id: "academia-puerto-cabello", nombre: "Academia Puerto Cabello", nombreCompleto: "Academia Puerto Cabello Fútbol Club", pais: "Venezuela", copa: "Sudamericana", nivel: 2 },
 ];
 
+// ---------------------------------------------------------------------------
+// La edición con la que arranca una carrera
+// ---------------------------------------------------------------------------
+//
+// Las copas de un año se juegan con los clasificados del año anterior, así que
+// la primera temporada de una carrera no tendría ninguna: ese año anterior
+// nunca existió en la partida. En vez de empezar con el continente en blanco,
+// la temporada 1 arranca con la edición REAL, cargada a mano acá.
+//
+// Son los dos sorteos tal como salieron: 8 grupos de 4 por copa, 32 equipos
+// cada una. Las fases previas de ese año se saltean —si los grupos ya están
+// sorteados, no hay nada que jugar antes—, y de la temporada 2 en adelante
+// sale todo del sorteo automático del juego (ver
+// Engine.armarCopasInternacionales).
+//
+// Los resultados NO están cargados: los grupos arrancan en cero y se juegan
+// fecha a fecha como cualquier otro año. Que Boca pase o quede afuera depende
+// de lo que hagas vos, no de lo que pasó en la realidad.
+//
+// `campeonesVigentes` son los campeones de la edición anterior. Se usan para
+// dos cosas: la Recopa de febrero, que es el primer partido de copa de la
+// carrera, y el cupo de campeón vigente del año siguiente.
+//
+// Los ids salen de CLUBES_INTERNACIONALES (los de afuera) y de CLUB_TEMPLATES
+// en data.js (los argentinos). Si algún id no existe, la siembra se descarta
+// entera y la temporada 1 queda sin copas, como antes: nunca a medias.
+const SIEMBRA_PRIMERA_TEMPORADA = {
+  campeonesVigentes: { Libertadores: 'flamengo', Sudamericana: 'lanus' },
+  grupos: {
+    Libertadores: {
+      // Flamengo, Estudiantes, Cusco, Independiente Medellín
+      A: ['flamengo', 'estudianteslp', 'cusco', 'independiente-medellin'],
+      // Nacional (Uru), Universitario, Coquimbo Unido, Deportes Tolima
+      B: ['nacional-uru', 'universitario', 'coquimbo-unido', 'deportes-tolima'],
+      // Fluminense, Bolívar, Deportivo La Guaira, Independiente Rivadavia
+      C: ['fluminense', 'bolivar', 'deportivo-la-guaira', 'independienterivadavia'],
+      // Boca Juniors, Cruzeiro, Universidad Católica, Barcelona
+      D: ['boca', 'cruzeiro', 'universidad-catolica', 'barcelona-sc'],
+      // Peñarol, Corinthians, Independiente Santa Fe, Platense
+      E: ['penarol', 'corinthians', 'santa-fe', 'platense'],
+      // Palmeiras, Cerro Porteño, Junior, Sporting Cristal
+      F: ['palmeiras', 'cerro-porteno', 'junior', 'sporting-cristal'],
+      // Liga de Quito, Lanús, Always Ready, Mirassol
+      G: ['liga-de-quito', 'lanus', 'always-ready', 'mirassol'],
+      // Independiente del Valle, Libertad, Rosario Central, Universidad Central
+      H: ['independiente-del-valle', 'libertad', 'rosariocentral', 'universidad-central'],
+    },
+    Sudamericana: {
+      // América de Cali, Tigre, Macará, Alianza Atlético
+      A: ['america-de-cali', 'tigre', 'macara', 'alianza-atletico'],
+      // Atlético Mineiro, Cienciano, Academia Puerto Cabello, Juventud
+      B: ['atletico-mineiro', 'cienciano', 'academia-puerto-cabello', 'juventud'],
+      // São Paulo, Millonarios, Boston River, O'Higgins
+      C: ['sao-paulo', 'millonarios', 'boston-river', 'o-higgins'],
+      // Santos, San Lorenzo, Deportivo Cuenca, Recoleta
+      D: ['santos', 'sanlorenzo', 'deportivo-cuenca', 'recoleta'],
+      // Racing, Caracas, Independiente Petrolero, Botafogo
+      E: ['racing', 'caracas', 'independiente-petrolero', 'botafogo'],
+      // Grêmio, Palestino, Montevideo City Torque, Deportivo Riestra
+      F: ['gremio', 'palestino', 'montevideo-city-torque', 'riestra'],
+      // Olimpia, Vasco da Gama, Audax Italiano, Barracas Central
+      G: ['olimpia', 'vasco-da-gama', 'audax-italiano', 'barracascentral'],
+      // River Plate, Red Bull Bragantino, Blooming, Carabobo
+      H: ['river', 'red-bull-bragantino', 'blooming', 'carabobo'],
+    },
+  },
+};
+
 // Cuántos cupos reparte cada país todos los años. Es lo que hace que el pozo
 // de arriba sea un pozo: si Brasil tiene 23 clubes cargados pero 13 cupos,
 // diez se quedan afuera cada temporada, y cuáles son cambia según cómo les

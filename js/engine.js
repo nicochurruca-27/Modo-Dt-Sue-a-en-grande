@@ -1963,7 +1963,13 @@ const Engine = {
     const s = this.state;
     s.copasInter = null;
     const qualification = s.copaQualification;
-    if (!qualification || !qualification.length) return;
+    // La primera temporada de una carrera no tiene clasificados de nadie: esos
+    // salen recién al cerrar un año. En vez de quedarse sin copas, se siembra
+    // con la edición real (ver SIEMBRA_PRIMERA_TEMPORADA en internacional.js).
+    if (!qualification || !qualification.length) {
+      this.sembrarCopasDeLaPrimeraTemporada();
+      return;
+    }
 
     // El primer año que se juegan las copas todavía no hay campeones del año
     // anterior, porque esa edición nunca existió en la partida. Se siembran
@@ -2002,6 +2008,79 @@ const Engine = {
       year: s.season.year,
       fecha: 0,
       copas: { Libertadores: limpia(libertadores), Sudamericana: limpia(sudamericana) },
+      recopa: this.armarRecopa(),
+    };
+  },
+
+  // Arma las dos copas de la temporada 1 con los grupos reales cargados a
+  // mano, sin sorteo y sin fases previas: el sorteo ya está hecho en la vida
+  // real y las previas de ese año ya se jugaron.
+  //
+  // Los grupos arrancan en cero, igual que los de cualquier otro año: lo único
+  // sembrado es QUIÉN juega contra quién, no lo que pasó.
+  //
+  // Si algo de la siembra no cierra —un id que no existe, un grupo con menos
+  // de dos equipos— se descarta entera y la temporada 1 queda sin copas, como
+  // antes de que esto existiera. Media copa sembrada sería peor que ninguna.
+  sembrarCopasDeLaPrimeraTemporada() {
+    const s = this.state;
+    const siembra = typeof SIEMBRA_PRIMERA_TEMPORADA === 'undefined' ? null : SIEMBRA_PRIMERA_TEMPORADA;
+    if (!siembra || !siembra.grupos) return;
+
+    const armada = {};
+    for (const copa of ['Libertadores', 'Sudamericana']) {
+      const porLetra = siembra.grupos[copa];
+      if (!porLetra) return;
+      const clubes = {};
+      const grupos = [];
+      for (const [letra, ids] of Object.entries(porLetra)) {
+        if (!ids || ids.length < 2) return;
+        for (const id of ids) {
+          const entrant = this.entrantDeClub(id);
+          if (!entrant) return;
+          clubes[id] = entrant;
+        }
+        grupos.push({
+          letra,
+          ids: ids.slice(),
+          tabla: Object.fromEntries(ids.map((id) => [id, this.emptyTableRow()])),
+          partidos: [],
+          fixture: this.fixtureDeGrupo(ids),
+        });
+      }
+      // Ningún club puede estar en las dos copas el mismo año.
+      if (armada.Libertadores && Object.keys(clubes).some((id) => armada.Libertadores.clubes[id])) return;
+      armada[copa] = {
+        copa,
+        clubes,
+        previa: { jugaron: [], camino: { fases: [], deLocal: false }, eliminados: [] },
+        grupos,
+      };
+    }
+
+    // Los campeones del año pasado: los de verdad, no los sorteados de
+    // sembrarCampeonesVigentes(). Con estos dos se juega la Recopa de febrero,
+    // que es el primer partido de copa de la carrera.
+    const vigentes = siembra.campeonesVigentes || {};
+    s.ultimasCopas = (s.ultimasCopas || []).concat(
+      ['Libertadores', 'Sudamericana'].map((copa) => {
+        const club = this.entrantDeClub(vigentes[copa]);
+        return club && {
+          copa,
+          championId: club.id,
+          championName: club.nombre,
+          championPais: club.pais,
+          runnerUpName: null,
+          userWon: false,
+          userStage: null,
+        };
+      }).filter(Boolean),
+    );
+
+    s.copasInter = {
+      year: s.season.year,
+      fecha: 0,
+      copas: { Libertadores: armada.Libertadores, Sudamericana: armada.Sudamericana },
       recopa: this.armarRecopa(),
     };
   },

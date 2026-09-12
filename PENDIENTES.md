@@ -57,17 +57,6 @@ Los 32 cruces de los treintaidosavos, en el orden de arriba hacia abajo del
 cuadro, para que la primera temporada arranque con la copa real en curso. Con
 los resultados al lado de los que ya se jugaron, si los hay.
 
-### Los grupos reales de la Libertadores y la Sudamericana
-
-Los 8 grupos de cada una, con sus 32 equipos, para sembrar la **primera**
-temporada. Hoy las dos copas arrancan recién en la segunda, porque se juegan con
-los clasificados del año anterior; con los grupos cargados a mano, la primera
-edición de la carrera es la real y de ahí en adelante sale todo del sorteo
-automático.
-
-Las fases previas no hacen falta: si los grupos ya vienen armados, ese año se
-saltean. Sí hacen falta los dos campeones vigentes, para la Recopa.
-
 ---
 
 ## 2. Sistema de partido en vivo
