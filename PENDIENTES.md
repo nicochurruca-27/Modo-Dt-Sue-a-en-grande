@@ -98,9 +98,6 @@ semana, el desgaste pesa.
 
 ## 4. Detalles pendientes
 
-- **Colores de las competencias.** La Sudamericana es negra con celeste y la
-  Libertadores negra con dorado. Están cargados a ojo en
-  `COLORES_COMPETICIONES` (`js/data.js`), esperando capturas para afinarlos.
 - **El usuario gana demasiadas copas.** En 45 temporadas de prueba con clubes
   grandes salió campeón 8 veces de 42 copas jugadas. La fuerza del plantel del
   usuario pesa más que la de los rivales simulados (`copaStrength` usa

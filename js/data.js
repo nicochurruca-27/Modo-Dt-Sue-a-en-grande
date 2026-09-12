@@ -363,15 +363,20 @@ const COLORES_COMPETICIONES = {
     oficial: { primario: null, secundario: null, acento: null },
     ui: { fondo: '#061B2A', brillo: '#0B3A57', acento: '#36C5F0' },
   },
+  // El dorado sale del trofeo del logo: va del bronce oscuro de las sombras al
+  // dorado claro de los brillos, sobre negro.
   libertadores: {
     nombre: 'Copa Libertadores',
-    oficial: { primario: '#DBAF4A', secundario: '#000000', acento: '#FFFFFF' },
+    oficial: { primario: '#C9922E', secundario: '#000000', acento: '#F2D98B' },
     ui: { fondo: '#0B0A07', brillo: '#231B0C', acento: '#DBAF4A' },
   },
+  // La Sudamericana no es negra: su gráfica oficial es azul profundo con
+  // celeste, y el trofeo del logo es plateado con una estrella dorada. Los
+  // valores salen de la lámina oficial del cuadro de eliminatorias.
   sudamericana: {
     nombre: 'Copa Sudamericana',
-    oficial: { primario: '#000000', secundario: '#FFFFFF', acento: null },
-    ui: { fondo: '#080808', brillo: '#1C1F22', acento: '#8C9298' },
+    oficial: { primario: '#0B1E6B', secundario: '#54C4F0', acento: '#C0C4C8' },
+    ui: { fondo: '#081445', brillo: '#14277F', acento: '#54C4F0' },
   },
   // De la Recopa no hay paleta documentada, así que el `ui` es una decisión
   // nuestra: un bronce que no se confunda ni con el dorado de la Libertadores
