@@ -128,6 +128,11 @@ const REAL_ROSTERS = {
     { name: 'Camilo Rey Domenech', pos: 'MED', posDetail: 'mediocampista mixto', altPosDetail: ['mediocampista defensivo'], age: 20, nation: 'ARG', contractYears: 3, rating: 61, projection: 75, number: 23, value: 2500000, salary: 180000, clause: 10000000, transferState: 'Retenido', role: 'mixto' },
     { name: 'Santiago Ascacíbar', pos: 'MED', posDetail: 'mediocampista defensivo', altPosDetail: ['mediocampista mixto'], age: 29, nation: 'ARG', contractYears: 4, rating: 76, projection: 76, number: 25, value: 5000000, salary: 1000000, clause: 20000000, transferState: 'Intocable', role: 'contención' },
     { name: 'Malcom Braida', pos: 'MED', posDetail: 'volante por izquierda', altPosDetail: ['lateral izquierdo', 'extremo izquierdo'], age: 29, nation: 'ARG', contractYears: 3, rating: 70, projection: 72, number: 27, value: 3000000, salary: 650000, transferState: 'Retenido', role: 'mixto' },
+    // Los dos pibes de la Reserva que acaba de subir el club. Su valoración de
+    // hoy es la de un juvenil recién convocado, no la de un titular de Primera:
+    // lo que los hace interesantes es la proyección, que es de dónde pueden
+    // llegar si les das minutos.
+    { name: 'Lautaro Mendieta', pos: 'MED', posDetail: 'mediocampista mixto', altPosDetail: ['extremo derecho', 'mediocampista ofensivo'], age: 20, nation: 'ARG', contractYears: 4, rating: 61, projection: 75, number: 33, value: 1200000, salary: 150000, clause: 10000000, transferState: 'Retenido', role: 'mixto' },
     { name: 'Milton Giménez', pos: 'DEL', posDetail: 'delantero centro', age: 30, nation: 'ARG', contractYears: 2, rating: 73, projection: 72, number: 9, value: 3000000, salary: 750000, clause: 15000000, transferState: 'Retenido' },
     { name: 'Ángel Romero', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['segundo delantero', 'extremo izquierdo'], age: 34, nation: 'PAR', contractYears: 1, rating: 69, projection: 66, number: 11, value: 800000, salary: 700000, transferState: 'Fin de contrato cercano' },
     { name: 'Enner Valencia', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 36, nation: 'ECU', contractYears: 2, rating: 72, projection: 70, number: 13, value: 1200000, salary: 1200000, transferState: 'Retenido' },
@@ -135,6 +140,7 @@ const REAL_ROSTERS = {
     { name: 'Leonel Flores', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['extremo izquierdo', 'segundo delantero'], age: 19, nation: 'ARG', contractYears: 3, rating: 69, projection: 79, number: 19, value: 4500000, salary: 160000, clause: 12000000, transferState: 'Retenido' },
     { name: 'Sebastián Villa', pos: 'DEL', posDetail: 'extremo derecho', altPosDetail: ['extremo izquierdo', 'segundo delantero'], age: 30, nation: 'COL', contractYears: 5, rating: 77, projection: 77, number: 22, value: 6500000, salary: 1200000, clause: 15000000, transferState: 'Intocable' },
     { name: 'Adam Bareiro', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 30, nation: 'PAR', contractYears: 3, rating: 71, projection: 71, number: 28, value: 2800000, salary: 700000, transferState: 'Retenido' },
+    { name: 'Rodrigo Bacidalupe', pos: 'DEL', posDetail: 'delantero centro', altPosDetail: ['segundo delantero'], age: 19, nation: 'ARG', contractYears: 2, rating: 62, projection: 78, number: 44, value: 1500000, salary: 150000, clause: 10000000, transferState: 'Retenido' },
   ],
 };
 
