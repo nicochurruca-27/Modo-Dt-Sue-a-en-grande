@@ -143,7 +143,10 @@ function render() {
 // Tabla de zona: clasifican los 8 primeros. En Primera van a los playoffs;
 // en la Nacional el 1º juega la Final por el ascenso y del 2º al 8º van al
 // Reducido.
-function zoneRowZone(index, isD1) {
+function zoneRowZone(index, isD1, total) {
+  // En la Nacional los dos últimos de cada zona se van al Federal A, y si ese
+  // sos vos se termina la carrera. Conviene verlo venir.
+  if (!isD1 && total && index >= total - DESCENSOS_POR_ZONA_D2) return 'desc';
   if (index >= 8) return null;
   if (isD1) return 'playoff';
   return index === 0 ? 'champ' : 'playoff';
@@ -691,7 +694,7 @@ function renderTablePanel() {
         <table class="table compact">
           <thead><tr><th>#</th><th>Club</th><th>PJ</th><th>Pts</th></tr></thead>
           <tbody>
-            ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1))).join('')}
+            ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1, table.length))).join('')}
           </tbody>
         </table>
       </div>
@@ -700,6 +703,7 @@ function renderTablePanel() {
         : [
           { zone: 'champ', text: 'Juega la Final por el ascenso' },
           { zone: 'playoff', text: 'Clasifica al Torneo Reducido' },
+          { zone: 'desc', text: 'Descienden al Federal A (se termina la carrera)' },
         ])}
     `;
   }
@@ -2011,11 +2015,13 @@ function renderSeasonEnd() {
     else ascensoText = `Ascenso directo: ${sum.d2PromotedDirect}. Ascenso por Reducido: ${sum.d2PromotedReducido}.`;
   }
 
-  const movementText = sum.userRelegated
-    ? 'Descendiste a Primera Nacional para la próxima temporada.'
-    : sum.userPromoted
-      ? '¡Lograste el ascenso a Primera División!'
-      : `Seguís en ${sum.isD1 ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
+  const movementText = sum.carreraTerminada
+    ? 'Te vas al Federal A. Hasta acá llegó la carrera.'
+    : sum.userRelegated
+      ? 'Descendiste a Primera Nacional para la próxima temporada.'
+      : sum.userPromoted
+        ? '¡Lograste el ascenso a Primera División!'
+        : `Seguís en ${sum.isD1 ? 'Primera División' : 'Primera Nacional'} la próxima temporada.`;
 
   // Lo que ganaste este año, para la vitrina de arriba de todo.
   const trofeos = [];
@@ -2040,7 +2046,14 @@ function renderSeasonEnd() {
 
   app.innerHTML = `
     <div class="card">
-      <h1>Fin de temporada — Año ${s.season.year}</h1>
+      <h1>${sum.carreraTerminada ? 'Fin de la carrera' : 'Fin de temporada'} — Año ${s.season.year}</h1>
+      ${sum.carreraTerminada ? `
+        <div class="carrera-terminada">
+          <h2>Se terminó</h2>
+          <p>${Engine.getClub(s.clubId).name} se va al Federal A y la dirigencia da por terminado tu ciclo. Abajo de la Primera Nacional no hay vuelta: la carrera se cierra acá.</p>
+          <p class="muted">Dirigiste ${s.season.year} ${s.season.year === 1 ? 'temporada' : 'temporadas'}.</p>
+        </div>
+      ` : ''}
 
       <div class="season-summary">
         <p>Terminaste <strong>${pos}°</strong> en tu zona con ${sum.myZoneTable[pos - 1].pts} puntos.</p>
@@ -2077,7 +2090,7 @@ function renderSeasonEnd() {
         ? bloque('Copas internacionales', copasResultHtml(sum.copasInternacionales))
         : ''}
 
-      ${sum.qualification.length ? bloque('Clasificados a las copas del año que viene', `
+      ${sum.qualification.length && !sum.carreraTerminada ? bloque('Clasificados a las copas del año que viene', `
         <ul>
           ${sum.qualification.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
         </ul>
@@ -2088,11 +2101,12 @@ function renderSeasonEnd() {
         <p class="muted">Ascendieron (Final directa + Reducido): ${sum.promoted.join(', ')}.</p>
       `)}
 
-      <button class="option-btn" id="continue-season-btn">Comenzar nueva temporada</button>
-      <button class="option-btn danger" id="restart-btn">Empezar de cero con otro club</button>
+      ${sum.carreraTerminada ? '' : '<button class="option-btn" id="continue-season-btn">Comenzar nueva temporada</button>'}
+      <button class="option-btn ${sum.carreraTerminada ? '' : 'danger'}" id="restart-btn">Empezar de cero con otro club</button>
     </div>
   `;
-  document.getElementById('continue-season-btn').addEventListener('click', () => { Engine.startNewSeason(); render(); });
+  const seguir = document.getElementById('continue-season-btn');
+  if (seguir) seguir.addEventListener('click', () => { Engine.startNewSeason(); render(); });
   document.getElementById('restart-btn').addEventListener('click', () => { Engine.resetGame(); render(); });
 }
 

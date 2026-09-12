@@ -545,6 +545,18 @@ h1, h2, h3 {
 .llave-lista .cruce:last-child { border-bottom: none; }
 /* El cuadro de la Copa Argentina. Son 64 equipos, así que si no entra a lo
    ancho se desliza, igual que la cancha. */
+/* El final de la carrera: descendiste de la Nacional y no hay división más
+   abajo. Se marca fuerte porque es lo único que cierra una partida. */
+.carrera-terminada {
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  background: rgba(239, 68, 68, 0.08);
+}
+.carrera-terminada h2 { margin: 0 0 6px; color: #fca5a5; }
+.carrera-terminada p { margin: 4px 0; }
+
 .cuadro-scroll {
   overflow-x: auto;
   margin: 8px 0;

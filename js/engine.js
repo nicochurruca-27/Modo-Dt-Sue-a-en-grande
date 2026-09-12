@@ -134,6 +134,11 @@ const TOTAL_ROUNDS = { D1: 16, D2: 35 };
 // equipo). El tope es 36 y no 30 porque los planteles de verdad son así de
 // grandes: Boca arranca con 31 contando a los pibes que suben de la Reserva,
 // y con el tope viejo no podías traer a nadie sin vender dos.
+// Los dos últimos de cada zona de la Nacional se van al Federal A. Abajo de la
+// Nacional el juego no tiene nada cargado, así que esto solo se mira para tu
+// club: si el que dirigís se va a la tercera, la carrera se termina ahí. Es la
+// única manera de perder el juego.
+const DESCENSOS_POR_ZONA_D2 = 2;
 const MAX_SQUAD = 36;
 // A partir de acá el juego empieza a avisar que te estás quedando sin lugar.
 const AVISO_PLANTEL = 3;
@@ -4374,6 +4379,17 @@ const Engine = {
   // campeón además le alcanzaba la tabla, el lugar que deja se corre hacia
   // abajo y termina entrando uno más a la Sudamericana. La cuenta de 6 y 6
   // no se mueve nunca; lo que cambia es quiénes son.
+  // ¿Tu club terminó en zona de descenso de la Nacional? Los dos últimos de
+  // cada zona se van al Federal A. Solo se mira para tu club: los demás no se
+  // mueven, porque abajo no hay una división cargada de dónde traer reemplazos
+  // — y si el que baja sos vos, la carrera se terminó igual.
+  seVaAlDescensoDeLaNacional(season) {
+    const tabla = season.myZone === 'A' ? season.myD2.zoneATable : season.myD2.zoneBTable;
+    if (!tabla || tabla.length <= DESCENSOS_POR_ZONA_D2) return false;
+    const puesto = tabla.findIndex((r) => r.id === this.state.clubId) + 1;
+    return puesto > 0 && puesto > tabla.length - DESCENSOS_POR_ZONA_D2;
+  },
+
   assignQualification(d1Data, relegated, copasDelAnio) {
     const s = this.state;
     const bajaron = new Set(relegated || []);
@@ -4534,11 +4550,15 @@ const Engine = {
 
     const userRelegated = relegated.includes(s.clubId);
     const userPromoted = promoted.includes(s.clubId);
-    if (userRelegated) {
+    const bajasteALaTercera = divisionThisSeason === 'D2' && this.seVaAlDescensoDeLaNacional(season);
+    const userPromoted2 = userPromoted;
+    if (bajasteALaTercera) {
+      notasEconomia.push('El club se va al Federal A y la dirigencia da por terminado tu ciclo.');
+    } else if (userRelegated) {
       const penalty = Math.round(s.budget * 0.25);
       Economia.registrar(this, 'Recorte por el descenso', -penalty);
       notasEconomia.push(`Por el descenso, el presupuesto bajó ${Economia.monto(penalty)} para la próxima temporada.`);
-    } else if (userPromoted) {
+    } else if (userPromoted2) {
       Economia.registrar(this, 'Refuerzo económico por el ascenso', 400000);
       notasEconomia.push(`Por el ascenso, la dirigencia sumó un refuerzo económico de ${Economia.monto(400000)}.`);
     }
@@ -4569,6 +4589,8 @@ const Engine = {
       promoted: promoted.map((id) => this.getClub(id).name),
       userRelegated,
       userPromoted,
+      // Cuando esto es true no hay temporada siguiente: se terminó la carrera.
+      carreraTerminada: bajasteALaTercera,
       economyNote,
     };
 
