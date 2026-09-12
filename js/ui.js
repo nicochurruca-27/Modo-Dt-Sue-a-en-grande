@@ -450,24 +450,22 @@ function renderTablePanel() {
   if (tablePanelTab === 'anual') {
     body = anualTableBody();
   } else if (tablePanelTab === 'copas') {
-    // Estos dos datos sobreviven al cambio de temporada, así que el panel
-    // muestra todo el año quiénes están jugando las copas y cómo salieron las
-    // del año pasado.
-    const jugando = s.copaQualification || [];
-    if (!jugando.length) {
-      body = '<p class="muted">Todavía no se definió ninguna clasificación a copas internacionales: se sabe recién a fin de temporada.</p>';
-    } else {
-      body = `
-        ${faseDeGruposHtml()}
-        <h4>Clasificados argentinos</h4>
-        <p class="muted">Los que están jugando las copas de este año:</p>
-        <ul>
-          ${jugando.map((q) => `<li${q.clubId === s.clubId ? ' class="me-line"' : ''}>${q.name} — ${q.comp} (${q.stage})</li>`).join('')}
-        </ul>
-        <h4>Cómo salieron las del año pasado</h4>
-        ${copasResultHtml(s.ultimasCopas)}
-      `;
-    }
+    // Durante el año acá se sigue la copa que se está jugando: los grupos
+    // primero y el cuadro después. La lista de clasificados argentinos no va
+    // más en este panel —con ver los grupos ya se sabe quiénes están— y queda
+    // donde sirve de verdad: en la pantalla de fin de temporada, que es cuando
+    // se definen los cupos del año que viene.
+    const enJuego = faseDeGruposHtml();
+    // Lo del año pasado va plegado: son siete títulos y, mientras estás
+    // jugando la copa de este año, lo único que querés ver arriba es tu grupo
+    // o tu llave.
+    body = enJuego
+      ? `${enJuego}
+        <details class="collapsible">
+          <summary>Cómo salieron las del año pasado</summary>
+          <div class="collapsible-body">${copasResultHtml(s.ultimasCopas)}</div>
+        </details>`
+      : copasResultHtml(s.ultimasCopas);
   } else {
     const zoneKey = `${s.season.myDivision}-${tablePanelTab === 'mine' ? myZoneLetter : otherZoneLetter}`;
     const zoneData = s.season.zones[zoneKey];
