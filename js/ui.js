@@ -1993,6 +1993,18 @@ function renderFifaBreak() {
   document.getElementById('continue-btn').addEventListener('click', () => { Engine.continueFromFifa(); render(); });
 }
 
+// El camino hasta el final, contado entero: cuántas temporadas dirigiste y en
+// qué año se dieron los dos descensos. Sin esto la pantalla decía solo cuántos
+// años llevabas, que por sí solo no cuenta nada.
+function caminoHastaElFinal(sum) {
+  const total = sum.temporadasDirigidas || 1;
+  const temporadas = `Dirigiste ${total} ${total === 1 ? 'temporada' : 'temporadas'}`;
+  if (!sum.anioDelDescenso) return `${temporadas}.`;
+  const enPrimera = sum.anioDelDescenso;
+  const enLaNacional = total - enPrimera;
+  return `${temporadas}: ${enPrimera} en Primera hasta el descenso y ${enLaNacional} en la Nacional hasta irte al Federal A.`;
+}
+
 function renderSeasonEnd() {
   const s = Engine.state;
   const sum = s.lastSeasonSummary;
@@ -2051,7 +2063,7 @@ function renderSeasonEnd() {
         <div class="carrera-terminada">
           <h2>Se terminó</h2>
           <p>${Engine.getClub(s.clubId).name} se va al Federal A y la dirigencia da por terminado tu ciclo. Abajo de la Primera Nacional no hay vuelta: la carrera se cierra acá.</p>
-          <p class="muted">Dirigiste ${s.season.year} ${s.season.year === 1 ? 'temporada' : 'temporadas'}.</p>
+          <p class="muted">${caminoHastaElFinal(sum)}</p>
         </div>
       ` : ''}
 

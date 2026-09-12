@@ -2824,6 +2824,9 @@ const Engine = {
       mercado: null,
       notasMercado: [],
       historialPuntos: {},
+      // En qué año te fuiste de Primera. Lo usa la pantalla de fin de carrera
+      // para contar el camino completo hasta el Federal A.
+      anioDelDescenso: null,
       log: [],
     };
     this.sembrarHistorialDePromedios();
@@ -4555,6 +4558,7 @@ const Engine = {
     if (bajasteALaTercera) {
       notasEconomia.push('El club se va al Federal A y la dirigencia da por terminado tu ciclo.');
     } else if (userRelegated) {
+      s.anioDelDescenso = s.season.year;
       const penalty = Math.round(s.budget * 0.25);
       Economia.registrar(this, 'Recorte por el descenso', -penalty);
       notasEconomia.push(`Por el descenso, el presupuesto bajó ${Economia.monto(penalty)} para la próxima temporada.`);
@@ -4591,6 +4595,8 @@ const Engine = {
       userPromoted,
       // Cuando esto es true no hay temporada siguiente: se terminó la carrera.
       carreraTerminada: bajasteALaTercera,
+      temporadasDirigidas: s.season.year,
+      anioDelDescenso: s.anioDelDescenso,
       economyNote,
     };
 
