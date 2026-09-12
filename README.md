@@ -61,6 +61,10 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **Logos de los torneos**: cada cuadro —Copa Argentina, Libertadores,
+  Sudamericana y la fase final de la Liga Profesional— lleva atrás el logo
+  oficial de su torneo, a media luz, y los colores de la competencia de fondo.
+  Están en `js/marcas.js` (ver `tools/generar-marcas.py`).
 - **Apertura y Clausura**: en Primera se juegan dos torneos por año, cada uno
   con 16 fechas de fase regular y playoffs de octavos a la final. La Nacional
   juega un solo torneo anual de 17 fechas.
@@ -332,6 +336,9 @@ js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
 js/internacional.js → clubes del resto de Sudamérica para las copas
 js/escudos.js → escudos reales embebidos como data URI
+js/marcas.js  → logos oficiales de cada torneo, embebidos igual que los
+                escudos: van de marca de agua atrás de cada cuadro
+                (ver tools/generar-marcas.py para regenerarlo)
 js/noticias.js → portal de noticias: arma los titulares a partir de lo que
                 va pasando en la partida (resultados, lesiones, mercado,
                 copas) y los guarda en s.noticias

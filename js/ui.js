@@ -421,80 +421,20 @@ function cuadroMedidas(columnas) {
 
 // ---------- Las marcas de las competencias ----------
 //
-// Dibujadas en SVG sobre un lienzo de 100x100. NO son los logos oficiales
-// —esos son marcas registradas y además vienen como imagen—: son marcas
-// simplificadas, con la misma forma y los mismos colores, para usar de fondo
-// del cuadro como hacen las láminas de CONMEBOL. Van a media luz, atrás de
-// todo: se reconocen de un vistazo y no le compiten a los escudos.
-
-// Copa Argentina: dos pentágonos, uno adentro del otro, rodeados de una rueda
-// de triangulitos. Es la que sale más parecida porque es pura geometría.
-function marcaCopaArgentina() {
-  const pentagono = (r, giro, fill) => {
-    const puntos = [0, 1, 2, 3, 4].map((i) => {
-      const a = ((giro + i * 72 - 90) * Math.PI) / 180;
-      return `${(50 + r * Math.cos(a)).toFixed(1)},${(50 + r * Math.sin(a)).toFixed(1)}`;
-    }).join(' ');
-    return `<polygon points="${puntos}" fill="${fill}" />`;
-  };
-  let rueda = '';
-  for (let i = 0; i < 15; i++) {
-    rueda += `<path d="M 0,-46 L 7.5,-33 L -6,-36 Z" fill="#2E3D62" transform="translate(50,50) rotate(${i * 24})" />`;
-  }
-  return `${rueda}${pentagono(30, 0, '#62B4E8')}${pentagono(15, 0, '#F2E52A')}`;
-}
-
-// Libertadores: las cinco costillas del trofeo, la del medio más alta,
-// abriéndose hacia arriba.
-function marcaLibertadores() {
-  const costillas = [-2, -1, 0, 1, 2].map((i) => {
-    const abs = Math.abs(i);
-    const base = 50 + i * 4;
-    const punta = 50 + i * 19;
-    const alto = 14 + abs * 9;
-    const grosor = 7 - abs * 1.2;
-    return `<path d="M ${base} 88 C ${base + i * 4} 60, ${punta - i * 3} 38, ${punta} ${alto}"
-      fill="none" stroke="#DBAF4A" stroke-width="${grosor}" stroke-linecap="round" />`;
-  }).join('');
-  return `${costillas}<circle cx="50" cy="82" r="6" fill="#DBAF4A" />`;
-}
-
-// Sudamericana: la copa abierta con la pelota arriba y la estrella dorada.
-function marcaSudamericana() {
-  return `
-    <path d="M 26 22 C 26 62, 38 74, 50 88 C 62 74, 74 62, 74 22"
-      fill="none" stroke="#C0C4C8" stroke-width="6" stroke-linecap="round" />
-    <circle cx="50" cy="30" r="19" fill="#C0C4C8" />
-    <circle cx="50" cy="30" r="15" fill="#1A2340" />
-    <path d="M 50 20 L 53.2 27.4 L 61 28 L 55 33 L 57 40.5 L 50 36.2 L 43 40.5 L 45 33 L 39 28 L 46.8 27.4 Z" fill="#F2C230" />
-    <circle cx="50" cy="56" r="4.5" fill="#C0C4C8" />
-  `;
-}
-
-// Liga Profesional: el escudito rectangular con las letras, como el de la
-// lámina de la fase final.
-function marcaLiga() {
-  return `
-    <rect x="26" y="14" width="48" height="72" rx="12" fill="none" stroke="#5FD0F5" stroke-width="5" />
-    <path d="M 40 30 C 48 24, 56 34, 64 28 L 64 48 C 56 54, 48 44, 40 50 Z" fill="#5FD0F5" />
-    <circle cx="40" cy="56" r="5" fill="#5FD0F5" />
-    <rect x="37" y="60" width="6" height="16" fill="#5FD0F5" />
-    <text x="50" y="82" text-anchor="middle" font-size="16" font-weight="800" fill="#5FD0F5" font-family="system-ui, sans-serif">LPF</text>
-  `;
-}
-
-const MARCAS_COMPETICIONES = {
-  liga: marcaLiga,
-  copaArgentina: marcaCopaArgentina,
-  libertadores: marcaLibertadores,
-  sudamericana: marcaSudamericana,
-};
-
+// Cada cuadro lleva atrás el logo oficial de su torneo, a media luz, como las
+// láminas de CONMEBOL. Los logos vienen embebidos como data URI en
+// js/marcas.js (los arma tools/generar-marcas.py a partir de la imagen
+// original, sin el fondo blanco).
+//
+// Si una competencia no está en MARCAS_COMPETICIONES se dibuja sin marca y el
+// cuadro queda igual: sumar un logo nuevo es solo agregarlo a ese archivo.
 function marcaDeCompeticionSvg(id, cx, cy, lado) {
-  const marca = MARCAS_COMPETICIONES[id];
+  const marca = typeof MARCAS_COMPETICIONES !== 'undefined' && MARCAS_COMPETICIONES[id];
   if (!marca) return '';
-  const escala = lado / 100;
-  return `<g transform="translate(${cx - lado / 2}, ${cy - lado / 2}) scale(${escala})" opacity="0.16">${marca()}</g>`;
+  // Ninguno de los logos es cuadrado: "meet" lo mete entero adentro del
+  // cuadrado que le damos, centrado y sin deformarlo.
+  return `<image href="${marca}" x="${cx - lado / 2}" y="${cy - lado / 2}"
+    width="${lado}" height="${lado}" preserveAspectRatio="xMidYMid meet" opacity="0.3" />`;
 }
 
 // El fondo del cuadro, con los colores de la competencia: oscuro en los bordes
