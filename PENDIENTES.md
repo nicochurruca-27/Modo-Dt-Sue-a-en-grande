@@ -102,8 +102,6 @@ semana, el desgaste pesa.
   grandes salió campeón 8 veces de 42 copas jugadas. La fuerza del plantel del
   usuario pesa más que la de los rivales simulados (`copaStrength` usa
   `squadStrength()` para vos y una fórmula sobre el nivel para los demás).
-- **El cuadro de la Copa Argentina en el celular se desliza para el costado.**
-  64 equipos no entran a lo ancho de una pantalla de teléfono.
 - **Los 4 descensos de la Primera Nacional** solo se miran para tu club. Los
   otros no se mueven, porque no hay una división más abajo de dónde traer
   reemplazos. Si algún día entra la tercera como división jugable, esto se

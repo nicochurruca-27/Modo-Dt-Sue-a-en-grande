@@ -358,10 +358,12 @@ const COLORES_COMPETICIONES = {
     oficial: { primario: null, secundario: null, acento: '#FFFFFF' },
     ui: { fondo: '#08083A', brillo: '#141470', acento: '#7DD3FC' },
   },
+  // Del logo: el azul oscuro de los triangulitos, el celeste del pentágono
+  // grande y el amarillo del chico.
   copaArgentina: {
     nombre: 'Copa Argentina',
-    oficial: { primario: null, secundario: null, acento: null },
-    ui: { fondo: '#061B2A', brillo: '#0B3A57', acento: '#36C5F0' },
+    oficial: { primario: '#2E3D62', secundario: '#62B4E8', acento: '#F2E52A' },
+    ui: { fondo: '#0B1430', brillo: '#1E2F5C', acento: '#62B4E8' },
   },
   // El dorado sale del trofeo del logo: va del bronce oscuro de las sombras al
   // dorado claro de los brillos, sobre negro.

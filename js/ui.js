@@ -382,12 +382,97 @@ function cruceDeCopaArgentinaHtml(cruce) {
 // de una copa internacional son 16 y cuatro columnas, y ahí hay lugar para
 // escudos más grandes.
 function cuadroMedidas(columnas) {
+  // Las medidas están calculadas para que el cuadro entre entero en el panel
+  // sin deslizarse, también en un celular angosto.
   const grande = columnas <= 4;
   return {
     fila: grande ? 34 : 22,
-    col: grande ? 38 : 26,
+    col: grande ? 36 : 25,
     escudo: grande ? 24 : 16,
   };
+}
+
+// ---------- Las marcas de las competencias ----------
+//
+// Dibujadas en SVG sobre un lienzo de 100x100. NO son los logos oficiales
+// —esos son marcas registradas y además vienen como imagen—: son marcas
+// simplificadas, con la misma forma y los mismos colores, para usar de fondo
+// del cuadro como hacen las láminas de CONMEBOL. Van a media luz, atrás de
+// todo: se reconocen de un vistazo y no le compiten a los escudos.
+
+// Copa Argentina: dos pentágonos, uno adentro del otro, rodeados de una rueda
+// de triangulitos. Es la que sale más parecida porque es pura geometría.
+function marcaCopaArgentina() {
+  const pentagono = (r, giro, fill) => {
+    const puntos = [0, 1, 2, 3, 4].map((i) => {
+      const a = ((giro + i * 72 - 90) * Math.PI) / 180;
+      return `${(50 + r * Math.cos(a)).toFixed(1)},${(50 + r * Math.sin(a)).toFixed(1)}`;
+    }).join(' ');
+    return `<polygon points="${puntos}" fill="${fill}" />`;
+  };
+  let rueda = '';
+  for (let i = 0; i < 15; i++) {
+    rueda += `<path d="M 0,-46 L 7.5,-33 L -6,-36 Z" fill="#2E3D62" transform="translate(50,50) rotate(${i * 24})" />`;
+  }
+  return `${rueda}${pentagono(30, 0, '#62B4E8')}${pentagono(15, 0, '#F2E52A')}`;
+}
+
+// Libertadores: las cinco costillas del trofeo, la del medio más alta,
+// abriéndose hacia arriba.
+function marcaLibertadores() {
+  const costillas = [-2, -1, 0, 1, 2].map((i) => {
+    const abs = Math.abs(i);
+    const base = 50 + i * 4;
+    const punta = 50 + i * 19;
+    const alto = 14 + abs * 9;
+    const grosor = 7 - abs * 1.2;
+    return `<path d="M ${base} 88 C ${base + i * 4} 60, ${punta - i * 3} 38, ${punta} ${alto}"
+      fill="none" stroke="#DBAF4A" stroke-width="${grosor}" stroke-linecap="round" />`;
+  }).join('');
+  return `${costillas}<circle cx="50" cy="82" r="6" fill="#DBAF4A" />`;
+}
+
+// Sudamericana: la copa abierta con la pelota arriba y la estrella dorada.
+function marcaSudamericana() {
+  return `
+    <path d="M 26 22 C 26 62, 38 74, 50 88 C 62 74, 74 62, 74 22"
+      fill="none" stroke="#C0C4C8" stroke-width="6" stroke-linecap="round" />
+    <circle cx="50" cy="30" r="19" fill="#C0C4C8" />
+    <circle cx="50" cy="30" r="15" fill="#1A2340" />
+    <path d="M 50 20 L 53.2 27.4 L 61 28 L 55 33 L 57 40.5 L 50 36.2 L 43 40.5 L 45 33 L 39 28 L 46.8 27.4 Z" fill="#F2C230" />
+    <circle cx="50" cy="56" r="4.5" fill="#C0C4C8" />
+  `;
+}
+
+const MARCAS_COMPETICIONES = {
+  copaArgentina: marcaCopaArgentina,
+  libertadores: marcaLibertadores,
+  sudamericana: marcaSudamericana,
+};
+
+function marcaDeCompeticionSvg(id, cx, cy, lado) {
+  const marca = MARCAS_COMPETICIONES[id];
+  if (!marca) return '';
+  const escala = lado / 100;
+  return `<g transform="translate(${cx - lado / 2}, ${cy - lado / 2}) scale(${escala})" opacity="0.16">${marca()}</g>`;
+}
+
+// El fondo del cuadro, con los colores de la competencia: oscuro en los bordes
+// y encendido en el centro, como las láminas que publica CONMEBOL. Si la
+// competencia no está cargada, el cuadro queda sin fondo y se ve el del panel.
+function cuadroFondoSvg(comp, id, ancho, alto) {
+  if (!comp) return '';
+  return `
+    <defs>
+      <radialGradient id="${id}" cx="50%" cy="50%" r="70%">
+        <stop offset="0%" stop-color="${comp.ui.brillo}" />
+        <stop offset="65%" stop-color="${comp.ui.fondo}" />
+        <stop offset="100%" stop-color="${comp.ui.fondo}" />
+      </radialGradient>
+    </defs>
+    <rect x="0" y="0" width="${ancho}" height="${alto}" rx="10" fill="url(#${id})" />
+    <circle cx="${ancho / 2}" cy="${alto / 2}" r="${Math.min(ancho, alto) * 0.22}" fill="${comp.ui.acento}" opacity="0.12" />
+  `;
 }
 
 // El centro vertical del casillero `k` de la columna `r`. Cada columna junta
@@ -409,7 +494,10 @@ function cuadroEscudoSvg(clubId, x, y, aroColor, m) {
     : '';
   const dibujo = crest
     ? `<image href="${crest}" x="${x}" y="${y - r}" width="${m.escudo}" height="${m.escudo}" />`
-    : `<circle cx="${x + r}" cy="${y}" r="${r}" fill="#475569" stroke="#64748b" stroke-width="1" />
+    // El escudo genérico (los clubes que todavía no tienen el suyo cargado) va
+    // oscuro con el borde del color de la copa, así se lee igual sobre el
+    // dorado de la Libertadores que sobre el azul de la Sudamericana.
+    : `<circle cx="${x + r}" cy="${y}" r="${r}" fill="rgba(2,6,23,0.72)" stroke="${m.borde}" stroke-width="1" />
        <text x="${x + r}" y="${y + r * 0.32}" text-anchor="middle" font-size="${Math.round(m.escudo * 0.44)}" font-weight="700" fill="#f1f5f9">${clubInitials(club.name)}</text>`;
   return `<g><title>${club.name}</title>${dibujo}${aro}</g>`;
 }
@@ -451,11 +539,15 @@ function cuadroSvg(rondas, opciones) {
   const columnas = rondas.length;
   if (columnas < 2) return '';
   const miClub = Engine.state.clubId;
+  const comp = op.competicion && typeof COLORES_COMPETICIONES !== 'undefined'
+    ? COLORES_COMPETICIONES[op.competicion]
+    : null;
   const m = cuadroMedidas(columnas);
   const altoTotal = (2 ** columnas / 2) * m.fila;
-  const medio = Math.round(m.col * 1.8);
+  const medio = Math.round(m.col * 1.2);
   const ancho = columnas * m.col * 2 + medio;
-  const lineas = op.color || '#475569';
+  const lineas = comp ? comp.ui.acento : '#475569';
+  m.borde = lineas;
 
   let dibujo = '';
   [0, 1].forEach((mitad) => {
@@ -484,17 +576,21 @@ function cuadroSvg(rondas, opciones) {
   });
 
   // En el medio va la definición y nada más: ni la sede ni la fecha.
+  // En el medio va el escudo del campeón y nada más. El rótulo iría pisando la
+  // última columna, y arriba del cuadro ya dice "Campeón: ..." con todas las
+  // letras.
   const colorCampeon = op.campeon === miClub ? 'var(--accent)' : lineas;
   const centro = op.campeon
     ? `<g><title>Campeón: ${Engine.getClub(op.campeon).name}</title>
-        ${cuadroEscudoSvg(op.campeon, ancho / 2 - m.escudo / 2, altoTotal / 2 - m.escudo * 0.3, colorCampeon, m)}
-        <text x="${ancho / 2}" y="${altoTotal / 2 + m.escudo}" text-anchor="middle" font-size="9" font-weight="700" fill="${colorCampeon}">CAMPEÓN</text>
+        ${cuadroEscudoSvg(op.campeon, ancho / 2 - m.escudo / 2, altoTotal / 2, colorCampeon, m)}
       </g>`
     : `<text x="${ancho / 2}" y="${altoTotal / 2}" text-anchor="middle" font-size="9" fill="${lineas}">FINAL</text>`;
 
   return `
     <div class="cuadro-scroll">
       <svg width="${ancho}" height="${altoTotal}" viewBox="0 0 ${ancho} ${altoTotal}" class="cuadro-svg">
+        ${cuadroFondoSvg(comp, `cuadroFondo-${op.competicion || 'x'}`, ancho, altoTotal)}
+        ${marcaDeCompeticionSvg(op.competicion, ancho / 2, altoTotal / 2, Math.min(ancho, altoTotal) * 0.7)}
         ${dibujo}
         ${centro}
       </svg>
@@ -510,7 +606,7 @@ function cuadroDeCopaArgentinaSvg() {
     .slice()
     .sort((a, b) => a.stageIndex - b.stageIndex)
     .map((h) => h.cruces.slice().sort((a, b) => a.pos - b.pos));
-  return cuadroSvg(rondas, { campeon: cb.champion });
+  return cuadroSvg(rondas, { campeon: cb.champion, competicion: 'copaArgentina' });
 }
 
 // El cuadro de una copa internacional, de octavos a la final. El playoff de la
@@ -519,12 +615,9 @@ function cuadroDeCopaArgentinaSvg() {
 function cuadroDeLlaveInternacionalSvg(copa) {
   const instancias = instanciasDeLaLlave(copa).filter((i) => i.etapa !== 'playoff');
   if (instancias.length < 2) return '';
-  const comp = typeof COLORES_COMPETICIONES !== 'undefined'
-    ? COLORES_COMPETICIONES[copa.copa === 'Libertadores' ? 'libertadores' : 'sudamericana']
-    : null;
   return cuadroSvg(instancias.map((i) => i.cruces), {
     campeon: copa.llave.campeon,
-    color: comp ? comp.ui.acento : null,
+    competicion: copa.copa === 'Libertadores' ? 'libertadores' : 'sudamericana',
   });
 }
 
