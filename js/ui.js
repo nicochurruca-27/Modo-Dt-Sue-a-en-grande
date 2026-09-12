@@ -829,18 +829,9 @@ function renderSquadPanel() {
       </div>
       ${reserva.length ? `
         <h3>Reserva</h3>
-        <div class="bench-list">
-          ${reserva.map((p) => {
-            const abbrev = posDetailAbbrev(p.posDetail);
-            const detail = abbrev ? ` (${abbrev})` : p.role ? ` (${p.role})` : '';
-            const baja = Engine.outLabel(p);
-            return `
-            <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''} ${baja ? 'unavailable' : ''}" data-player="${p.id}">
-              <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${detail} (${p.rating})</span>
-              ${baja ? `<span class="out-tag">${baja}</span>` : ''}
-            </div>
-          `;
-          }).join('')}
+        <p class="muted">Los que quedaron afuera de la lista. Tocá uno y después un suplente para subirlo al banco.</p>
+        <div class="banco-grid">
+          ${reserva.map((p) => benchJerseySvg(p, club)).join('')}
         </div>
       ` : ''}
     </div>
