@@ -727,15 +727,61 @@ const Engine = {
     };
   },
 
+  // ---------- Banco de suplentes y reserva ----------
+  //
+  // De los que no son titulares, doce van al banco y el resto a la reserva.
+  // El banco lo arma el juego solo la primera vez (el mejor arquero que
+  // quede, y después por valoración), pero una vez que lo tocás manda tu
+  // orden: s.banco es la lista de los doce y se guarda con la partida.
+  BANCO_SUPLENTES: 12,
+
+  // Todos los que no están en el once, con los lesionados y suspendidos al
+  // final: arriba quedan los que realmente podés poner en la cancha.
   getBench() {
     const s = this.state;
     if (!s.startingSlots || !s.startingSlots.length) this.recomputeStartingSlots();
     const startingSet = new Set(s.startingSlots.map((e) => e.playerId).filter(Boolean));
-    // Los lesionados y suspendidos van al final: arriba quedan los que
-    // realmente podés poner en la cancha.
     return [...s.squad]
       .filter((p) => !startingSet.has(p.id))
       .sort((a, b) => (this.isAvailable(b) - this.isAvailable(a)) || b.rating - a.rating);
+  },
+
+  // Deja s.banco con doce nombres válidos: saca a los que se fueron del club
+  // o pasaron a ser titulares y completa con los mejores de la reserva. Si
+  // entre los doce no quedó ningún arquero, entra el mejor que haya: quedarse
+  // sin arquero en el banco no es una decisión táctica, es un descuido.
+  asegurarBanco() {
+    const s = this.state;
+    const fueraDelOnce = this.getBench();
+    const disponibles = new Map(fueraDelOnce.map((p) => [p.id, p]));
+    const banco = (s.banco || []).filter((id) => disponibles.has(id));
+    const enBanco = new Set(banco);
+    const resto = fueraDelOnce.filter((p) => !enBanco.has(p.id));
+
+    while (banco.length < this.BANCO_SUPLENTES && resto.length) {
+      const hayArquero = banco.some((id) => disponibles.get(id).pos === 'POR');
+      const faltanParaCerrar = this.BANCO_SUPLENTES - banco.length;
+      const arquero = resto.find((p) => p.pos === 'POR');
+      const elegido = (!hayArquero && arquero && faltanParaCerrar === 1) ? arquero : resto[0];
+      banco.push(elegido.id);
+      enBanco.add(elegido.id);
+      resto.splice(resto.indexOf(elegido), 1);
+    }
+    s.banco = banco;
+    return banco;
+  },
+
+  // Los doce del banco, en el orden que tengan guardado.
+  getBanco() {
+    const ids = this.asegurarBanco();
+    const porId = new Map(this.state.squad.map((p) => [p.id, p]));
+    return ids.map((id) => porId.get(id)).filter(Boolean);
+  },
+
+  // Los que no entran ni al once ni al banco.
+  getReserva() {
+    const enBanco = new Set(this.asegurarBanco());
+    return this.getBench().filter((p) => !enBanco.has(p.id));
   },
 
   // Intercambia dos jugadores cualesquiera: dos titulares (se cambian de
@@ -748,6 +794,28 @@ const Engine = {
   swapPlayers(idA, idB) {
     const s = this.state;
     if (!s.startingSlots || idA === idB) return false;
+    const banco = this.asegurarBanco();
+    const enBancoA = banco.indexOf(idA);
+    const enBancoB = banco.indexOf(idB);
+
+    // Dos del banco (o uno del banco y uno de la reserva): cambian de lugar
+    // entre ellos y el once no se toca.
+    const esTitular = (id) => s.startingSlots.some((e) => e.playerId === id);
+    if (!esTitular(idA) && !esTitular(idB)) {
+      if (enBancoA >= 0 && enBancoB >= 0) {
+        banco[enBancoA] = idB;
+        banco[enBancoB] = idA;
+      } else if (enBancoA >= 0) {
+        banco[enBancoA] = idB;
+      } else if (enBancoB >= 0) {
+        banco[enBancoB] = idA;
+      } else {
+        return false; // los dos son de la reserva: no hay nada que cambiar
+      }
+      s.banco = banco;
+      this.save();
+      return true;
+    }
     // Un lesionado o suspendido no puede entrar a la cancha: el cambio se
     // rechaza y la UI avisa por qué.
     const entra = [idA, idB].map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
@@ -762,9 +830,18 @@ const Engine = {
     }
     if (!slotA && !slotB) return false;
     const starterEntry = slotA || slotB;
+    const starterId = starterEntry.playerId;
     const benchId = slotA ? idB : idA;
     if (!s.squad.some((p) => p.id === benchId)) return false;
     starterEntry.playerId = benchId;
+    // El que sale de la cancha ocupa exactamente el lugar del que entró: si
+    // el que entró estaba en el banco, se queda con ese lugar; si venía de la
+    // reserva, el titular se va a la reserva.
+    const lugar = banco.indexOf(benchId);
+    if (lugar >= 0) {
+      banco[lugar] = starterId;
+      s.banco = banco;
+    }
     this.save();
     return true;
   },
@@ -2719,6 +2796,7 @@ const Engine = {
       squad: null,
       formation: '433',
       startingSlots: null,
+      banco: null,
       season: null,
       calendar: null,
       copaBracket: null,

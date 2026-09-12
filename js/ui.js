@@ -672,6 +672,23 @@ const WIDTH_FRACTION_BY_CATEGORY = {
   abierta: 0.84,
 };
 
+// Un suplente dibujado como los de la cancha: la misma camiseta, el mismo
+// dorsal y la misma placa con el nombre. Va en su propio <svg> chiquito para
+// poder acomodarlos en una grilla, en vez de posicionados sobre el campo.
+function benchJerseySvg(p, club) {
+  const w = PITCH_JERSEY_W + 12;
+  const h = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + 12;
+  const baja = Engine.outLabel(p);
+  return `
+    <div class="banco-card${baja ? ' unavailable' : ''}" title="${p.name}${baja ? ` — ${baja}` : ''}">
+      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="banco-svg">
+        ${playerMarkerSvg(p, club, 6, 4, p.id === selectedPlayerId)}
+      </svg>
+      ${baja ? `<span class="out-tag banco-out">${baja}</span>` : ''}
+    </div>
+  `;
+}
+
 function buildPitchSvg(xi, club) {
   const f = xi.formation;
   const rows = [
@@ -781,7 +798,8 @@ function renderSquadPanel() {
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
   const club = Engine.getClub(s.clubId);
   const xi = Engine.getStartingXI();
-  const bench = Engine.getBench();
+  const banco = Engine.getBanco();
+  const reserva = Engine.getReserva();
 
   const styles = ['Defensiva', 'Equilibrada', 'Ofensiva'];
   const activeStyle = xi.formation.style;
@@ -805,19 +823,26 @@ function renderSquadPanel() {
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       ${alBordeDeLaSuspension(s.squad)}
       <h3>Suplentes</h3>
-      <div class="bench-list">
-        ${bench.map((p) => {
-          const abbrev = posDetailAbbrev(p.posDetail);
-          const detail = abbrev ? ` (${abbrev})` : p.role ? ` (${p.role})` : '';
-          const baja = Engine.outLabel(p);
-          return `
-          <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''} ${baja ? 'unavailable' : ''}" data-player="${p.id}">
-            <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${detail} (${p.rating})</span>
-            ${baja ? `<span class="out-tag">${baja}</span>` : ''}
-          </div>
-        `;
-        }).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
+      <p class="muted">Los doce que van al banco. Tocá uno y después otro de la reserva para cambiarlos.</p>
+      <div class="banco-grid">
+        ${banco.map((p) => benchJerseySvg(p, club)).join('') || '<p class="muted">No hay suplentes disponibles.</p>'}
       </div>
+      ${reserva.length ? `
+        <h3>Reserva</h3>
+        <div class="bench-list">
+          ${reserva.map((p) => {
+            const abbrev = posDetailAbbrev(p.posDetail);
+            const detail = abbrev ? ` (${abbrev})` : p.role ? ` (${p.role})` : '';
+            const baja = Engine.outLabel(p);
+            return `
+            <div class="pick-row player-chip-row ${p.id === selectedPlayerId ? 'selected' : ''} ${baja ? 'unavailable' : ''}" data-player="${p.id}">
+              <span>${p.number != null ? `#${p.number} ` : ''}${p.name} — ${p.pos}${detail} (${p.rating})</span>
+              ${baja ? `<span class="out-tag">${baja}</span>` : ''}
+            </div>
+          `;
+          }).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 
