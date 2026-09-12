@@ -2992,7 +2992,7 @@ const Engine = {
       const j = Math.floor(Math.random() * (i + 1));
       [entrants[i], entrants[j]] = [entrants[j], entrants[i]];
     }
-    s.copaBracket = { alive: entrants.map((id, i) => ({ id, seed: i + 1 })), stageIndex: 0, champion: null, runnerUp: null };
+    s.copaBracket = { alive: entrants.map((id, i) => ({ id, seed: i + 1 })), stageIndex: 0, champion: null, runnerUp: null, historial: [] };
   },
 
   // Las amarillas que no llegaron a suspensión se borran al terminar cada
@@ -3246,10 +3246,13 @@ const Engine = {
 
     if (!userInvolved) {
       const pairs = this.pairStage(cb.alive);
+      const cruces = [];
       cb.alive = pairs.map((pair) => {
-        const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
-        return pair.find((p) => p.id === winnerId);
+        const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
+        cruces.push(this.cruceAnotado(pair, resultado));
+        return pair.find((p) => p.id === resultado.ganador);
       });
+      this.anotarRondaDeCopa(cb.stageIndex, cruces);
       cb.stageIndex++;
       if (cb.alive.length === 1) {
         cb.champion = cb.alive[0].id;
@@ -3818,30 +3821,76 @@ const Engine = {
     return this.seedOrderBestVsWorst(ranked);
   },
 
-  resolveKnockout(idA, idB) {
-    if (idA === null) return idB;
-    if (idB === null) return idA;
+  // Una llave a partido único. Devuelve el resultado completo y no solo quién
+  // pasó, porque el cuadro de la Copa Argentina muestra los marcadores.
+  resolverCruce(idA, idB) {
+    if (idA === null || idB === null) {
+      return { ganador: idA === null ? idB : idA, golesA: null, golesB: null, penales: false };
+    }
     const sa = this.clubStrength(idA);
     const sb = this.clubStrength(idB);
     const score = this.simulateScore(sa, sb, 2);
-    if (score.homeGoals !== score.awayGoals) return score.homeGoals > score.awayGoals ? idA : idB;
+    const empate = score.homeGoals === score.awayGoals;
     const prob = Math.max(0.15, Math.min(0.85, 0.5 + (sa - sb) / 100));
-    return Math.random() < prob ? idA : idB;
+    return {
+      ganador: empate
+        ? (Math.random() < prob ? idA : idB)
+        : (score.homeGoals > score.awayGoals ? idA : idB),
+      golesA: score.homeGoals,
+      golesB: score.awayGoals,
+      penales: empate,
+    };
   },
 
-  simulateSeedsToChampion(seeds) {
+  resolveKnockout(idA, idB) {
+    return this.resolverCruce(idA, idB).ganador;
+  },
+
+  // El cuadro de la Copa Argentina, ronda por ronda. s.copaBracket.alive solo
+  // guarda a los que siguen vivos, así que sin esto no hay manera de saber
+  // quién eliminó a quién ni con qué resultado. Una ronda se puede anotar en
+  // dos veces (primero los cruces que resuelve la computadora y después el
+  // tuyo, cuando lo jugás), así que se van sumando al mismo registro.
+  anotarRondaDeCopa(stageIndex, cruces) {
+    const cb = this.state.copaBracket;
+    if (!cb || !cruces || !cruces.length) return;
+    cb.historial = cb.historial || [];
+    const ronda = cb.historial.find((r) => r.stageIndex === stageIndex);
+    if (ronda) ronda.cruces = ronda.cruces.concat(cruces);
+    else cb.historial.push({ stageIndex, cruces });
+    cb.historial.sort((a, b) => a.stageIndex - b.stageIndex);
+  },
+
+  cruceAnotado(pair, resultado) {
+    return {
+      a: pair[0] ? pair[0].id : null,
+      b: pair[1] ? pair[1].id : null,
+      ganador: resultado.ganador,
+      golesA: resultado.golesA,
+      golesB: resultado.golesB,
+      penales: resultado.penales,
+    };
+  },
+
+  // `anotar` es opcional: la Copa Argentina lo usa para guardar cada ronda que
+  // se resuelve de una, y así el cuadro queda completo aunque vos hayas
+  // quedado eliminado en la primera.
+  simulateSeedsToChampion(seeds, anotar) {
     let alive = seeds;
     let runnerUp = null;
     while (alive.length > 1) {
       const pairs = this.pairStage(alive);
+      const cruces = [];
       const winners = pairs.map((pair) => {
-        const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
+        const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
+        cruces.push(this.cruceAnotado(pair, resultado));
         if (pairs.length === 1) {
-          const loser = pair.find((p) => p.id !== winnerId);
+          const loser = pair.find((p) => p.id !== resultado.ganador);
           runnerUp = loser ? loser.id : null;
         }
-        return pair.find((p) => p.id === winnerId);
+        return pair.find((p) => p.id === resultado.ganador);
       });
+      if (anotar) anotar(alive.length, cruces);
       alive = winners;
     }
     return { champion: alive[0] ? alive[0].id : null, runnerUp };
@@ -3870,6 +3919,7 @@ const Engine = {
     const s = this.state;
     const pairs = this.pairStage(s.bracket.alive);
     const winners = [];
+    const cruces = [];
     let userEntry = null;
     let opponentEntry = null;
 
@@ -3880,9 +3930,15 @@ const Engine = {
         opponentEntry = pair.find((p) => p.id !== s.clubId);
         return;
       }
-      const winnerId = this.resolveKnockout(pair[0].id, pair[1].id);
-      winners.push(pair.find((p) => p.id === winnerId));
+      const resultado = this.resolverCruce(pair[0].id, pair[1] ? pair[1].id : null);
+      winners.push(pair.find((p) => p.id === resultado.ganador));
+      cruces.push(this.cruceAnotado(pair, resultado));
     });
+    // Los otros cruces de la ronda quedan resueltos desde ahora, pero NO se
+    // anotan todavía: si se anotaran acá, el cuadro te mostraría cómo salió el
+    // resto de la ronda antes de que juegues tu partido. Se guardan y se
+    // anotan junto con el tuyo (ver resolveUserBracketMatch).
+    s.bracket.pendingCruces = cruces;
 
     s.bracket.pendingWinners = winners;
     s.bracket.pendingIsFinal = pairs.length === 1;
@@ -3936,6 +3992,11 @@ const Engine = {
       Economia.premioCopaArgentina(this, vivosAntes, isFinal && userWon);
     }
 
+    if (isBye && s.bracket.kind === 'copa') {
+      this.anotarRondaDeCopa(s.bracket.stageIndex, s.bracket.pendingCruces || []);
+      s.bracket.pendingCruces = null;
+    }
+
     if (!isBye) {
       const m = s.pendingMatch;
       const clubName = (id) => this.getClub(id).name;
@@ -3948,6 +4009,17 @@ const Engine = {
       else if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
       if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : m.extraTime ? ' (en el alargue)' : ''}.`);
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
+      if (s.bracket.kind === 'copa') {
+        this.anotarRondaDeCopa(s.bracket.stageIndex, (s.bracket.pendingCruces || []).concat([{
+          a: m.home,
+          b: m.away,
+          ganador: userWon ? s.clubId : m.opponentId,
+          golesA: m.homeGoals,
+          golesB: m.awayGoals,
+          penales: !!m.shootout,
+        }]));
+        s.bracket.pendingCruces = null;
+      }
     }
 
     const advancingEntry = userWon ? s.bracket.pendingUserEntry : s.bracket.pendingOpponentEntry;
@@ -3962,7 +4034,10 @@ const Engine = {
       return;
     }
 
-    if (!userWon) {
+    // La Copa Argentina sigue su curso aunque vos quedes afuera, ronda por
+    // ronda y en la fecha que le toca a cada una. Si se simulara todo de una
+    // acá, en marzo ya sabrías quién sale campeón en octubre.
+    if (!userWon && !s.bracket.oneRoundAtATime) {
       this.simulateBracketFully();
       return;
     }
@@ -3971,7 +4046,7 @@ const Engine = {
     if (s.bracket.oneRoundAtATime) {
       // Copa Argentina: guardar el progreso y volver a la liga. El próximo
       // checkpoint retoma esta misma ronda del cuadro.
-      s.copaBracket = { alive: s.bracket.alive, stageIndex: s.bracket.stageIndex, champion: null, runnerUp: null };
+      s.copaBracket = { alive: s.bracket.alive, stageIndex: s.bracket.stageIndex, champion: null, runnerUp: null, historial: s.copaBracket.historial || [] };
       s.bracket = null;
       this.seguirEnLaMismaSemana();
       return;
@@ -3983,7 +4058,13 @@ const Engine = {
   // ya quedó eliminado, o le tocó un bye) y define campeón y subcampeón.
   simulateBracketFully() {
     const s = this.state;
-    const result = this.simulateSeedsToChampion(s.bracket.alive);
+    // La instancia se saca de cuántos siguen vivos (64 equipos = 6 rondas), así
+    // no hay que llevar un contador aparte que se desincronice.
+    const etapaPorVivos = (vivos) => COPA_STAGE_NAMES.length - Math.round(Math.log2(vivos));
+    const anotar = s.bracket.kind === 'copa'
+      ? (vivos, cruces) => this.anotarRondaDeCopa(etapaPorVivos(vivos), cruces)
+      : null;
+    const result = this.simulateSeedsToChampion(s.bracket.alive, anotar);
     s.bracket.champion = result.champion;
     s.bracket.runnerUp = result.runnerUp;
     this.onBracketComplete();
@@ -4021,7 +4102,7 @@ const Engine = {
     }
 
     if (kind === 'copa') {
-      s.copaBracket = { alive: [{ id: s.bracket.champion, seed: 1 }], stageIndex: s.bracket.stageIndex, champion: s.bracket.champion, runnerUp: s.bracket.runnerUp };
+      s.copaBracket = { alive: [{ id: s.bracket.champion, seed: 1 }], stageIndex: s.bracket.stageIndex, champion: s.bracket.champion, runnerUp: s.bracket.runnerUp, historial: s.copaBracket.historial || [] };
       s.log.unshift(`Copa Argentina: salió campeón ${this.getClub(s.bracket.champion).name}.`);
       s.bracket = null;
       this.seguirEnLaMismaSemana();

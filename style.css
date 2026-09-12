@@ -544,6 +544,10 @@ h1, h2, h3 {
 }
 .llave-lista .cruce:last-child { border-bottom: none; }
 .cruce-equipos { font-size: 0.85rem; }
+/* El cuadro de la Copa Argentina son 32 cruces en la primera ronda, así que
+   va más apretado que el de una copa internacional. */
+.llave-lista.compacta .cruce { padding: 4px 0; }
+.cruce-marcador { color: var(--muted); margin: 0 3px; }
 .cruce-equipos strong { margin: 0 4px; }
 .cruce-detalle { font-size: 0.74rem; }
 

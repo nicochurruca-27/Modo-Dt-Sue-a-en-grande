@@ -270,15 +270,31 @@ function grupoDelUsuario(copa) {
 function copaDelPanel() {
   const copas = copasEnCurso();
   if (!copas.length) return null;
-  if (!copas.some((c) => c.copa === copaPanelCopa)) {
-    const mia = copas.find((c) => grupoDelUsuario(c) >= 0);
-    copaPanelCopa = (mia || copas[0]).copa;
-    copaPanelGrupo = null;
-  }
   const copa = copas.find((c) => c.copa === copaPanelCopa);
+  if (!copa) return null;
   if (copaPanelGrupo === null) copaPanelGrupo = Math.max(0, grupoDelUsuario(copa));
   copaPanelGrupo = Math.min(Math.max(0, copaPanelGrupo), copa.grupos.length - 1);
   return copa;
+}
+
+// Deja elegida una competencia válida. La primera vez cae en la copa
+// internacional que juega tu club; si no jugás ninguna, en la Copa Argentina.
+function competenciaDelPanel() {
+  const competencias = competenciasDelPanel();
+  if (!competencias.length) return null;
+  if (!competencias.some((c) => c.id === copaPanelCopa)) {
+    const mia = competencias.find((c) => c.copa && grupoDelUsuario(c.copa) >= 0);
+    copaPanelCopa = (mia || competencias[0]).id;
+    copaPanelGrupo = null;
+    copaPanelEtapa = null;
+  }
+  return competencias.find((c) => c.id === copaPanelCopa);
+}
+
+function selectorDeCompetenciasHtml() {
+  const competencias = competenciasDelPanel();
+  if (competencias.length < 2) return '';
+  return `<div class="copa-switch">${competencias.map((c) => `<button class="option-btn small copa-switch-btn${c.id === copaPanelCopa ? ' activo' : ''}" data-copa="${c.id}">${c.id === 'copaArgentina' ? 'Argentina' : c.nombre}</button>`).join('')}</div>`;
 }
 
 // Una fila de tabla de grupo. Es igual a la de la liga pero con el país al
@@ -339,6 +355,59 @@ function llaveHtml(copa) {
 
 // La Recopa va arriba de todo mientras se juega: son dos fechas de febrero y
 // después desaparece de la vista principal.
+// Las competencias que se pueden mirar en la pestaña Copas: siempre la Copa
+// Argentina (se juega desde la primera temporada) y, a partir de la segunda,
+// las dos internacionales.
+function competenciasDelPanel() {
+  const s = Engine.state;
+  const lista = [];
+  if (s.copaBracket && s.copaBracket.alive) lista.push({ id: 'copaArgentina', nombre: 'Copa Argentina' });
+  copasEnCurso().forEach((c) => lista.push({ id: c.copa, nombre: c.copa, copa: c }));
+  return lista;
+}
+
+// Un cruce de la Copa Argentina. Es a partido único, así que alcanza con una
+// línea: el resultado y quién pasó, en negrita.
+function cruceDeCopaArgentinaHtml(cruce) {
+  const s = Engine.state;
+  const nombre = (id) => (id && Engine.getClub(id) ? Engine.getClub(id).name : 'Libre');
+  const mio = cruce.a === s.clubId || cruce.b === s.clubId;
+  const marcador = cruce.golesA == null ? 'pasó sin jugar' : `${cruce.golesA} - ${cruce.golesB}`;
+  const ganoA = cruce.ganador === cruce.a;
+  const fuerte = (id, gano) => (gano ? `<strong>${nombre(id)}</strong>` : nombre(id));
+  return `<li class="cruce${mio ? ' me-line' : ''}">
+    <span class="cruce-equipos">${fuerte(cruce.a, ganoA)} <span class="cruce-marcador">${marcador}</span> ${fuerte(cruce.b, !ganoA)}</span>
+    ${cruce.penales ? '<span class="muted cruce-detalle">Se definió por penales</span>' : ''}
+  </li>`;
+}
+
+function copaArgentinaHtml() {
+  const cb = Engine.state.copaBracket;
+  if (!cb) return '';
+  const rondas = (cb.historial || []).slice();
+  const vivos = (cb.alive || []).length;
+
+  if (!rondas.length) {
+    return `<h4>Copa Argentina</h4>
+      <p class="muted">El cuadro ya está sorteado: ${vivos} equipos y seis rondas repartidas de febrero a octubre. Todavía no se jugó ninguna.</p>`;
+  }
+  if (copaPanelEtapa === null || copaPanelEtapa >= rondas.length) copaPanelEtapa = rondas.length - 1;
+  const ronda = rondas[copaPanelEtapa];
+  const campeon = cb.champion
+    ? `<p class="me-line">Campeón: <strong>${Engine.getClub(cb.champion).name}</strong>${cb.runnerUp ? ` <span class="muted">— finalista: ${Engine.getClub(cb.runnerUp).name}</span>` : ''}</p>`
+    : `<p class="muted">Siguen vivos ${vivos} equipos. Lo que viene: ${COPA_STAGE_NAMES[cb.stageIndex] || 'la final'}.</p>`;
+  return `
+    <h4>Copa Argentina</h4>
+    ${campeon}
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="etapa-prev-btn">◀</button>
+      <strong>${COPA_STAGE_NAMES[ronda.stageIndex] || 'Ronda'}</strong>
+      <button class="option-btn small" id="etapa-next-btn">▶</button>
+    </div>
+    <ul class="llave-lista compacta">${ronda.cruces.map(cruceDeCopaArgentinaHtml).join('')}</ul>
+  `;
+}
+
 function recopaHtml() {
   const ci = Engine.state.copasInter;
   const rec = ci && ci.recopa;
@@ -350,17 +419,24 @@ function recopaHtml() {
   `;
 }
 
+// El cuerpo de la pestaña Copas: el selector de competencias arriba y abajo
+// lo que corresponda a la elegida (el cuadro de la Copa Argentina, o los
+// grupos y después la llave de una internacional).
+function competenciaHtml() {
+  const elegida = competenciaDelPanel();
+  if (!elegida) return '';
+  const selector = selectorDeCompetenciasHtml();
+  if (elegida.id === 'copaArgentina') return selector + copaArgentinaHtml();
+  return selector + faseDeGruposHtml();
+}
+
 function faseDeGruposHtml() {
   const copa = copaDelPanel();
   if (!copa) return '';
   const ci = Engine.state.copasInter;
-  const copas = copasEnCurso();
-  const selectorDeCopa = copas.length > 1
-    ? `<div class="copa-switch">${copas.map((c) => `<button class="option-btn small copa-switch-btn${c.copa === copaPanelCopa ? ' activo' : ''}" data-copa="${c.copa}">${c.copa}</button>`).join('')}</div>`
-    : '';
   // Cuando la fase de grupos terminó, lo que interesa es el cuadro.
   if (copa.llave) {
-    return `<h4>Copa ${copa.copa}</h4>${selectorDeCopa}${llaveHtml(copa)}`;
+    return `<h4>Copa ${copa.copa}</h4>${llaveHtml(copa)}`;
   }
   const grupo = copa.grupos[copaPanelGrupo];
   const esMiGrupo = grupo.ids.includes(Engine.state.clubId);
@@ -376,7 +452,6 @@ function faseDeGruposHtml() {
 
   return `
     <h4>Copa ${copa.copa} — Fase de grupos</h4>
-    ${selectorDeCopa}
     <div class="panel-tab-switch">
       <button class="option-btn small" id="grupo-prev-btn">◀</button>
       <strong>Grupo ${grupo.letra}${esMiGrupo ? ' · el tuyo' : ''}</strong>
@@ -398,18 +473,26 @@ function faseDeGruposHtml() {
 // Los botones de la fase de grupos. Se enganchan después de pintar el panel,
 // igual que las flechas de las pestañas.
 function engancharBotonesDeGrupos() {
-  const copa = copaDelPanel();
-  if (!copa) return;
   const flechas = (idPrev, idNext, total, leer, escribir) => {
+    if (!total) return;
     const mover = (paso) => { escribir((leer() + paso + total) % total); renderTablePanel(); };
     const prev = document.getElementById(idPrev);
     const next = document.getElementById(idNext);
     if (prev) prev.addEventListener('click', () => mover(-1));
     if (next) next.addEventListener('click', () => mover(1));
   };
-  flechas('grupo-prev-btn', 'grupo-next-btn', copa.grupos.length, () => copaPanelGrupo, (v) => { copaPanelGrupo = v; });
-  if (copa.llave) {
-    flechas('etapa-prev-btn', 'etapa-next-btn', instanciasDeLaLlave(copa).length, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+  const elegida = competenciaDelPanel();
+  if (elegida && elegida.id === 'copaArgentina') {
+    const rondas = ((Engine.state.copaBracket || {}).historial || []).length;
+    flechas('etapa-prev-btn', 'etapa-next-btn', rondas, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+  } else {
+    const copa = copaDelPanel();
+    if (copa) {
+      flechas('grupo-prev-btn', 'grupo-next-btn', copa.grupos.length, () => copaPanelGrupo, (v) => { copaPanelGrupo = v; });
+      if (copa.llave) {
+        flechas('etapa-prev-btn', 'etapa-next-btn', instanciasDeLaLlave(copa).length, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+      }
+    }
   }
   document.querySelectorAll('.copa-switch-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -473,7 +556,7 @@ function renderTablePanel() {
     // dos copas del año.
     const ci = s.copasInter;
     const recopa = ci && ci.fecha === 0 ? recopaHtml() : '';
-    const enJuego = recopa + faseDeGruposHtml();
+    const enJuego = recopa + competenciaHtml();
     // Lo del año pasado va plegado: son siete títulos y, mientras estás
     // jugando la copa de este año, lo único que querés ver arriba es tu grupo
     // o tu llave.
