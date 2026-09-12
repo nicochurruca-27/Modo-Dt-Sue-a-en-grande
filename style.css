@@ -137,6 +137,19 @@ body {
   .layout[data-view="market"] #squad-panel { display: none; }
 }
 
+/* Cuando la pantalla da de sobra, el panel de tablas se ensancha. En un
+   monitor grande quedaba un hueco vacío a los costados mientras el cuadro de
+   la Copa Argentina —64 equipos— se veía por la mitad y con escudos de 16px.
+   El cuadro se dibuja según el lugar que tiene (ver cuadroMedidas en ui.js),
+   así que con el panel más ancho entra entero y con escudos más grandes.
+
+   Los saltos están puestos para que la columna del medio, que es donde se
+   juega, nunca baje de sus 480px: recién se ensancha cuando lo que sobra
+   alcanza para las dos cosas. */
+@media (min-width: 1360px) { #table-panel { flex-basis: 380px; } }
+@media (min-width: 1460px) { #table-panel { flex-basis: 440px; } }
+@media (min-width: 1700px) { #table-panel { flex-basis: 500px; } }
+
 /* Celular en horizontal: el ancho ya alcanza para las 3 columnas como en
    PC, así que se mantiene ese layout completo (solo se achican un poco los
    paneles laterales para que entre todo sin scroll horizontal). */

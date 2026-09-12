@@ -435,19 +435,38 @@ function cruceDeCopaArgentinaHtml(cruce) {
 // cuadro que publican los diarios: a la izquierda los 32 equipos de una llave,
 // a la derecha los otros 32, y cada columna es una instancia. Se dibuja con
 // escudos y no con nombres porque con 64 equipos no hay ancho que alcance.
-// Las medidas del cuadro según cuántas instancias tenga. El de la Copa
-// Argentina son 64 equipos y seis columnas por mitad, así que va apretado; el
-// de una copa internacional son 16 y cuatro columnas, y ahí hay lugar para
-// escudos más grandes.
-function cuadroMedidas(columnas) {
-  // Las medidas están calculadas para que el cuadro entre entero en el panel
-  // sin deslizarse, también en un celular angosto.
-  const grande = columnas <= 4;
-  return {
-    fila: grande ? 34 : 22,
-    col: grande ? 36 : 25,
-    escudo: grande ? 24 : 16,
-  };
+// El ancho que hay para dibujar adentro del panel: lo que mide el panel menos
+// el padding de la tarjeta. Se mide sobre el elemento real porque el panel no
+// mide lo mismo en la PC que en el celular, y en la PC además se ensancha
+// cuando la pantalla da (ver la media query de #table-panel en style.css).
+//
+// Si todavía no se pintó —en el celular el panel arranca escondido— se cae a
+// un ancho conservador, el del panel angosto.
+function anchoParaDibujar() {
+  const panel = document.getElementById('table-panel');
+  const ancho = panel ? panel.clientWidth : 0;
+  return ancho > 80 ? ancho - 44 : 210;
+}
+
+// Las medidas del cuadro. Antes eran dos tamaños fijos —uno para 4 columnas y
+// otro para 6— calculados para el panel angosto, así que en una pantalla
+// grande el cuadro quedaba chiquito con medio panel vacío al lado.
+//
+// Ahora se calculan a partir del lugar que hay. El cuadro mide
+// `columnas * col * 2 + col * 1.2` de ancho (ver cuadroSvg), así que de ahí
+// sale cuánto puede medir cada columna para llenarlo sin deslizarse.
+//
+// Los topes son para los dos extremos: abajo, que un cuadro de 6 columnas en
+// un panel angosto no baje de escudos ilegibles (ahí sí se desliza); arriba,
+// que uno de 4 columnas en una pantalla ancha no termine con escudos gigantes.
+//
+// La altura de la fila sale del escudo y no del ancho de columna: son 64
+// equipos en vertical, así que cada píxel de más se multiplica por 32.
+function cuadroMedidas(columnas, ancho) {
+  const disponible = ancho || anchoParaDibujar();
+  const col = Math.max(25, Math.min(38, Math.floor(disponible / (columnas * 2 + 1.2))));
+  const escudo = Math.round(col * 0.66);
+  return { fila: escudo + 6, col, escudo };
 }
 
 // ---------- Las marcas de las competencias ----------
