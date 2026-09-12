@@ -60,52 +60,68 @@
 const SAVE_KEY = 'dt-simulador-save-v3';
 
 const FIFA_ROUNDS = [5, 11];
-// La Copa Argentina es un cuadro de 64 a partido único, así que son seis
-// rondas y necesita seis fechas repartidas a lo largo de la edición.
-const COPA_ROUNDS = [2, 4, 6, 8, 11, 14];
 const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
-// Las copas internacionales no se resuelven de un saque a fin de año: se
-// juegan DURANTE la temporada, como en la realidad. La fase de grupos son 6
-// fechas entre marzo y mayo (dos por mes) metidas entre las fechas del
-// Apertura, igual que la Copa Argentina, pero en semanas distintas a las de
-// COPA_ROUNDS para no amontonar tres partidos en la misma semana.
+
+// ---------- El calendario del año ----------
 //
-// Con una fecha por semana arrancando el 1º de febrero, estas seis caen el 1
-// y el 15 de marzo, el 12 y el 19 de abril, y el 3 y el 10 de mayo. Las dos
-// seguidas de abril y mayo no son un descuido: CONMEBOL programa la fase de
-// grupos justo así, en pares de semanas consecutivas con un hueco en el medio.
-const COPA_INTER_ROUNDS = [3, 5, 9, 10, 12, 13];
-// Y de octavos a la final se juega en el Clausura, que es cuando se juega de
-// verdad: agosto a noviembre. Cada instancia son dos fechas —ida y vuelta—
-// con un hueco en el medio, menos la final, que es a partido único en una
-// sede neutral que no es la cancha de ninguno de los dos.
+// La unidad es la semana: una fecha de liga por semana, el fin de semana. Los
+// partidos de copa se juegan ENTRE SEMANA, en la misma semana que la fecha de
+// liga, así que un checkpoint de copa NO arranca una semana nueva: sigue la
+// que está (ver seguirEnLaMismaSemana). Antes cada partido de copa se comía
+// siete días y el año futbolero terminaba durando catorce meses.
 //
-// `D1` son las fechas del Clausura. En la Nacional no hay dos torneos, así que
-// las mismas instancias caen en la segunda mitad de su único torneo de 35,
-// que es la misma época del año.
+// Con esto el año entra en un año: arranca el 1º de febrero y las finales de
+// los playoffs caen a mediados de diciembre, como en la realidad.
 //
-// El playoff de octavos es solo de la Sudamericana: ahí el segundo de cada
-// grupo se cruza con un tercero de la Libertadores.
-// La Recopa Sudamericana abre el año: la juegan los campeones del año pasado,
-// el de la Libertadores contra el de la Sudamericana, y va en febrero, antes
-// de que arranquen las copas nuevas. Es ida y vuelta: primero en la cancha del
-// campeón de la Sudamericana y la vuelta en la del campeón de la Libertadores,
-// que es el que cierra en casa. Manda el global, sin gol de visitante, y si
-// queda igualado hay alargue y penales.
+// Abajo está dónde cae cada partido de copa, por fecha del torneo local. En
+// Primera el año son dos torneos, así que hay una lista para cada uno; la
+// Nacional juega un torneo anual de 35 fechas y lleva una sola.
 //
-// No reparte nada: el que la gana se lleva el título y la plata, y listo. No
-// clasifica a ninguna copa.
-const RECOPA_ROUNDS = [0, 1];
+// Los números salen de las fechas reales. Contando las semanas que se comen
+// las fechas FIFA y el mercado de pases del medio, las fechas del Apertura
+// caen entre febrero y junio y las del Clausura entre julio y noviembre, así
+// que cada competencia queda más o menos donde va:
+//
+//   Recopa            febrero (dos fechas seguidas)
+//   Fase de grupos    marzo, abril y mayo, dos por mes
+//   Copa Argentina    de febrero a noviembre, una cada mes y medio
+//   Llaves de copa    de julio a noviembre, ida y vuelta con un hueco
+const FECHAS_DE_COPAS = {
+  D1: {
+    apertura: {
+      recopa: [0, 1],
+      grupos: [4, 6, 8, 10, 12, 14],
+      copaArgentina: [2, 9, 15],
+    },
+    clausura: {
+      copaArgentina: [5, 9, 13],
+      llaves: { playoff: [0, 1], octavos: [3, 4], cuartos: [7, 8], semis: [11, 12], final: [15] },
+    },
+  },
+  D2: {
+    unico: {
+      recopa: [0, 1],
+      grupos: [4, 6, 8, 10, 12, 14],
+      copaArgentina: [2, 9, 15, 22, 27, 33],
+      llaves: { playoff: [18, 19], octavos: [20, 21], cuartos: [24, 25], semis: [28, 29], final: [31] },
+    },
+  },
+};
+
+// Las instancias de las llaves, en orden. El playoff de octavos es solo de la
+// Sudamericana: ahí el segundo de cada grupo se cruza con un tercero de la
+// Libertadores. En qué fecha cae cada una sale de FECHAS_DE_COPAS.
 const COPA_INTER_LLAVES = [
-  { etapa: 'playoff', nombre: 'Playoff de Octavos', alcanzado: 'el playoff de octavos', soloSudamericana: true, D1: [0, 1], D2: [17, 18] },
-  { etapa: 'octavos', nombre: 'Octavos de Final', alcanzado: 'los octavos de final', D1: [2, 3], D2: [20, 21] },
-  { etapa: 'cuartos', nombre: 'Cuartos de Final', alcanzado: 'los cuartos de final', D1: [6, 7], D2: [24, 25] },
-  { etapa: 'semis', nombre: 'Semifinal', alcanzado: 'las semifinales', D1: [10, 11], D2: [28, 29] },
-  { etapa: 'final', nombre: 'Final', alcanzado: 'la final', neutral: true, D1: [14], D2: [33] },
+  { etapa: 'playoff', nombre: 'Playoff de Octavos', alcanzado: 'el playoff de octavos', soloSudamericana: true },
+  { etapa: 'octavos', nombre: 'Octavos de Final', alcanzado: 'los octavos de final' },
+  { etapa: 'cuartos', nombre: 'Cuartos de Final', alcanzado: 'los cuartos de final' },
+  { etapa: 'semis', nombre: 'Semifinal', alcanzado: 'las semifinales' },
+  { etapa: 'final', nombre: 'Final', alcanzado: 'la final', neutral: true },
 ];
 const FECHAS_DE_GRUPOS = 6;
 const GRUPOS_POR_COPA = 8;
 const LETRAS_DE_GRUPO = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
 const TRANSFER_ROUND_D2 = 17; // ventana de pases de la Nacional, a mitad de su único torneo
 // Primera juega 16 fechas: las 15 del fixture de su zona (14 partidos contra
 // su zona + el interzonal de emparejamiento en la fecha que le tocaría estar
@@ -1568,13 +1584,13 @@ const Engine = {
     const cuando = {
       etapa: { etapa: 'recopa', nombre: 'Recopa Sudamericana' },
       pierna,
-      piernas: RECOPA_ROUNDS.length,
+      piernas: (this.calendarioDeCopas().recopa || [0, 1]).length,
     };
 
     if (rec.a !== s.clubId && rec.b !== s.clubId) {
       this.jugarPartidoDeLlave({ clubes: rec.clubes }, rec, cuando);
       if (pierna === cuando.piernas - 1) this.cerrarRecopa();
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
 
@@ -1617,7 +1633,7 @@ const Engine = {
     s.pendingMatch = null;
     s.matchContext = null;
     if (ctx.llave.decisiva) this.cerrarRecopa();
-    this.enterEditionRound();
+    this.seguirEnLaMismaSemana();
   },
 
   cerrarRecopa() {
@@ -1855,7 +1871,7 @@ const Engine = {
   // fase previa caen a los grupos de la otra copa.
   //
   // A partir de acá la fase de grupos se juega fecha a fecha durante el año
-  // (ver COPA_INTER_ROUNDS). Lo que va de octavos en adelante se sigue
+  // (ver FECHAS_DE_COPAS). Lo que va de octavos en adelante se sigue
   // resolviendo al cierre de la temporada, pero ya partiendo de estas tablas.
   armarCopasInternacionales() {
     const s = this.state;
@@ -2228,7 +2244,7 @@ const Engine = {
       this.simularFechaDeCopas(ci.fecha, null);
       ci.fecha++;
       if (ci.fecha >= FECHAS_DE_GRUPOS) this.cerrarLasDosFasesDeGrupos();
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
 
@@ -2262,13 +2278,12 @@ const Engine = {
   // En Primera las llaves van en el Clausura; en la Nacional, que tiene un
   // solo torneo, en su segunda mitad.
   llaveQueTocaEstaFecha() {
-    const season = this.state.season;
-    const esNacional = season.myDivision === 'D2';
-    if (!esNacional && season.edition !== 'clausura') return null;
-    const clave = esNacional ? 'D2' : 'D1';
+    const llaves = this.calendarioDeCopas().llaves;
+    if (!llaves) return null;
     for (const etapa of COPA_INTER_LLAVES) {
-      const pierna = etapa[clave].indexOf(season.roundIndex);
-      if (pierna >= 0) return { etapa, pierna, piernas: etapa[clave].length };
+      const rondas = llaves[etapa.etapa] || [];
+      const pierna = rondas.indexOf(this.state.season.roundIndex);
+      if (pierna >= 0) return { etapa, pierna, piernas: rondas.length };
     }
     return null;
   },
@@ -2513,7 +2528,7 @@ const Engine = {
     if (!mio) {
       this.simularPartidosDeLlave(cuando, null);
       this.cerrarLoQueTermino(cuando);
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
 
@@ -2569,7 +2584,7 @@ const Engine = {
     s.pendingMatch = null;
     s.matchContext = null;
     this.cerrarLoQueTermino(cuando);
-    this.enterEditionRound();
+    this.seguirEnLaMismaSemana();
   },
 
   cerrarLoQueTermino(cuando) {
@@ -2588,7 +2603,7 @@ const Engine = {
     let vueltas = 0;
     while (copa.llave && !copa.llave.campeon && vueltas++ < 10) {
       const etapa = COPA_INTER_LLAVES.find((e) => e.etapa === copa.llave.etapa);
-      const piernas = etapa.D1.length;
+      const piernas = etapa.etapa === 'final' ? 1 : 2;
       for (let pierna = 0; pierna < piernas; pierna++) {
         copa.llave.cruces.forEach((cruce) => {
           if (!cruce.ganador && cruce.b) this.jugarPartidoDeLlave(copa, cruce, { etapa, pierna });
@@ -2964,6 +2979,25 @@ const Engine = {
     this.startCalendarWeek('enterEditionRoundContent');
   },
 
+  // Los partidos de copa son de entre semana: se juegan en la MISMA semana que
+  // la fecha de liga, así que al terminar uno no se arranca una semana nueva,
+  // se sigue con lo que falte de esta. Solo la fecha de liga hace pasar la
+  // semana (ver enterEditionRound). Si cada copa se comiera su propia semana,
+  // el año duraría catorce meses.
+  seguirEnLaMismaSemana() {
+    this.enterEditionRoundContent();
+  },
+
+  // Dónde caen los partidos de copa dentro del torneo que se está jugando
+  // (ver FECHAS_DE_COPAS). En Primera cambia según sea el Apertura o el
+  // Clausura; en la Nacional hay una sola lista.
+  calendarioDeCopas() {
+    const season = this.state.season;
+    if (!season) return {};
+    if (season.myDivision === 'D2') return FECHAS_DE_COPAS.D2.unico;
+    return FECHAS_DE_COPAS.D1[season.edition] || {};
+  },
+
   // ---------- Calendario día a día entre una fecha y la siguiente ----------
   //
   // Una semana dura 7 días: los días 1 a 6 son de rutina (a veces con un
@@ -3043,31 +3077,33 @@ const Engine = {
       return;
     }
 
-    // La Copa Argentina corre una sola vez por año, en simultáneo con la
-    // primera etapa (Apertura para Primera, la única edición de la Nacional).
-    // Cada uno de los 5 checkpoints hace avanzar el cuadro exactamente una
-    // ronda (dieciseisavos, octavos, cuartos, semifinal, final).
-    const copaEditionOk = season.edition !== 'clausura';
-    if (copaEditionOk && COPA_ROUNDS.includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copaBracket.alive.length > 1) {
+    const calendario = this.calendarioDeCopas();
+
+    // La Copa Argentina dura todo el año, como en la realidad: sus seis rondas
+    // se reparten de febrero a noviembre, una cada mes y medio más o menos, y
+    // cruzan el Apertura y el Clausura. Cada checkpoint hace avanzar el cuadro
+    // exactamente una ronda.
+    if ((calendario.copaArgentina || []).includes(season.roundIndex) && !season.copaShown.includes(season.roundIndex) && s.copaBracket.alive.length > 1) {
       season.copaShown.push(season.roundIndex);
       this.advanceCopaBracket();
       return;
     }
 
     // La Recopa abre el año, en febrero, antes que todo lo demás.
-    if (copaEditionOk && s.copasInter && s.copasInter.recopa && !s.copasInter.recopa.ganador
-      && RECOPA_ROUNDS.includes(season.roundIndex)
+    const recopaRounds = calendario.recopa || [];
+    if (s.copasInter && s.copasInter.recopa && !s.copasInter.recopa.ganador
+      && recopaRounds.includes(season.roundIndex)
       && !(season.copaInterShown || []).includes(`r${season.roundIndex}`)) {
       season.copaInterShown = (season.copaInterShown || []).concat([`r${season.roundIndex}`]);
-      this.avanzarRecopa(RECOPA_ROUNDS.indexOf(season.roundIndex));
+      this.avanzarRecopa(recopaRounds.indexOf(season.roundIndex));
       return;
     }
 
     // Las copas internacionales corren en paralelo a la liga: seis fechas de
     // grupos entre marzo y mayo, en semanas distintas a las de la Copa
     // Argentina para no amontonar partidos.
-    if (copaEditionOk && s.copasInter && s.copasInter.fecha < FECHAS_DE_GRUPOS
-      && COPA_INTER_ROUNDS.includes(season.roundIndex)
+    if (s.copasInter && s.copasInter.fecha < FECHAS_DE_GRUPOS
+      && (calendario.grupos || []).includes(season.roundIndex)
       && !(season.copaInterShown || []).includes(season.roundIndex)) {
       season.copaInterShown = (season.copaInterShown || []).concat([season.roundIndex]);
       this.avanzarFechaDeCopas();
@@ -3137,7 +3173,7 @@ const Engine = {
         cb.champion = cb.alive[0].id;
         s.log.unshift(`Copa Argentina: salió campeón ${this.getClub(cb.champion).name}.`);
       }
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
 
@@ -3636,7 +3672,7 @@ const Engine = {
       s.pendingMatch = null;
       s.matchContext = null;
       if (ci.fecha >= FECHAS_DE_GRUPOS) this.cerrarLasDosFasesDeGrupos();
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
     } else if (m.context === 'bracket') {
       this.resolveUserBracketMatch(userWon, false);
     }
@@ -3855,7 +3891,7 @@ const Engine = {
       // checkpoint retoma esta misma ronda del cuadro.
       s.copaBracket = { alive: s.bracket.alive, stageIndex: s.bracket.stageIndex, champion: null, runnerUp: null };
       s.bracket = null;
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
     this.resolveBracketStage();
@@ -3906,7 +3942,7 @@ const Engine = {
       s.copaBracket = { alive: [{ id: s.bracket.champion, seed: 1 }], stageIndex: s.bracket.stageIndex, champion: s.bracket.champion, runnerUp: s.bracket.runnerUp };
       s.log.unshift(`Copa Argentina: salió campeón ${this.getClub(s.bracket.champion).name}.`);
       s.bracket = null;
-      this.enterEditionRound();
+      this.seguirEnLaMismaSemana();
       return;
     }
     this.save();
