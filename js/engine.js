@@ -60,6 +60,10 @@
 const SAVE_KEY = 'dt-simulador-save-v3';
 
 const FIFA_ROUNDS = [5, 11];
+// Cuántas semanas dura la pretemporada. El año arranca el 1° de enero y el
+// torneo en febrero, así que enero entero queda para armar el plantel: cuatro
+// semanas con el mercado abierto y el almanaque corriendo igual que siempre.
+const SEMANAS_DE_PRETEMPORADA = 4;
 const COPA_STAGE_NAMES = ['Treintaidosavos de Final', 'Dieciseisavos de Final', 'Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 
 // ---------- El calendario del año ----------
@@ -3586,12 +3590,12 @@ const Engine = {
     if (option) {
       s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
     }
-    // El primer partido de la carrera también pasa por el calendario día a
-    // día, igual que cualquier otra fecha (antes saltaba directo a
-    // 'pre-match' porque enterEditionRound ya lo había dejado armado desde
-    // newGame(), pero ahora esa función solo arranca la semana en
-    // calendario, así que hay que volver a llamarla acá).
-    this.enterEditionRound();
+    // Después de la presentación se sigue con lo que armó startNewSeason. La
+    // carrera arranca el 1° de enero, así que lo que viene es la pretemporada;
+    // el primer partido llega recién en febrero, pasando los días como
+    // cualquier otra fecha.
+    if ((s.season.pretemporada || 0) > 0) this.empezarLaPretemporada();
+    else this.enterEditionRound();
   },
 
   // Arranca un año nuevo completo: simula instantáneamente la división en la
@@ -3626,9 +3630,10 @@ const Engine = {
     };
     s.bracket = null;
     s.lastSeasonSummary = null;
-    // El almanaque arranca de nuevo cada temporada. El año futbolero va de
-    // febrero a noviembre y todo el calendario de copas está programado sobre
-    // esos meses: la Recopa en febrero, la fase de grupos entre marzo y mayo,
+    // El almanaque arranca de nuevo cada temporada. El año va de enero a
+    // noviembre —enero es la pretemporada— y todo el calendario de copas está
+    // programado sobre esos meses: la Recopa en febrero, los grupos entre
+    // marzo y mayo,
     // las llaves de agosto a noviembre. El contador de días seguía de largo de
     // una temporada a la otra, así que cada año se corría unos tres meses y a
     // la tercera temporada la segunda fecha del Apertura caía en diciembre.
@@ -3651,8 +3656,53 @@ const Engine = {
     // resuelta y los grupos sorteados, listos para jugarse fecha a fecha.
     this.armarCopasInternacionales();
 
-    if (careerStart) this.startFirstEdition();
+    // El año arranca en enero con la pretemporada. Al empezar una carrera se
+    // entra derecho; en los años siguientes, primero las ofertas por tus
+    // jugadores y las renovaciones, y después enero.
+    if (careerStart) this.empezarLaPretemporada();
     else this.startTransferWindow('pre-season');
+  },
+
+  // ---------- La pretemporada (enero) ----------
+  //
+  // Cuatro semanas de almanaque antes de que arranque el torneo. No es tiempo
+  // muerto: es la ventana de pases del verano, así que se puede entrar y salir
+  // del mercado todas las veces que quieras mientras dure (ver
+  // abrirElMercado). El torneo empieza recién en febrero.
+  empezarLaPretemporada() {
+    const s = this.state;
+    s.season.pretemporada = SEMANAS_DE_PRETEMPORADA;
+    this.startCalendarWeek('seguirLaPretemporada');
+  },
+
+  seguirLaPretemporada() {
+    const s = this.state;
+    s.season.pretemporada = Math.max(0, (s.season.pretemporada || 0) - 1);
+    if (s.season.pretemporada > 0) {
+      this.startCalendarWeek('seguirLaPretemporada');
+      return;
+    }
+    this.startFirstEdition();
+  },
+
+  // ¿Se puede firmar hoy? En la pretemporada sí, todo enero; y en la ventana
+  // del medio del año, mientras dure su pantalla.
+  mercadoAbierto() {
+    const s = this.state;
+    if (!s.season) return false;
+    if (s.screen === 'transfer') return true;
+    return (s.season.pretemporada || 0) > 0;
+  },
+
+  // Entrar al mercado desde un día de pretemporada. Se puede entrar y salir
+  // cuantas veces quieras: al salir se vuelve al mismo día del almanaque.
+  abrirElMercado() {
+    const s = this.state;
+    if (!this.mercadoAbierto()) return;
+    s.notasMercado = Mercado.resolverAcuerdos(this);
+    s.season.transferReason = 'pretemporada';
+    s.screen = 'transfer';
+    this.save();
   },
 
   startFirstEdition() {
@@ -5276,12 +5326,12 @@ const Engine = {
     if (!s.season) return null;
     if (s.season.myDivision === 'D2') {
       return s.season.transferShown
-        ? 'la pretemporada, en enero'
-        : 'la mitad de la temporada, en junio';
+        ? 'enero, en la pretemporada del año que viene'
+        : 'la mitad de la temporada';
     }
     return s.season.edition === 'apertura'
       ? 'junio, al terminar el Apertura'
-      : 'enero, en la pretemporada';
+      : 'enero, en la pretemporada del año que viene';
   },
 
   // Los jugadores que están sin club, tal como se ven hoy.
@@ -5342,7 +5392,11 @@ const Engine = {
   continueFromTransfer() {
     const s = this.state;
     if (s.season.transferReason === 'between-editions') this.startEdition('clausura');
-    else if (s.season.transferReason === 'pre-season') this.startFirstEdition();
+    // La ventana que se abre al cambiar de año desemboca en la pretemporada:
+    // enero sigue con el mercado abierto, así que no se pierde nada.
+    else if (s.season.transferReason === 'pre-season') this.empezarLaPretemporada();
+    // Y si entraste al mercado desde un día de enero, volvés a ese mismo día.
+    else if (s.season.transferReason === 'pretemporada') { s.screen = 'calendar'; }
     else this.enterEditionRound();
     this.save();
   },

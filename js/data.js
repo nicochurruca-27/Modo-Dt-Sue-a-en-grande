@@ -3,10 +3,11 @@
 
 const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-// El calendario de la carrera arranca el 1° de febrero, como el arranque
-// real de la temporada de AFA, y avanza de a un día por cada "Avanzar" del
-// jugador (ver Engine.startCalendarWeek/advanceCalendarDay).
-const CALENDAR_START_MONTH = 1; // 0 = enero
+// El calendario de la carrera arranca el 1° de enero y avanza de a un día
+// (ver Engine.avanzarUnDia). Enero entero es la PRETEMPORADA: el torneo
+// todavía no empezó y el mercado de verano está abierto, como en la realidad.
+// La primera fecha cae a principios de febrero.
+const CALENDAR_START_MONTH = 0; // 0 = enero
 const CALENDAR_START_DAY = 1;
 // El año real de la primera temporada de una carrera. Adentro del juego las
 // temporadas se cuentan 1, 2, 3... (season.year), que es lo que se guarda en

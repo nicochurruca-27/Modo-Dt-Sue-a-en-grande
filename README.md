@@ -61,6 +61,11 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **El año arranca el 1° de enero, con la pretemporada**: enero entero —cuatro
+  semanas de almanaque— es pretemporada, con el **mercado de verano abierto**:
+  desde el calendario entrás y salís del mercado las veces que quieras y el
+  almanaque te espera en el mismo día. El torneo arranca a principios de
+  febrero (la primera fecha cae el 5) y el año se termina en octubre.
 - **El almanaque corre día a día**: tocás "Avanzar" y los días empiezan a
   pasar solos, con la fecha moviéndose a la vista (un día cada 300 ms). Se
   frena solo cuando aparece algo —un mensaje del club, o el final de la

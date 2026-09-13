@@ -94,7 +94,7 @@ function formatCalendarDate(dayCount, temporada, conAnio = true) {
   while (day > DAYS_IN_MONTH[month]) {
     day -= DAYS_IN_MONTH[month];
     month = (month + 1) % 12;
-    // Una temporada arranca el 1° de febrero y termina en octubre, así que
+    // Una temporada arranca el 1° de enero y termina en noviembre, así que
     // esto no debería pasar nunca; queda por las dudas, para que un
     // calendario más largo no muestre "enero" del año que ya pasó.
     if (month === 0) anio++;
@@ -2074,12 +2074,17 @@ function renderCalendar() {
     return;
   }
 
+  // En la pretemporada el mercado está abierto todo enero: se puede entrar y
+  // salir las veces que haga falta y el almanaque te espera en el mismo día.
+  const enPretemporada = (s.season.pretemporada || 0) > 0;
   app.innerHTML = `
     ${header()}
     <div class="card">
       <h2 id="calendar-fecha">${dateLabel}</h2>
-      <p class="muted" id="calendar-nota">${s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.'}</p>
+      <p class="muted" id="calendar-nota">${s.lastDecisionNote ? s.lastDecisionNote : (enPretemporada ? 'Pretemporada: el torneo arranca en febrero.' : 'Otro día tranquilo en el club.')}</p>
+      ${enPretemporada ? '<p class="mercado-aviso abierto"><strong>El mercado de verano está abierto.</strong> Podés entrar y salir todo enero.</p>' : ''}
       <button class="option-btn" id="continue-btn">Avanzar</button>
+      ${enPretemporada ? '<button class="option-btn" id="mercado-btn">Ir al mercado de pases</button>' : ''}
     </div>
     ${noticiasHtml()}
   `;
@@ -2093,6 +2098,10 @@ function renderCalendar() {
     s.lastDecisionNote = null;
     arrancarLosDias();
   });
+  const mercadoBtn = document.getElementById('mercado-btn');
+  if (mercadoBtn) {
+    mercadoBtn.addEventListener('click', () => { detenerLosDias(); Engine.abrirElMercado(); render(); });
+  }
   wireNoticias();
 }
 
@@ -2656,9 +2665,11 @@ function renderContractRenewal() {
 function renderTransfer() {
   const s = Engine.state;
   const libres = Engine.jugadoresLibres();
+  const enPretemporada = s.season.transferReason === 'pretemporada';
   const windowLabel = {
     'between-editions': 'Mercado de pases — entre el Apertura y el Clausura',
     'pre-season': 'Mercado de pases — pretemporada',
+    pretemporada: 'Mercado de pases — pretemporada',
   }[s.season.transferReason] || 'Mercado de pases — mitad de temporada';
   app.innerHTML = `
     ${header()}
@@ -2700,7 +2711,7 @@ function renderTransfer() {
           </div>
         </div>
       </details>
-      <button class="option-btn" id="continue-btn">Continuar temporada</button>
+      <button class="option-btn" id="continue-btn">${enPretemporada ? 'Volver al calendario' : 'Continuar temporada'}</button>
     </div>
   `;
   app.querySelectorAll('#libres-list button').forEach((btn) => {
@@ -3057,8 +3068,8 @@ function renderMarketPanel() {
     <div class="card mercado-card">
       <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
       ${masaSalarialHtml()}
-      ${s.screen === 'transfer'
-        ? '<p class="mercado-aviso abierto"><strong>El mercado está abierto.</strong> Es ahora: lo que negociaste durante el año se firma en esta ventana y podés fichar a los que están libres.</p>'
+      ${Engine.mercadoAbierto()
+        ? '<p class="mercado-aviso abierto"><strong>El mercado está abierto.</strong> Lo que negociaste se firma en esta ventana y podés fichar a los que están libres.</p>'
         : `<p class="muted mercado-aviso"><strong>El mercado está cerrado.</strong> Abre dos veces al año, como en la realidad: en la pretemporada (enero) y a mitad de año, al terminar el Apertura (junio). La próxima es en ${Engine.proximaVentanaDeMercado() || 'la próxima ventana'}. Mientras tanto podés negociar todo lo que quieras: el acuerdo que cierres se firma solo cuando abra.</p>`}
       ${avisoDePlantel()}
       ${finanzasHtml()}
