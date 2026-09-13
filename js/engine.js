@@ -2948,7 +2948,10 @@ const Engine = {
 
   // ---------- Ciclo de vida de la partida ----------
 
-  newGame(clubId) {
+  // `historial` llega solo cuando venís de otro club (te echaron y agarraste
+  // una oferta): el DT y lo que hizo antes se conservan, todo lo demás
+  // arranca de cero.
+  newGame(clubId, historial) {
     const dt = this.state && this.state.dt;
     this.state = {
       screen: 'pre-match',
@@ -2978,6 +2981,15 @@ const Engine = {
       finanzas: null,
       // Cuánto de un sueldo "de catálogo" paga este club (ver Economia).
       escalaSalarial: null,
+      // Lo que la dirigencia piensa de vos, de 0 a 100. Si llega a cero, chau.
+      confianza: 60,
+      // Lo que ganaste en ESTE club. Se guarda en el historial cuando el ciclo
+      // termina, así la carrera de un DT cuenta lo que hizo en cada lado.
+      titulosEnElClub: 0,
+      // En qué temporada agarraste este club.
+      desdeAnio: 1,
+      // Los clubes que dirigiste antes de este, con lo que hiciste en cada uno.
+      historialDT: historial || [],
       mercado: null,
       notasMercado: [],
       historialPuntos: {},
@@ -3035,6 +3047,160 @@ const Engine = {
   // Qué le pide la dirigencia para esta temporada, según el nivel del club.
   // Es solo sabor/contexto (no afecta el cálculo del juego): le da un
   // objetivo a la carrera en vez de arrancar en el vacío.
+  // ---------- La dirigencia ----------
+  //
+  // Hasta acá el objetivo de temporada era texto decorativo: podías salir
+  // último diez años seguidos y nadie te decía nada. La única forma de perder
+  // era descender dos categorías, que es rarísimo. Un juego donde no se puede
+  // perder el trabajo no es una carrera, es una caja de arena.
+  //
+  // Ahora la dirigencia tiene una confianza de 0 a 100 que se mueve fecha a
+  // fecha según dónde estás contra lo que te pidieron. Si llega a cero, te
+  // echan — y la carrera sigue en otro club, que es de lo que se trata.
+
+  // Dónde tendrías que estar según lo que te pidió el club. Es el puesto a
+  // partir del cual la dirigencia está conforme.
+  PUESTO_ESPERADO: {
+    campeonato: 2,
+    copas: 5,
+    'mitad-tabla': 8,
+    'no-descender': 12,
+    salvarse: 13,
+    ascenso: 2,
+    reducido: 8,
+    consolidarse: 12,
+  },
+
+  puestoEsperado() {
+    const key = this.state.objective && this.state.objective.key;
+    const esperado = this.PUESTO_ESPERADO[key];
+    return esperado || 10;
+  },
+
+  confianza() {
+    const c = this.state.confianza;
+    return c == null ? 60 : c;
+  },
+
+  // Cómo te ve la dirigencia, en palabras.
+  estadoDeLaDirigencia() {
+    const c = this.confianza();
+    if (c >= 80) return { clave: 'respaldo', texto: 'La dirigencia te respalda del todo' };
+    if (c >= 55) return { clave: 'conforme', texto: 'La dirigencia está conforme' };
+    if (c >= 32) return { clave: 'dudas', texto: 'En la dirigencia hay dudas' };
+    if (c >= 15) return { clave: 'cuestionado', texto: 'Tu puesto está cuestionado' };
+    return { clave: 'pendiendo', texto: 'La dirigencia ya busca reemplazo' };
+  },
+
+  // Se llama al cerrar cada fecha de liga. La confianza se mueve por dónde
+  // estás en la tabla contra lo que te pidieron, y además por cómo venís: una
+  // racha mala duele aunque la tabla todavía no lo muestre.
+  actualizarConfianza() {
+    const s = this.state;
+    const zona = s.season && s.season.zones && s.season.zones[this.myZoneKey()];
+    if (!zona) return;
+    const tabla = this.sortTable(zona.table);
+    const pos = tabla.findIndex((r) => r.id === s.clubId) + 1;
+    if (!pos) return;
+
+    // Estar por encima de lo pedido suma; por debajo, resta. Cada puesto vale
+    // poco: lo que hunde a un técnico es estar mal muchas fechas seguidas, no
+    // una sola.
+    const esperado = this.puestoEsperado();
+    let delta = (esperado - pos) * 0.9;
+
+    // La racha, sobre los últimos cinco resultados propios.
+    const mios = (s.season.myResults || []).slice(-5);
+    const ganados = mios.filter((r) => r === 'G').length;
+    const perdidos = mios.filter((r) => r === 'P').length;
+    delta += (ganados - perdidos) * 1.1;
+
+    // Las primeras fechas no cuentan: nadie echa a un técnico en la fecha 2,
+    // y la tabla todavía no dice nada.
+    if (s.season.roundIndex < 4) delta = Math.max(delta, 0);
+
+    s.confianza = Math.max(0, Math.min(100, this.confianza() + delta));
+  },
+
+  // Un título o una buena copa cambian el humor de golpe.
+  sumarConfianza(puntos) {
+    this.state.confianza = Math.max(0, Math.min(100, this.confianza() + puntos));
+  },
+
+  // Te echan. La carrera NO se termina acá: se termina el ciclo en ESTE club.
+  // Aparecen las ofertas de los que te quieren y elegís. Eso es lo que hace
+  // que dirigir sea una carrera y no una partida atada a un solo escudo.
+  echarAlDT() {
+    const s = this.state;
+    const club = this.getClub(s.clubId);
+    const zona = s.season.zones[this.myZoneKey()];
+    const tabla = zona ? this.sortTable(zona.table) : [];
+    const pos = tabla.findIndex((r) => r.id === s.clubId) + 1;
+
+    s.cicloTerminado = {
+      clubId: s.clubId,
+      clubName: club.name,
+      titulos: s.titulosEnElClub || 0,
+      desdeAnio: s.desdeAnio || 1,
+      anio: s.season.year,
+      fecha: s.season.roundIndex + 1,
+      posicion: pos,
+      deCuantos: tabla.length,
+      objetivo: s.objective ? s.objective.text : '',
+    };
+    s.ofertas = this.ofertasDeTrabajo();
+    s.screen = 'despido';
+    if (typeof Noticias !== 'undefined') Noticias.trasElDespido(this);
+    this.save();
+  },
+
+  // Quién te llama después de un despido. No te viene a buscar un grande: te
+  // buscan clubes de tu tamaño para abajo, y cuantos más títulos tengas, más
+  // arriba llegan. Se excluye el club que te acaba de echar.
+  ofertasDeTrabajo() {
+    const s = this.state;
+    const club = this.getClub(s.clubId);
+    const titulos = (s.historialDT || []).reduce((a, h) => a + (h.titulos || 0), 0);
+    const techo = Math.min(5, Math.max(1, club.reputation - 1 + Math.floor(titulos / 2)));
+    const candidatos = s.clubs
+      .filter((c) => c.id !== s.clubId && c.reputation <= techo)
+      .sort((a, b) => b.reputation - a.reputation);
+    if (!candidatos.length) return [];
+    // Tres ofertas de distinto porte, para que la elección sea una decisión:
+    // la mejor que consigas, una intermedia y una de abajo.
+    const tercios = [0, Math.floor(candidatos.length / 3), Math.floor(candidatos.length * 2 / 3)];
+    const elegidos = [];
+    tercios.forEach((desde) => {
+      const tramo = candidatos.slice(desde, desde + Math.max(1, Math.floor(candidatos.length / 3)));
+      const c = this.shuffled(tramo).find((x) => !elegidos.some((e) => e.id === x.id));
+      if (c) elegidos.push(c);
+    });
+    return elegidos.map((c) => ({
+      id: c.id,
+      nombre: c.name,
+      division: c.division,
+      reputacion: c.reputation,
+      objetivo: this.seasonObjective(c).text,
+    }));
+  },
+
+  // Agarrás uno de los clubes que te ofrecieron. Se arranca de cero ahí —
+  // plantel, economía, temporada— pero el DT y su historial siguen siendo los
+  // tuyos.
+  aceptarOferta(clubId) {
+    const s = this.state;
+    const ciclo = s.cicloTerminado;
+    const historial = (s.historialDT || []).concat(ciclo ? [{
+      clubId: ciclo.clubId,
+      clubName: ciclo.clubName,
+      desde: ciclo.desdeAnio || 1,
+      hasta: ciclo.anio,
+      titulos: ciclo.titulos || 0,
+      final: 'despedido',
+    }] : []);
+    this.newGame(clubId, historial);
+  },
+
   seasonObjective(club) {
     if (club.division === 'D1') {
       if (club.reputation >= 5) return { key: 'campeonato', text: 'Pelear el campeonato y meterse en la Copa Libertadores.' };
@@ -3117,6 +3283,10 @@ const Engine = {
     // La pretemporada deja a todos enteros, por cansados que hayan terminado.
     if (s.squad) s.squad.forEach((p) => { p.energia = ENERGIA_MAXIMA; });
     this.cerrarEstadisticasDelAnio();
+    // Una temporada nueva es una hoja bastante limpia: el que la pasó mal
+    // arranca con algo de aire, y el que la rompió no queda blindado para
+    // siempre. Los títulos del año que pasó sí se los llevó puestos.
+    s.confianza = Math.max(45, Math.min(85, this.confianza() + 12));
     Economia.nuevaTemporada(s);
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
@@ -4070,13 +4240,22 @@ const Engine = {
       if (homeTable) this.updateTableRow(homeTable, m.home, m.homeGoals, m.awayGoals);
       if (awayTable) this.updateTableRow(awayTable, m.away, m.awayGoals, m.homeGoals);
       s.log.unshift(`Liga: ${clubName(m.home)} ${m.homeGoals}-${m.awayGoals} ${clubName(m.away)}`);
+      // La racha propia, que es lo que mira la dirigencia además de la tabla.
+      const mios = m.isHome ? m.homeGoals : m.awayGoals;
+      const suyos = m.isHome ? m.awayGoals : m.homeGoals;
+      if (!Array.isArray(s.season.myResults)) s.season.myResults = [];
+      s.season.myResults.push(mios > suyos ? 'G' : mios === suyos ? 'E' : 'P');
       if (m.isHome) Economia.cobrarPartidoDeLocal(this, !!(s.matchContext && s.matchContext.clasico));
       this.simulateWholeRound(s.season.roundIndex, m);
       this.recordRoundResult(m.home, m.away, m.homeGoals, m.awayGoals);
       Noticias.trasLaFecha(this);
+      // La dirigencia mira la tabla recién cuando se jugó la fecha entera.
+      this.actualizarConfianza();
+      Noticias.trasLaDirigencia(this);
       s.pendingMatch = null;
       s.matchContext = null;
       s.season.roundIndex++;
+      if (this.confianza() <= 0) { this.echarAlDT(); return; }
       this.enterEditionRound();
     } else if (m.context === 'copa-inter' && s.matchContext.copa === 'Recopa') {
       this.resolverRecopaDelUsuario();
@@ -4880,6 +5059,11 @@ const Engine = {
     // lastSeasonSummary, que se limpia): son los que alimentan la pestaña
     // "Copas" del panel durante todo el año siguiente.
     s.ultimasCopas = copasDelAnio;
+    // Lo que ganaste cambia el humor de la dirigencia de golpe, y quedarte
+    // afuera de todo también.
+    const ganadas = copasDelAnio.filter((c) => c.userWon).length;
+    if (ganadas) this.sumarConfianza(18 * ganadas);
+    s.titulosEnElClub = (s.titulosEnElClub || 0) + ganadas;
     Noticias.trasLasCopas(this, copasDelAnio);
     s.copaQualification = qualification;
 

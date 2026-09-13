@@ -123,6 +123,21 @@ amarillas, lesiones. Con esos hechos, dibujarlos en vivo es casi gratis.
 
 ---
 
+## 5. La carrera del DT, lo que falta
+
+Ya existen la confianza de la dirigencia, el despido, las ofertas de otros
+clubes y el historial de dónde dirigiste. Falta:
+
+- **Reputación propia del DT**, que hoy se estima contando títulos. Debería
+  crecer también por sostenerse en un club, por buenas campañas sin título y
+  por dirigir en Primera.
+- **Renunciar**, para irse a un club que te tienta antes de que te echen.
+- **Ofertas estando en funciones**: hoy solo te llaman cuando quedaste libre.
+- **Que la dirigencia hable de otras cosas**: pedir un refuerzo, bancarte
+  públicamente, poner un ultimátum con fecha.
+
+---
+
 ## 5. Camisetas con los colores de cada club
 
 En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy

@@ -584,6 +584,31 @@ h1, h2, h3 {
 }
 .cuadro-svg { display: block; }
 
+/* Cómo te ve la dirigencia, arriba de todo. La barra baja y cambia de color a
+   medida que se te complica: no hace falta leer un número para saber que el
+   próximo partido puede ser el último. */
+.dirigencia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+.dirigencia-barra {
+  flex: 0 0 70px;
+  height: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dirigencia-llena { height: 100%; background: var(--accent); }
+.dirigencia-texto { font-size: 0.8rem; color: var(--muted); }
+.dirigencia.dudas .dirigencia-llena { background: #eab308; }
+.dirigencia.cuestionado .dirigencia-llena { background: #f97316; }
+.dirigencia.pendiendo .dirigencia-llena { background: var(--danger); }
+.dirigencia.cuestionado .dirigencia-texto,
+.dirigencia.pendiendo .dirigencia-texto { color: #fca5a5; font-weight: 600; }
+
 /* Masa salarial: la pista ES el presupuesto de sueldos del club. Llena quiere
    decir que lo usaste todo; pasarse no alarga la barra —no hay adónde— sino
    que la pinta de rojo, y cuánto te estás pasando lo dice el texto. */

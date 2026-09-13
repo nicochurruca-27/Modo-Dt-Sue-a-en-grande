@@ -134,6 +134,14 @@ abrir seguís donde quedaste.
   seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
   lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
   forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
+- **La dirigencia y el despido**: el objetivo de temporada dejó de ser un
+  cartel. La dirigencia tiene una confianza de 0 a 100 que se mueve fecha a
+  fecha según dónde estás contra lo que te pidieron y cómo venís de racha, y se
+  ve arriba de todo con una barra que cambia de color. Ganar un título la sube
+  de golpe. Si llega a cero te echan — y ahí **la carrera sigue**: te vienen a
+  buscar tres clubes de tu tamaño para abajo, elegís uno y arrancás de cero con
+  otro plantel y otro objetivo, pero con tu historial encima. Un club chico no
+  te echa por salir décimo; uno grande sí.
 - **Masa salarial**: el plantel cuesta plata todas las semanas. No se cobra el
   sueldo entero —el modelo económico ya lo tenía descontado— sino la
   DIFERENCIA contra lo que gastaría en sueldos un club de tu tamaño: un

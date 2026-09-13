@@ -120,6 +120,7 @@ function render() {
   else if (s.screen === 'transfer') renderTransfer();
   else if (s.screen === 'fifa-break') renderFifaBreak();
   else if (s.screen === 'season-end') renderSeasonEnd();
+  else if (s.screen === 'despido') renderDespido();
   renderTablePanel();
   renderSquadPanel();
   renderMarketPanel();
@@ -1619,6 +1620,7 @@ function header() {
       <div class="topbar-club">${clubCrest(club, 28)}<span><strong>${club.name}</strong> <span class="muted">— ${divisionName}, Zona ${club.zone}</span></span></div>
       ${dtLine}
       ${objectiveLine}
+      ${dirigenciaHtml()}
       ${compromisoHtml()}
       <div class="muted">Presupuesto: ${money(s.budget)}${table ? ` · Posición en zona: ${pos}°/${table.length}` : ''} · Ánimo: ${s.morale}</div>
       <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
@@ -1902,6 +1904,67 @@ function tituloDelCompromiso() {
 }
 
 // La línea entera, con el chip de la competición pintado con su color.
+// Cómo te ve la dirigencia. Es una barra y una frase: alcanza para saber si
+// estás tranquilo o si el próximo partido puede ser el último, sin tener que
+// interpretar un número.
+function dirigenciaHtml() {
+  const s = Engine.state;
+  if (!s.objective) return '';
+  const c = Engine.confianza();
+  const estado = Engine.estadoDeLaDirigencia();
+  return `
+    <div class="dirigencia ${estado.clave}">
+      <div class="dirigencia-barra"><div class="dirigencia-llena" style="width:${Math.round(c)}%"></div></div>
+      <span class="dirigencia-texto">${estado.texto}</span>
+    </div>
+  `;
+}
+
+// Te echaron. No es el final de la carrera: es el final de un ciclo. Acá se
+// elige el próximo club entre los que te vinieron a buscar.
+function renderDespido() {
+  const s = Engine.state;
+  const c = s.cicloTerminado;
+  const ofertas = s.ofertas || [];
+  const historial = s.historialDT || [];
+
+  app.innerHTML = `
+    <div class="card">
+      <div class="carrera-terminada">
+        <h2>Te echaron de ${c.clubName}</h2>
+        <p>Fecha ${c.fecha} de la temporada ${anioDeTemporada(c.anio)}, con el equipo ${c.posicion}° de ${c.deCuantos}.</p>
+        <p class="muted">Lo que te habían pedido: ${c.objetivo}</p>
+      </div>
+      ${historial.length ? `
+        <h3>Tu carrera hasta acá</h3>
+        <ul class="llave-lista">
+          ${historial.map((h) => `<li class="cruce"><span class="cruce-equipos">${h.clubName}</span><span class="muted cruce-detalle">${anioDeTemporada(h.desde)}–${anioDeTemporada(h.hasta)}${h.titulos ? ` · ${h.titulos} ${h.titulos === 1 ? 'título' : 'títulos'}` : ''} · ${h.final}</span></li>`).join('')}
+        </ul>
+      ` : ''}
+      ${ofertas.length ? `
+        <h3>Te vinieron a buscar</h3>
+        <p class="muted">Elegí dónde seguir. Arrancás de cero: otro plantel, otro presupuesto, otro objetivo.</p>
+        <div class="club-grid">
+          ${ofertas.map((o) => `
+            <button class="club-btn" data-oferta="${o.id}">
+              ${clubCrest(Engine.getClub(o.id), 56)}
+              <strong>${o.nombre}</strong>
+              <span class="muted">${o.division === 'D1' ? 'Primera División' : 'Primera Nacional'}</span>
+              <span class="muted">${o.objetivo}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : '<p>No te llamó nadie. Acá se termina la carrera.</p>'}
+      <button class="option-btn ${ofertas.length ? 'danger' : ''}" id="restart-btn">Empezar de cero con otro DT</button>
+    </div>
+  `;
+
+  app.querySelectorAll('[data-oferta]').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.aceptarOferta(btn.dataset.oferta); render(); });
+  });
+  document.getElementById('restart-btn').addEventListener('click', () => { Engine.resetGame(); render(); });
+}
+
 function compromisoHtml() {
   const c = proximoCompromiso();
   if (!c) return '';

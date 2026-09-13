@@ -173,6 +173,44 @@ const Noticias = {
   // publica cuando el goleador llega a una cifra redonda, que es cuando un
   // diario de verdad escribiría algo. Sin esto, un gol por partido serían
   // cincuenta titulares iguales al año.
+  // La dirigencia habla cuando cambia de opinión, no todas las fechas. Se
+  // publica solo al cruzar un escalón (de conforme a dudas, de dudas a
+  // cuestionado...), así el feed avisa que la cosa se está poniendo fea sin
+  // repetir lo mismo cada semana.
+  trasLaDirigencia(engine) {
+    const s = engine.state;
+    const estado = engine.estadoDeLaDirigencia();
+    if (s.ultimoEstadoDirigencia === estado.clave) return;
+    const antes = s.ultimoEstadoDirigencia;
+    s.ultimoEstadoDirigencia = estado.clave;
+    // El primer estado de la carrera no es noticia: no cambió nada todavía.
+    if (!antes) return;
+    const club = engine.getClub(s.clubId);
+    const malas = ['dudas', 'cuestionado', 'pendiendo'];
+    const empeora = malas.indexOf(estado.clave) > malas.indexOf(antes);
+    const bajadas = {
+      respaldo: 'Los dirigentes salieron a bancar el proceso.',
+      conforme: 'En el club están tranquilos con el rumbo.',
+      dudas: 'En los pasillos del club ya se escuchan cuestionamientos.',
+      cuestionado: 'La continuidad del entrenador está en discusión.',
+      pendiendo: 'En el club ya sondean entrenadores. El próximo partido puede ser el último.',
+    };
+    this.push(s, 'ultimahora',
+      `${estado.texto} en ${club.name}`,
+      bajadas[estado.clave] || '',
+      { clubId: s.clubId, destacada: estado.clave === 'pendiendo' || (empeora && estado.clave === 'cuestionado') });
+  },
+
+  trasElDespido(engine) {
+    const s = engine.state;
+    const c = s.cicloTerminado;
+    if (!c) return;
+    this.push(s, 'ultimahora',
+      `${c.clubName} echó a ${s.dt ? s.dt.name : 'su entrenador'}`,
+      `Se va en la fecha ${c.fecha}, con el equipo ${c.posicion}° de ${c.deCuantos}. El objetivo era: ${c.objetivo}`,
+      { clubId: c.clubId, destacada: true });
+  },
+
   trasUnGol(engine, jugador) {
     const s = engine.state;
     const goles = engine.estadisticasDe(jugador).goles;
