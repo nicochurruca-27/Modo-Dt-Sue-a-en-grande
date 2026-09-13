@@ -145,6 +145,88 @@ const Mercado = {
     return Math.max(1, faltan);
   },
 
+  // ---------- Las ofertas que te llegan a vos ----------
+  //
+  // Hasta acá los rivales se movían entre ellos y tu plantel era intocable:
+  // podías quedarte con tu 9 de 85 para siempre y nadie iba a venir a
+  // buscarlo. Eso es media historia menos, y es la mitad que más duele.
+  //
+  // Ahora, en cada ventana, los clubes que te miran hacen una oferta por
+  // alguno de tus mejores. Puede venir de un club argentino —y entonces el
+  // jugador pasa a jugar ahí, y te lo vas a cruzar— o de afuera, que paga
+  // bastante más y se lo lleva del país.
+  MAX_OFERTAS_POR_VENTANA: 3,
+
+  ofertasPorTusJugadores(engine) {
+    const s = engine.state;
+    if (!s.squad || s.squad.length <= 15) return [];
+    const club = engine.getClub(s.clubId);
+
+    // A quién miran: a los mejores, y a los pibes con techo alto. Un jugador
+    // que no juega ni rinde no lo viene a buscar nadie.
+    const deseables = s.squad
+      .map((p) => {
+        const techo = p.potential || p.rating;
+        // Un pibe de 70 con techo 85 interesa más que un 74 de 31 años.
+        const atractivo = p.rating + Math.max(0, techo - p.rating) * (p.age <= 23 ? 1.2 : 0.3) - Math.max(0, p.age - 29) * 2;
+        return { p, atractivo };
+      })
+      .filter((x) => x.atractivo >= 63)
+      .sort((a, b) => b.atractivo - a.atractivo)
+      .slice(0, 6);
+    if (!deseables.length) return [];
+
+    const ofertas = [];
+    engine.shuffled(deseables).slice(0, this.MAX_OFERTAS_POR_VENTANA).forEach(({ p, atractivo }) => {
+      // Cuanto más te lo quieren, más chances de que la oferta exista.
+      const chance = Math.min(0.8, (atractivo - 62) / 28);
+      if (Math.random() > chance) return;
+      const comprador = this.compradorPara(engine, p, club);
+      if (!comprador) return;
+      const valor = engine.valueOf(p);
+      // De afuera pagan más: se lo llevan del país y compiten con otros.
+      const factor = comprador.extranjero ? 1.3 + Math.random() * 0.6 : 0.95 + Math.random() * 0.45;
+      ofertas.push({
+        playerId: p.id,
+        nombre: p.name,
+        rating: p.rating,
+        edad: p.age,
+        club: comprador,
+        monto: Math.round(valor * factor),
+      });
+    });
+    return ofertas;
+  },
+
+  // Quién viene a buscarlo. Un jugador bueno interesa a un club más grande que
+  // el tuyo; uno muy bueno, a uno de afuera. Nunca lo viene a buscar un club
+  // más chico: esos no pagan.
+  compradorPara(engine, jugador, club) {
+    const s = engine.state;
+    const deAfuera = typeof CLUBES_INTERNACIONALES !== 'undefined' ? CLUBES_INTERNACIONALES : [];
+    // Los de afuera aparecen solo por jugadores que valen la pena, y más
+    // seguido cuanto mejor es el jugador.
+    if (deAfuera.length && jugador.rating >= 72 && Math.random() < (jugador.rating - 68) / 16) {
+      const nivelQueLoQuiere = jugador.rating >= 80 ? 4 : 3;
+      const candidatos = deAfuera.filter((c) => c.nivel >= nivelQueLoQuiere);
+      if (candidatos.length) {
+        const c = engine.shuffled(candidatos)[0];
+        return { id: c.id, nombre: c.nombre, pais: c.pais, extranjero: true };
+      }
+    }
+    // Entre clásicos no se venden jugadores. Que River viniera a comprarle un
+    // pibe a Boca rompía la ilusión más que cualquier otra cosa del mercado.
+    const clasicos = typeof CLASICOS !== 'undefined' ? CLASICOS : [];
+    const esClasico = (id) => clasicos.some((par) => par.includes(id) && par.includes(s.clubId));
+    const argentinos = s.clubs.filter((c) => c.id !== s.clubId
+      && c.division === 'D1'
+      && !esClasico(c.id)
+      && c.reputation >= club.reputation - 1);
+    if (!argentinos.length) return null;
+    const c = engine.shuffled(argentinos)[0];
+    return { id: c.id, nombre: c.name, pais: 'Argentina', extranjero: false };
+  },
+
   // ---------- El mercado de los otros clubes ----------
   //
   // Una vez por ventana de pases, los clubes rivales se compran y se venden

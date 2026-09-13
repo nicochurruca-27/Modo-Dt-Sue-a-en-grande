@@ -78,10 +78,10 @@ simple (busca a alguien que lo mejore y listo):
   gastar solo lo que tiene, y vender para comprar.
 - **Necesidades por puesto**: un club con tres arqueros y sin centrales sigue
   comprando delanteros.
-- **Que te vengan a comprar a vos.** Es lo que más falta: hoy los rivales se
-  mueven entre ellos y tu plantel es intocable. Que aparezca una oferta por tu
-  figura y tengas que decidir es la mitad de la historia que el juego quiere
-  contar.
+- **Negociar la oferta**: hoy es aceptar o rechazar. Debería poder pedirse más
+  plata, o un porcentaje de una futura venta.
+- **Que el jugador opine**: si se quiere ir y lo retenés, que baje su ánimo y
+  pida salir en la ventana siguiente.
 - **Política de juveniles**: que un club de cantera grande suba pibes propios
   en vez de comprar.
 - **Que los rivales se lesionen y acumulen amarillas**, como tu plantel.

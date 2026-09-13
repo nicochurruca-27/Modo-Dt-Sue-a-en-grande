@@ -2990,6 +2990,8 @@ const Engine = {
       desdeAnio: 1,
       // Los clubes que dirigiste antes de este, con lo que hiciste en cada uno.
       historialDT: historial || [],
+      // Lo que otros clubes te ofrecen por tus jugadores en cada ventana.
+      ofertasRecibidas: [],
       mercado: null,
       notasMercado: [],
       historialPuntos: {},
@@ -4692,7 +4694,51 @@ const Engine = {
     // jugador que te gustaba puede haberse ido a otro lado.
     Mercado.mercadoDeLosRivales(this);
     s.contractQueue = s.squad.filter((p) => p.contractYears <= 1).map((p) => p.id);
-    this.showNextContractDecision();
+    // Y las ofertas que te llegan a vos van primero de todo: si vendés a
+    // alguien, cambia a quién te conviene renovar y con cuánta plata salís al
+    // mercado.
+    s.ofertasRecibidas = Mercado.ofertasPorTusJugadores(this);
+    this.mostrarSiguienteOferta();
+  },
+
+  mostrarSiguienteOferta() {
+    const s = this.state;
+    if (!s.ofertasRecibidas || !s.ofertasRecibidas.length) {
+      this.showNextContractDecision();
+      return;
+    }
+    s.screen = 'oferta-recibida';
+    this.save();
+  },
+
+  // Aceptás o rechazás la oferta que está arriba de la pila.
+  resolverOferta(aceptar) {
+    const s = this.state;
+    const oferta = s.ofertasRecibidas.shift();
+    const jugador = oferta && s.squad.find((p) => p.id === oferta.playerId);
+    // Si el plantel quedó en el mínimo mientras mirabas las ofertas, no se
+    // puede vender a nadie más.
+    if (jugador && aceptar && s.squad.length > MIN_SQUAD) {
+      Economia.registrar(this, `Venta de ${jugador.name} a ${oferta.club.nombre}`, oferta.monto);
+      s.squad = s.squad.filter((p) => p.id !== jugador.id);
+      // Si lo compró un club argentino, pasa a jugar ahí de verdad y te lo vas
+      // a cruzar. Si se fue afuera, se fue: el juego no modela esas ligas.
+      if (!oferta.club.extranjero) {
+        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year);
+        this._fuerzas = {};
+      }
+      this.repairStartingSlots();
+      Noticias.trasUnaVentaGrande(this, jugador, oferta);
+      s.lastDecisionNote = `${jugador.name} se fue a ${oferta.club.nombre}. Entraron ${Economia.monto(oferta.monto)}.`;
+    } else if (jugador && aceptar) {
+      s.lastDecisionNote = 'No se puede vender: el plantel quedaría por debajo del mínimo.';
+    } else if (jugador) {
+      // Rechazar a un club grande no sale gratis: el jugador quería irse.
+      const golpe = oferta.club.extranjero ? 4 : 2;
+      s.morale = Math.max(-15, s.morale - golpe);
+      s.lastDecisionNote = `${jugador.name} se queda. En el vestuario no cayó del todo bien.`;
+    }
+    this.mostrarSiguienteOferta();
   },
 
   showNextContractDecision() {

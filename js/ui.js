@@ -121,6 +121,7 @@ function render() {
   else if (s.screen === 'fifa-break') renderFifaBreak();
   else if (s.screen === 'season-end') renderSeasonEnd();
   else if (s.screen === 'despido') renderDespido();
+  else if (s.screen === 'oferta-recibida') renderOfertaRecibida();
   renderTablePanel();
   renderSquadPanel();
   renderMarketPanel();
@@ -1922,6 +1923,46 @@ function dirigenciaHtml() {
 
 // Te echaron. No es el final de la carrera: es el final de un ciclo. Acá se
 // elige el próximo club entre los que te vinieron a buscar.
+// Vinieron a buscarte un jugador. Es la decisión que más duele del juego:
+// la plata contra el equipo.
+function renderOfertaRecibida() {
+  const s = Engine.state;
+  const o = s.ofertasRecibidas[0];
+  const p = s.squad.find((x) => x.id === o.playerId);
+  if (!p) { Engine.resolverOferta(false); render(); return; }
+  const club = Engine.getClub(s.clubId);
+  const valor = Engine.valueOf(p);
+  const sobre = Math.round((o.monto / valor - 1) * 100);
+  const st = Engine.estadisticasDe(p);
+  const sueldo = Economia.sueldoDe(Engine, p);
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card">
+      <h2>Oferta por ${p.name}</h2>
+      <p><strong>${o.club.nombre}</strong>${o.club.extranjero ? ` (${o.club.pais})` : ''} ofrece <strong>${money(o.monto)}</strong> por ${p.name}.</p>
+      <ul>
+        <li>${p.age} años · ${p.pos} · valoración ${p.rating}${p.potential > p.rating ? ` (puede llegar a ${p.potential})` : ''}</li>
+        <li>Vale ${money(valor)}: te ofrecen un ${sobre >= 0 ? `${sobre}% más` : `${-sobre}% menos`}</li>
+        <li>${st.pj ? `Lleva ${st.pj} ${st.pj === 1 ? 'partido' : 'partidos'} y ${st.goles} ${st.goles === 1 ? 'gol' : 'goles'} esta temporada` : 'Todavía no jugó esta temporada'}</li>
+        <li>Te ahorrás ${money(sueldo)} al año de sueldo</li>
+      </ul>
+      <p class="muted">${o.club.extranjero
+        ? 'Si aceptás se va del país y no lo volvés a ver.'
+        : `Si aceptás va a jugar en ${o.club.nombre}, y lo vas a tener enfrente.`}</p>
+      <div class="options">
+        <button class="option-btn" id="aceptar-oferta">Aceptar y cobrar ${money(o.monto)}</button>
+        <button class="option-btn" id="rechazar-oferta">Rechazar: no se vende</button>
+      </div>
+      ${s.squad.length <= MIN_SQUAD ? '<p class="muted">Ojo: con el plantel en el mínimo no se puede vender a nadie.</p>' : ''}
+    </div>
+    ${noticiasHtml()}
+  `;
+  document.getElementById('aceptar-oferta').addEventListener('click', () => { Engine.resolverOferta(true); render(); });
+  document.getElementById('rechazar-oferta').addEventListener('click', () => { Engine.resolverOferta(false); render(); });
+  wireNoticias();
+}
+
 function renderDespido() {
   const s = Engine.state;
   const c = s.cicloTerminado;

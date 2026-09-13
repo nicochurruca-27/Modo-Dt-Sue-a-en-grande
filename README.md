@@ -134,6 +134,12 @@ abrir seguís donde quedaste.
   seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
   lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
   forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
+- **Te vienen a comprar**: en cada ventana, los clubes que miran a tus
+  jugadores hacen una oferta. Puede ser un club argentino —y entonces el
+  jugador pasa a jugar ahí y lo vas a tener enfrente— o uno del exterior, que
+  paga bastante más y se lo lleva del país. Interesan los mejores y, sobre
+  todo, los pibes con techo alto. Entre clásicos no se venden jugadores.
+  Rechazar una oferta grande no sale gratis: el vestuario se entera.
 - **El mundo se mueve solo**: en cada ventana de pases los clubes rivales se
   compran y se venden jugadores entre ellos, sin que vos hagas nada. Un club
   busca a alguien que lo mejore de verdad y que su dueño esté dispuesto a

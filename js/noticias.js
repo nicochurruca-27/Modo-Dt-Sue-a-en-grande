@@ -184,6 +184,20 @@ const Noticias = {
   // El mercado de los otros clubes. No se publican las nueve operaciones: se
   // eligen las que a un hincha le importarían —la de mayor valoración y la que
   // involucre a un grande— y el resto queda como movimiento de fondo.
+  // Cuando se te va una figura. Es la noticia que más duele y la que mejor
+  // cuenta lo que pasó en la temporada, así que va destacada siempre.
+  trasUnaVentaGrande(engine, jugador, oferta) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    const plata = '$' + Math.round(oferta.monto).toLocaleString('es-AR');
+    this.push(s, 'mercado',
+      `${jugador.name} se va de ${club.name} a ${oferta.club.nombre}`,
+      oferta.club.extranjero
+        ? `${jugador.age} años, valoración ${jugador.rating}. Se va del país: ${oferta.club.nombre} de ${oferta.club.pais} pagó ${plata}.`
+        : `${jugador.age} años, valoración ${jugador.rating}. ${oferta.club.nombre} pagó ${plata} y ahora hay que enfrentarlo.`,
+      { clubId: s.clubId, destacada: true });
+  },
+
   trasElMercadoDeLosRivales(engine, hechas) {
     if (!hechas || !hechas.length) return;
     const s = engine.state;
