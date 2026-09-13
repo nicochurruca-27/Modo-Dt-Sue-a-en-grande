@@ -3253,7 +3253,7 @@ function masaSalarialHtml() {
   const club = Engine.getClub(s.clubId);
   if (!club || typeof Economia === 'undefined') return '';
   const masa = Economia.masaSalarial(Engine);
-  const vara = Economia.masaSalarialNormal(club);
+  const vara = Economia.varaSalarial(Engine);
   const exc = masa - vara;
   const semanal = Math.round(exc / Economia.SEMANAS_POR_ANIO);
   const proporcion = vara > 0 ? masa / vara : 1;

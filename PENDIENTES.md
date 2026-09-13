@@ -169,22 +169,26 @@ a rayas verticales, con banda cruzada, con franja horizontal).
 
 ## 7. Los presupuestos de los clubes
 
-Hoy los presupuestos de arranque están todos muy juntos: Boca y River rondan
-los $16 M, los que siguen un poco menos, y los de mitad de tabla y los chicos
-terminan casi con lo mismo. En la realidad la diferencia es mucho más grande,
-los clubes argentinos manejan bastante más plata, y además hay clubes con
-problemas financieros de verdad (San Lorenzo, por ejemplo) que hoy no se
-distinguen de uno sano de su mismo tamaño.
+Hecho. Cada club de Primera tiene ahora su propia economía en `js/finanzas.js`
+(valor de plantel, socios, aforo y estado de las cuentas, con datos reales de
+2026), y de ahí salen el presupuesto de arranque, el goteo semanal, la vara de
+sueldos y la recaudación de local.
 
-Falta cargar números más realistas y más separados entre sí, y ver si conviene
-que el presupuesto no salga solo de la reputación (ver `Engine.startingBudget`)
-sino de un dato propio por club. Es un cambio que toca el balance entero del
-juego —los sueldos, los precios de los pases, la masa salarial— así que hay que
-medirlo con carreras largas después de tocarlo.
+Lo que quedó pendiente de acá:
 
-Nico va a buscar los datos reales.
-
----
+- **La Primera Nacional sigue andando por categoría.** No hay datos publicados
+  comparables de esos 36 clubes, así que usan la tabla de siempre.
+- **Un club chico que renueva todos los contratos se queda sin un peso.** Con
+  Aldosivi en automático, el presupuesto llega a cero en la temporada 6. NO es
+  culpa de este cambio: con el modelo viejo llegaba a cero en la 9, así que
+  esto lo adelanta pero no lo inventa. El problema de fondo es que el goteo
+  semanal de un club chico no alcanza para el costo de las renovaciones, y se
+  arregla del lado de las renovaciones, no del de los presupuestos.
+- **La recaudación de local no usa el aforo**, que está cargado y sería el dato
+  natural: hoy se estira junto con el resto de la economía del club. Queda para
+  cuando se quiera afinar.
+- **Los socios tampoco se usan todavía.** Están cargados para cuando la cuota
+  social sea una fuente propia y no una proporción de la categoría.
 
 ## 8. El arranque de la carrera
 

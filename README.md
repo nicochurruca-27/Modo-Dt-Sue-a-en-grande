@@ -69,6 +69,15 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
+- **Cada club tiene su propia economía** (ver `js/finanzas.js`): el valor de su
+  plantel, sus socios, el aforo de su cancha y en qué estado están sus cuentas,
+  con datos reales de 2026. Antes la plata salía de la CATEGORÍA del club y la
+  categoría de su reputación deportiva, así que Boca y River manejaban lo
+  mismo, los de mitad de tabla casi lo mismo que los chicos, y un club fundido
+  tenía la misma billetera que uno sano. Ahora lo deportivo y lo económico son
+  dos ejes distintos: los presupuestos de arranque van de $25,6 M (River) a
+  $2,3 M (Estudiantes de Río Cuarto), y **San Lorenzo arranca con un plantel de
+  los más caros del país y menos plata que Belgrano**, porque está en crisis.
 - **La presentación en sociedad** es la conferencia de prensa del día que te
   presentan: la pared de prensa con el escudo repetido, los flashes de las
   cámaras, tu nombre, tu cancha, el presupuesto, con cuántos jugadores

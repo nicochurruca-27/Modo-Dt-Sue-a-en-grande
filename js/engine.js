@@ -292,7 +292,18 @@ const Engine = {
   // reputation. La escala tiene bastante más diferencia entre el tier 5 y el
   // 1 que entre niveles deportivos intermedios, para reflejar que los
   // ingresos de los clubes grandes son varias veces los de uno chico.
+  // Con cuánta plata arrancás en un club. Antes era una tabla de cinco valores
+  // por categoría: los dos grandes $16 M, los chicos $1,8 M y casi nada en el
+  // medio, así que Boca y River eran iguales y un club de mitad de tabla tenía
+  // casi lo mismo que uno chico.
+  //
+  // Ahora sale de la economía real del club (ver Economia.presupuestoInicial y
+  // js/finanzas.js). Los clubes de la Primera Nacional, que no tienen datos
+  // publicados, siguen con la tabla de siempre.
   startingBudget(club) {
+    if (club.division === 'D1' && Economia.finanzasDe(club)) {
+      return Economia.presupuestoInicial(club);
+    }
     const tier = club.budgetTier || club.reputation;
     const table = club.division === 'D1'
       ? { 5: 16000000, 4: 8000000, 3: 5000000, 2: 3000000, 1: 1800000 }

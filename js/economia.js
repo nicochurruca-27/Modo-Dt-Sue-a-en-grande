@@ -278,6 +278,63 @@ const Economia = {
     return redondeado;
   },
 
+  // ---------- El tamaño económico de cada club ----------
+  //
+  // Hasta acá toda la plata salía de la CATEGORÍA del club, y la categoría
+  // salía de su reputación deportiva. O sea que Boca y River manejaban lo
+  // mismo, los de mitad de tabla casi lo mismo que los chicos, y un club
+  // fundido tenía la misma billetera que uno sano.
+  //
+  // Ahora cada club de Primera tiene su propio tamaño, sacado de datos reales
+  // (ver js/finanzas.js). Lo deportivo y lo económico pasan a ser dos ejes
+  // distintos, que es como es: Independiente Rivadavia tiene un plantel caro
+  // para lo chico que es como institución, y San Lorenzo tiene un plantel de
+  // los más valiosos del país con las cuentas hechas pedazos.
+  //
+  // El ingreso anual se estima con el VALOR DEL PLANTEL. No es una ocurrencia:
+  // es el único dato comparable que existe para los 30, y donde hay ingresos
+  // publicados la cuenta cierra bien (Racing declaró unos USD 86 M con un
+  // plantel de 81, Belgrano unos 36 con uno de 32). Los clubes de la Primera
+  // Nacional no tienen datos publicados: siguen andando por categoría.
+  finanzasDe(club) {
+    return (typeof FINANZAS_CLUBES === 'undefined' ? null : FINANZAS_CLUBES[club.id]) || null;
+  },
+
+  ingresoAnualDe(club) {
+    const f = this.finanzasDe(club);
+    if (f) return Math.round(f.plantel * 1000000);
+    return this.datosDe(club).ingresoAnualTotal;
+  },
+
+  // Cuánto más grande (o más chico) es este club que el promedio de su
+  // categoría. Con esto se estiran o se achican todas las cifras de la
+  // categoría sin tocar sus PROPORCIONES, que están calibradas: la tele, los
+  // socios y las entradas siguen pesando lo mismo entre sí.
+  escalaDe(club) {
+    const f = this.finanzasDe(club);
+    if (!f) return 1;
+    const total = this.datosDe(club).ingresoAnualTotal;
+    if (!total) return 1;
+    return Math.max(0.3, Math.min(9, this.ingresoAnualDe(club) / total));
+  },
+
+  // Los dos extremos reales de la liga, para interpolar entre ellos.
+  INGRESO_CHICO: 8000000,
+  INGRESO_GRANDE: 151000000,
+
+  entreExtremos(ingreso, enElChico, enElGrande) {
+    const x = Math.min(1, Math.max(0, (Math.log(ingreso) - Math.log(this.INGRESO_CHICO))
+      / (Math.log(this.INGRESO_GRANDE) - Math.log(this.INGRESO_CHICO))));
+    return enElChico + (enElGrande - enElChico) * x;
+  },
+
+  // Cuánto de su plata llega de verdad al plantel según cómo esté el club.
+  factorDeSalud(club) {
+    const f = this.finanzasDe(club);
+    if (!f || typeof SALUD_FACTOR === 'undefined') return 1;
+    return SALUD_FACTOR[f.salud] !== undefined ? SALUD_FACTOR[f.salud] : 1;
+  },
+
   // ---------- Goteo semanal ----------
 
   // El margen que le queda al club sobre sus ingresos ordinarios una vez
@@ -292,15 +349,44 @@ const Economia = {
   // ingreso y la TV más los socios son el grueso. Repartiendo el peso de los
   // sueldos de forma pareja sobre las dos partes, la proporción entre una y
   // otra queda como en la realidad.
-  margen(club) {
+  // Cuánto de sus ingresos ordinarios se le va al club en sueldos. Cuanto más
+  // grande el club, menor la proporción: factura mucho más de lo que le crece
+  // la planilla.
+  enSueldos(club) {
+    if (this.finanzasDe(club)) return this.entreExtremos(this.ingresoAnualDe(club), 0.78, 0.61);
     const cat = this.categoriaDe(club);
-    return Math.max(0, 1 - (SUELDOS_SOBRE_ORDINARIOS[cat] !== undefined ? SUELDOS_SOBRE_ORDINARIOS[cat] : 0.7));
+    return SUELDOS_SOBRE_ORDINARIOS[cat] !== undefined ? SUELDOS_SOBRE_ORDINARIOS[cat] : 0.7;
   },
 
+  margen(club) {
+    return Math.max(0, 1 - this.enSueldos(club));
+  },
+
+  // La porción del excedente que llega al plantel. Baja a medida que el club
+  // crece —el grande tiene mucha más estructura y mucha más deuda que pagar
+  // antes de llegar al fútbol— y la castiga el estado de las cuentas.
+  //
+  // Antes esto era un escalón por categoría, y la categoría salía de la
+  // reputación DEPORTIVA. Con los ingresos ya separados por club ese escalón
+  // contaba dos veces lo mismo y daba vuelta el orden: Independiente Rivadavia
+  // terminaba con más plata para gastar que Talleres.
   porcionDe(club) {
+    if (this.finanzasDe(club)) {
+      return this.entreExtremos(this.ingresoAnualDe(club), 0.45, 0.15) * this.factorDeSalud(club);
+    }
     const cat = this.categoriaDe(club);
     return PORCION_DT_POR_CATEGORIA[cat] !== undefined ? PORCION_DT_POR_CATEGORIA[cat] : this.PORCION_DT;
   },
+
+  // Con cuánta plata arranca una carrera en este club: unos tres años de lo
+  // que le llega al plantel. Antes era una tabla de cinco valores por
+  // categoría (los dos grandes $16 M, los chicos $1,8 M y nada en el medio).
+  presupuestoInicial(club) {
+    const anual = this.ingresoAnualDe(club) * this.margen(club) * this.porcionDe(club);
+    return Math.round(anual * this.ANIOS_DE_ARRANQUE);
+  },
+
+  ANIOS_DE_ARRANQUE: 2.9,
 
   // ---------- Masa salarial ----------
   //
@@ -374,8 +460,13 @@ const Economia = {
     const club = engine.getClub(s.clubId);
     const cruda = (s.squad || []).reduce((total, p) => total + this.sueldoBase(p), 0);
     s.escalaSalarial = cruda > 0
-      ? Math.max(0.25, Math.min(4, this.masaSalarialNormal(club) / cruda))
+      ? Math.max(0.25, Math.min(4, this.masaSalarialSana(club) / cruda))
       : 1;
+    // La escala está topeada, así que en un club donde la plata y el plantel
+    // no coinciden no llega a igualar la cuenta teórica. La vara se guarda
+    // sobre lo que el plantel cuesta DE VERDAD ya calibrado, y así la barra
+    // arranca siempre justa.
+    s.varaSalarial = Math.round(this.masaSalarial(engine));
   },
 
   // El sueldo anual que tu club le paga a un jugador.
@@ -390,19 +481,42 @@ const Economia = {
 
   // Lo que gastaría en sueldos de jugadores un club de este tamaño. Es la vara
   // contra la que se mide tu plantel.
-  masaSalarialNormal(club) {
+  // Lo que un club de este tamaño gastaría en sueldos si estuviera SANO. Es
+  // la referencia con la que se calibran los sueldos de los jugadores al
+  // arrancar una carrera: un jugador de 80 cuesta lo que cuesta, esté el club
+  // fundido o no.
+  masaSalarialSana(club) {
     const d = this.datosDe(club);
-    const bruto = d.fuentes.television.anual + d.fuentes.patrocinadores.anual
-      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual;
-    const cat = this.categoriaDe(club);
-    const enSueldos = SUELDOS_SOBRE_ORDINARIOS[cat] !== undefined ? SUELDOS_SOBRE_ORDINARIOS[cat] : 0.7;
-    return Math.round(bruto * enSueldos * this.PROPORCION_JUGADORES);
+    const bruto = (d.fuentes.television.anual + d.fuentes.patrocinadores.anual
+      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual) * this.escalaDe(club);
+    return Math.round(bruto * this.enSueldos(club) * this.PROPORCION_JUGADORES);
+  },
+
+  // La vara contra la que se mide tu plantel.
+  //
+  // Se prefiere la que quedó GUARDADA al arrancar la carrera (ver
+  // calibrarEscalaSalarial): es lo que de verdad costaba el plantel que
+  // heredaste, así que el año empieza con la barra justo en su lugar. La
+  // cuenta teórica queda de respaldo para las partidas viejas.
+  //
+  // Sin esto había un agujero: la vara sale de la PLATA del club y el plantel
+  // se arma con su REPUTACIÓN deportiva, y cuando las dos no coinciden —San
+  // Lorenzo, con plantel de los más caros del país y cuentas de club de mitad
+  // de tabla— la diferencia se pagaba como "ahorro en sueldos" todas las
+  // semanas. El club en crisis terminaba más rico que uno sano.
+  masaSalarialNormal(club) {
+    return this.masaSalarialSana(club);
+  },
+
+  varaSalarial(engine) {
+    const guardada = engine.state.varaSalarial;
+    if (guardada) return guardada;
+    return this.masaSalarialNormal(engine.getClub(engine.state.clubId));
   },
 
   // Cuánto te estás pasando (o ahorrando) por año.
   excedenteSalarial(engine) {
-    const club = engine.getClub(engine.state.clubId);
-    return this.masaSalarial(engine) - this.masaSalarialNormal(club);
+    return this.masaSalarial(engine) - this.varaSalarial(engine);
   },
 
   // La cuota semanal de ese excedente. Positiva es plata que sale.
@@ -418,8 +532,8 @@ const Economia = {
   // jugás de local.
   ingresoSemanalFijo(club) {
     const d = this.datosDe(club);
-    const goteoAnual = d.fuentes.television.anual + d.fuentes.patrocinadores.anual
-      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual;
+    const goteoAnual = (d.fuentes.television.anual + d.fuentes.patrocinadores.anual
+      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual) * this.escalaDe(club);
     return Math.round((goteoAnual * this.margen(club) * this.porcionDe(club)) / this.SEMANAS_POR_ANIO);
   },
 
@@ -433,6 +547,13 @@ const Economia = {
   },
 
   // ---------- Recaudación de local ----------
+
+  // Lo que deja un partido de local, ya estirado al tamaño del club: un club
+  // que factura el triple que el promedio de su categoría también llena más.
+  recaudacionDe(club) {
+    return this.datosDe(club).recaudacionPartidoLocal * this.escalaDe(club);
+  },
+
 
   // Un equipo que anda bien llena más la cancha. El dato de recaudación por
   // partido es un promedio de la temporada, así que se lo mueve un poco según
@@ -453,7 +574,7 @@ const Economia = {
     const s = engine.state;
     const club = engine.getClub(s.clubId);
     const d = this.datosDe(club);
-    const bruto = d.recaudacionPartidoLocal
+    const bruto = this.recaudacionDe(club)
       * (esClasico ? d.multiplicadorClasico : 1)
       * this.factorPorRendimiento(engine);
     this.registrar(engine, esClasico ? 'Recaudación del clásico de local' : 'Recaudación de local',
@@ -469,7 +590,7 @@ const Economia = {
     const club = engine.getClub(s.clubId);
     const rival = engine.getClub(rivalId);
     if (!club || !rival) return;
-    const pozo = (this.datosDe(club).recaudacionPartidoLocal + this.datosDe(rival).recaudacionPartidoLocal) / 2;
+    const pozo = (this.recaudacionDe(club) + this.recaudacionDe(rival)) / 2;
     const bruto = pozo * (ganaste ? 0.7 : 0.3) * this.factorPorRendimiento(engine);
     this.registrar(engine, `Recaudación en cancha neutral (${ganaste ? '70' : '30'}%)`,
       bruto * this.margen(club) * this.porcionDe(club));
@@ -593,7 +714,7 @@ const Economia = {
   resumenAnual(club) {
     const d = this.datosDe(club);
     const semanal = this.ingresoSemanalFijo(club);
-    const local = Math.round(d.recaudacionPartidoLocal * this.margen(club) * this.porcionDe(club));
+    const local = Math.round(this.recaudacionDe(club) * this.margen(club) * this.porcionDe(club));
     return {
       categoria: this.categoriaDe(club),
       semanal,
