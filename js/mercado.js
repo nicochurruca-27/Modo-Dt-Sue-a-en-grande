@@ -24,6 +24,10 @@
 // Lo único que se guarda en s.mercado son ids y los acuerdos pendientes:
 // JSON puro, chico, y sobrevive al save/load como el resto del estado.
 
+// Con menos de esto un club no puede ni poner un once y rotar, así que el
+// generador lo completa con juveniles (ver `plantel`).
+const PLANTEL_MINIMO = 22;
+
 const MERCADO_ESTADOS = {
   intocable: {
     label: 'Intocable',
@@ -156,16 +160,40 @@ const Mercado = {
     const meses = this.mesesHastaFinDeTemporada(s.calendar ? s.calendar.dayCount : 0);
 
     const real = typeof REAL_ROSTERS !== 'undefined' && REAL_ROSTERS[clubId];
+    // Los planteles investigados también corren los años: envejecen, crecen
+    // hacia su proyección y se retiran, igual que los generados. Sin esto,
+    // Boca y River quedaban congelados en su plantel de 2026 para siempre:
+    // en la temporada 15 seguían con los mismos jugadores y la misma edad,
+    // y eran los dos únicos clubes del juego que no podían ni crecer ni caer.
     const base = real && real.length >= 11
       ? real.map((p, i) => ({
         id: `${clubId}-r${i}`,
         name: p.name, pos: p.pos, posDetail: p.posDetail, altPosDetail: p.altPosDetail,
-        rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears,
+        age: p.age + aniosPasados,
+        rating: this.ratingConLosAnios(p.rating, p.age, p.projection ?? p.rating, aniosPasados),
+        projection: p.projection,
+        nation: p.nation,
+        // El contrato corre y, si se venció, el club lo renueva.
+        contractYears: Math.max(1, (p.contractYears || 1) - (aniosPasados % Math.max(1, p.contractYears || 1))),
         role: p.role, loanFrom: p.loanFrom,
-        value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
+        // El valor y el sueldo investigados valen para el plantel de hoy. Con
+        // los años la valoración cambia, así que el valor se recalcula solo
+        // (ver más abajo) y el sueldo se deja como referencia del contrato.
+        value: aniosPasados ? undefined : p.value,
+        salary: p.salary, clause: aniosPasados ? undefined : p.clause,
+        transferState: p.transferState,
       }))
-      : SQUAD_POSITIONS.map((pos, i) => {
-        const promedio = 44 + club.reputation * 6;
+      : (() => {
+        // Dos clubes de la misma reputación tenían plantel del mismo nivel
+        // exacto: la media de once jugadores lavaba cualquier diferencia y
+        // Platense y Riestra daban el mismo número hasta el decimal. Este
+        // sorteo —uno por club, sembrado, siempre el mismo— hace que adentro
+        // de cada reputación haya clubes mejor y peor armados, que es lo que
+        // pasa de verdad y lo que hace que la tabla no tenga siempre la
+        // misma forma.
+        const nivelDelClub = 44 + club.reputation * 6 + (rnd() * 6 - 3);
+        return SQUAD_POSITIONS.map((pos, i) => {
+        const promedio = nivelDelClub;
         const ratingBase = Math.max(35, Math.min(90, Math.round(promedio + (rnd() * 16 - 8))));
         const edadBase = Math.round(17 + rnd() * 18);
         const nation = this.nacionSembrada(rnd);
@@ -182,15 +210,51 @@ const Mercado = {
           contractYears: Math.max(1, contratoBase - (aniosPasados % Math.max(1, contratoBase))),
           role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(rnd() * 3)] : undefined,
         };
-      })
-        // Los que se pasaron de edad se retiran y dejan el lugar libre.
-        .filter((p) => p.age <= 39);
+        });
+      })();
+
+    // Los que se pasaron de edad se retiran y dejan el lugar libre. Vale para
+    // los dos caminos: un plantel investigado también se queda sin sus
+    // veteranos a medida que pasan las temporadas.
+    const vivos = base.filter((p) => p.age <= 39);
+
+    // Y el club repone. Sin esto los planteles se vaciaban solos: como nadie
+    // reemplaza a los que se retiran, River llegaba a la temporada 12 con 17
+    // jugadores y seguía bajando, hasta quedar por debajo de un once.
+    //
+    // Los que entran son pibes, como si subieran de inferiores: es el
+    // reemplazo más barato de modelar y el más parecido a lo que hace un club
+    // que perdió un veterano. Salen del mismo generador sembrado, así que son
+    // siempre los mismos para ese club en esa temporada.
+    //
+    // Esto NO es todavía un mercado entre clubes rivales: nadie compra ni
+    // vende, solo se tapa el agujero para que un plantel no se desarme en una
+    // carrera larga.
+    const nivel = 44 + club.reputation * 6;
+    while (vivos.length < PLANTEL_MINIMO) {
+      const pos = SQUAD_POSITIONS[vivos.length % SQUAD_POSITIONS.length];
+      const edad = 17 + Math.floor(rnd() * 4);
+      // El sorteo va centrado en el nivel del club. Si los juveniles entraran
+      // por debajo, cada reposición bajaría un poco el promedio y en 30
+      // temporadas todos los clubes del juego habrían perdido 4 o 5 puntos
+      // mientras el tuyo sube: la diferencia se iría a cualquier lado.
+      const rating = Math.max(35, Math.round(nivel - 5 + rnd() * 10));
+      const nation = this.nacionSembrada(rnd);
+      vivos.push({
+        id: `${clubId}-c${anio}-${vivos.length}`,
+        name: this.nombreSembrado(rnd, nation),
+        pos, nation, age: edad, rating,
+        projection: engine.computePotential(rating, edad, club, rnd),
+        contractYears: 2 + Math.floor(rnd() * 3),
+        role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(rnd() * 3)] : undefined,
+      });
+    }
 
     // El ranking por valoración decide a quiénes el club considera
     // intocables: las figuras del plantel.
-    const ranking = base.slice().sort((a, b) => b.rating - a.rating).map((p) => p.id);
+    const ranking = vivos.slice().sort((a, b) => b.rating - a.rating).map((p) => p.id);
 
-    return base
+    return vivos
       .filter((p) => !m.fichados.includes(p.id))
       .map((p) => {
         const valor = engine.valueOf(p);

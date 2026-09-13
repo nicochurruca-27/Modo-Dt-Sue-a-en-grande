@@ -7,11 +7,9 @@ que no se pierda entre una charla y la otra.
 cada sistema, bugs, exploits, roadmap por fases y prioridades puntuadas. Este
 archivo es la lista de tareas; ese otro es el diagnóstico y el orden.
 
-El hallazgo principal de esa auditoría, que manda sobre casi todo lo de acá
-abajo: `Engine.clubStrength()` devuelve `44 + reputación * 6` para todo club
-que no sea el tuyo, así que los rivales no tienen plantel en la simulación
-aunque `mercado.js` sí se los genere. De ahí salen que ganes demasiadas copas,
-que la tabla tenga siempre la misma forma y que el mundo no se mueva.
+El hallazgo principal de esa auditoría ya está resuelto: `clubStrength()`
+ahora sale del plantel real de cada club. Lo que sigue abierto de ese frente
+está más abajo, en "Planteles rivales que se muevan de verdad".
 
 ---
 
@@ -69,7 +67,29 @@ los resultados al lado de los que ya se jugaron, si los hay.
 
 ---
 
-## 2. Sistema de partido en vivo
+## 2. Planteles rivales que se muevan de verdad
+
+Los clubes rivales ya tienen plantel en la simulación: envejecen, crecen hacia
+su techo, se retiran y el club repone con juveniles. Falta lo que los haría un
+mundo de verdad:
+
+- **Que se guarden.** Hoy el plantel de un rival se regenera con la semilla
+  cada vez que se lo mira. Lo único que persiste son los jugadores que vos le
+  compraste (`s.mercado.fichados`). Hace falta guardar un *diff* por club —
+  altas, bajas y cuánto creció cada jugador— en vez del plantel entero, para
+  que el guardado no engorde.
+- **Que los juveniles de reposición sean los mismos de un año al otro.** Hoy
+  se sortean con el año adentro del id, así que el pibe que subió en la
+  temporada 10 no es el mismo que está en la 11. Se arregla solo cuando los
+  planteles se guarden.
+- **Que compren y vendan entre ellos.** Es la IA de clubes nivel 1: cada club
+  con su presupuesto, sus puestos flojos y su política. Depende de lo
+  anterior.
+- **Que se lesionen y acumulen amarillas**, como tu plantel.
+
+---
+
+## 3. Sistema de partido en vivo
 
 El cambio más grande que queda. Hoy el partido se resuelve de una: elegís la
 charla táctica y aparece el resultado final.
@@ -87,7 +107,7 @@ tienen sentido cuando un jugador cansado rinde menos y te obliga a sacarlo.
 
 ---
 
-## 3. Energía y desgaste
+## 4. Energía y desgaste
 
 Aprobado y sin empezar. Es lo próximo.
 
@@ -105,7 +125,7 @@ semana, el desgaste pesa.
 
 ---
 
-## 4. Camisetas con los colores de cada club
+## 5. Camisetas con los colores de cada club
 
 En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy
 es siempre la misma: toma los colores del club del usuario. La idea es que cada
@@ -120,12 +140,13 @@ a rayas verticales, con banda cruzada, con franja horizontal).
 
 ---
 
-## 5. Detalles pendientes
+## 6. Detalles pendientes
 
-- **El usuario gana demasiadas copas.** En 45 temporadas de prueba con clubes
-  grandes salió campeón 8 veces de 42 copas jugadas. La fuerza del plantel del
-  usuario pesa más que la de los rivales simulados (`copaStrength` usa
-  `squadStrength()` para vos y una fórmula sobre el nivel para los demás).
+- **El usuario todavía gana de más.** Con la fuerza de los rivales saliendo de
+  su plantel, en 60 temporadas medidas los títulos de liga bajaron a la mitad
+  (20 → 10) y las copas internacionales de 7 a 1 de 120. Sigue habiendo una
+  ventaja estructural: vos podés comprar y los rivales no. Se termina de
+  emparejar con la IA de clubes (punto 2).
 - **Los 4 descensos de la Primera Nacional** solo se miran para tu club. Los
   otros no se mueven, porque no hay una división más abajo de dónde traer
   reemplazos. Si algún día entra la tercera como división jugable, esto se

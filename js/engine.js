@@ -383,10 +383,57 @@ const Engine = {
     return xi.reduce((sum, p) => sum + p.effectiveRating, 0) / xi.length;
   },
 
+  // Cuánto vale un club en la cancha.
+  //
+  // El tuyo vale lo que valen tus once. Los demás valían `reputación * 6`: un
+  // número fijo que no cambiaba nunca, ni en la fecha 30 ni en la temporada
+  // 12. Eso hacía que ningún club pudiera crecer ni caer, que venderle el 9 a
+  // Vélez no debilitara a Vélez, y que vos ganaras todo.
+  //
+  // Ahora sale del plantel de verdad. Mercado.plantel() ya arma el plantel
+  // completo de cualquier club con un generador sembrado por id: es el mismo
+  // siempre, envejece y evoluciona solo con los años, y NO incluye a los
+  // jugadores que vos le compraste. Todo eso ya estaba escrito; lo único que
+  // faltaba era que el motor de partido lo mirara.
   clubStrength(clubId) {
     if (clubId === this.state.clubId) return this.squadStrength();
     const club = this.getClub(clubId);
-    return 44 + club.reputation * 6 + (Math.random() * 10 - 5);
+    if (!club) return 50;
+    // El ±3 es la diferencia entre un día bueno y uno malo. Antes era ±5 sobre
+    // un número fijo y era lo ÚNICO que separaba dos partidos del mismo club.
+    return this.fuerzaDelPlantel(clubId, club) + (Math.random() * 6 - 3);
+  },
+
+  // El nivel del mejor once posible de un club: el arquero y los diez de campo
+  // de más valoración. No se toman los 11 mejores a secas porque sin el
+  // arquero un club lleno de delanteros daría un promedio inflado.
+  //
+  // Armar un plantel cuesta (son ~22 jugadores con nombre, edad y valor), y
+  // esto se llama dos veces por partido en cada fecha de las dos divisiones.
+  // Así que se guarda el resultado. La memoria NO va en this.state: es un dato
+  // derivado, se puede recalcular siempre, y no tiene por qué engordar el
+  // guardado. La clave lleva el año (los planteles envejecen) y cuántos
+  // jugadores fichaste (comprarle uno a un club lo deja sin él).
+  fuerzaDelPlantel(clubId, club) {
+    const s = this.state;
+    const clave = `${clubId}|${s.season ? s.season.year : 1}|${(s.mercado && s.mercado.fichados || []).length}`;
+    if (!this._fuerzas) this._fuerzas = {};
+    if (this._fuerzas[clave] != null) return this._fuerzas[clave];
+
+    let fuerza;
+    const plantel = typeof Mercado !== 'undefined' ? Mercado.plantel(this, clubId) : null;
+    if (!plantel || plantel.length < 11) {
+      // Un club sin plantel generable (no debería pasar) cae al número viejo.
+      fuerza = 44 + club.reputation * 6;
+    } else {
+      const porRating = (a, b) => b.rating - a.rating;
+      const arquero = plantel.filter((p) => p.pos === 'POR').sort(porRating)[0];
+      const campo = plantel.filter((p) => p !== arquero).sort(porRating).slice(0, arquero ? 10 : 11);
+      const once = arquero ? [arquero, ...campo] : campo;
+      fuerza = once.reduce((suma, p) => suma + p.rating, 0) / once.length;
+    }
+    this._fuerzas[clave] = fuerza;
+    return fuerza;
   },
 
   // ---------- Formación y once titular ----------
