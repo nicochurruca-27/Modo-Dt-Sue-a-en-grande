@@ -1435,3 +1435,171 @@ body.sin-scroll { overflow: hidden; }
 .compromiso-detalle {
   color: var(--muted);
 }
+
+/* ---------- La pantalla de inicio ---------- */
+/*
+   La puerta de entrada. Es la única pantalla que se sale del gris del resto
+   del juego a propósito: cancha de noche, los escudos pasando de fondo y la
+   pelota girando. Todo dibujado acá y en un SVG: ni una imagen de afuera, así
+   que funciona igual abriendo el archivo único sin internet.
+
+   `data-fase` lo pone render() (ver faseDeLaPantalla en ui.js): en el inicio y
+   mientras creás el DT no hay tabla, ni plantel, ni mercado, así que las
+   pestañas del celular y los paneles laterales no se muestran. Antes se veían
+   las cuatro pestañas vacías arriba del formulario. */
+body[data-fase="inicio"] { padding: 0; }
+body[data-fase="inicio"] .layout { display: block; max-width: none; }
+body[data-fase="inicio"] #table-panel,
+body[data-fase="inicio"] #squad-panel,
+body[data-fase="inicio"] #market-panel,
+body[data-fase="inicio"] #mobile-tabs,
+body[data-fase="creacion"] #table-panel,
+body[data-fase="creacion"] #squad-panel,
+body[data-fase="creacion"] #market-panel,
+body[data-fase="creacion"] #mobile-tabs { display: none !important; }
+/* El inicio va a pantalla completa: encajonado en la columna del medio
+   quedaban dos franjas grises a los costados y se perdía todo el efecto. Lo
+   que se centra es el contenido (ver .inicio-contenido), no la columna. */
+body[data-fase="inicio"] .center-col { max-width: none; width: 100%; margin: 0; }
+body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
+
+.inicio {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  /* El cielo de una noche de partido arriba y el pasto abajo. */
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(56, 189, 248, 0.28), transparent 60%),
+    radial-gradient(90% 60% at 50% 115%, rgba(34, 197, 94, 0.35), transparent 65%),
+    linear-gradient(180deg, #04101f 0%, #072033 45%, #04220f 100%);
+}
+
+/* Los escudos de fondo, muy bajos de luz: se notan pero no compiten con el
+   texto. Dos filas que van para lados contrarios. */
+.inicio-escudos {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8% 0;
+  opacity: 0.13;
+  pointer-events: none;
+  /* Se desvanecen contra los bordes para que no queden cortados de golpe. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.inicio-fila {
+  display: flex;
+  gap: 28px;
+  width: max-content;
+  /* La lista va duplicada en el HTML, así que correr la mitad justa cierra el
+     ciclo sin salto. */
+  animation: inicio-desfile 70s linear infinite;
+}
+
+.inicio-fila.viene { animation-direction: reverse; animation-duration: 90s; }
+.inicio-fila img { width: 64px; height: 64px; }
+
+@keyframes inicio-desfile {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.inicio-contenido {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  text-align: center;
+}
+
+.inicio-pelota { width: 116px; height: 116px; filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55)); }
+.inicio-pelota-gajos { transform-origin: 70px 70px; animation: inicio-girar 22s linear infinite; }
+
+@keyframes inicio-girar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Con el sistema en "menos movimiento", nada se mueve. */
+@media (prefers-reduced-motion: reduce) {
+  .inicio-fila, .inicio-pelota-gajos { animation: none; }
+}
+
+.inicio-titulo {
+  margin: 14px 0 10px;
+  font-size: clamp(2.4rem, 11vw, 3.6rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.inicio-titulo span {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.42em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+
+.inicio-bajada {
+  margin: 0 auto 26px;
+  max-width: 420px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.inicio-acciones { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+
+.inicio-principal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #22c55e, #15803d);
+  color: #04220f;
+  font: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(21, 128, 61, 0.45);
+  text-align: left;
+}
+
+.inicio-principal.sola { justify-content: center; text-align: center; }
+.inicio-principal:hover { background: linear-gradient(180deg, #16a34a, #166534); }
+.inicio-principal strong { display: block; font-size: 1.05rem; }
+.inicio-detalle { display: block; font-size: 0.8rem; opacity: 0.75; }
+.inicio-principal img { border-radius: 6px; background: rgba(255, 255, 255, 0.85); padding: 2px; }
+
+/* El botón de al lado, el que no querés apretar sin querer. */
+.option-btn.ghost {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #cbd5e1;
+}
+
+.option-btn.ghost:hover { background: rgba(148, 163, 184, 0.14); }
+
+.inicio-aviso {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: left;
+}
+
+.inicio-aviso strong { color: #fca5a5; }
+.inicio-aviso p { margin: 8px 0 14px; color: #e2e8f0; font-size: 0.92rem; line-height: 1.45; }
+.inicio-botones { display: flex; flex-direction: column; gap: 8px; }

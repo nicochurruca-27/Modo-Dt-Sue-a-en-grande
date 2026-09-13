@@ -163,3 +163,39 @@ a rayas verticales, con banda cruzada, con franja horizontal).
   otros no se mueven, porque no hay una división más abajo de dónde traer
   reemplazos. Si algún día entra la tercera como división jugable, esto se
   completa.
+
+---
+
+## 7. Los presupuestos de los clubes
+
+Hoy los presupuestos de arranque están todos muy juntos: Boca y River rondan
+los $16 M, los que siguen un poco menos, y los de mitad de tabla y los chicos
+terminan casi con lo mismo. En la realidad la diferencia es mucho más grande,
+los clubes argentinos manejan bastante más plata, y además hay clubes con
+problemas financieros de verdad (San Lorenzo, por ejemplo) que hoy no se
+distinguen de uno sano de su mismo tamaño.
+
+Falta cargar números más realistas y más separados entre sí, y ver si conviene
+que el presupuesto no salga solo de la reputación (ver `Engine.startingBudget`)
+sino de un dato propio por club. Es un cambio que toca el balance entero del
+juego —los sueldos, los precios de los pases, la masa salarial— así que hay que
+medirlo con carreras largas después de tocarlo.
+
+Nico va a buscar los datos reales.
+
+---
+
+## 8. El arranque de la carrera
+
+Hecho: la pantalla de inicio (punto 1 de lo que charlamos).
+
+Queda pendiente, en este orden:
+
+- **La presentación en sociedad**, que hoy es un escudo y dos líneas. Podría
+  ser la conferencia de prensa de verdad: tu nombre, el objetivo de la
+  dirigencia, el presupuesto con el que contás y con qué plantel arrancás.
+- **La pantalla de elegir club**, que podría contar bastante más de cada club
+  antes de que te decidas (la reputación es hoy cinco estrellitas y nada más).
+
+El orden del arranque queda como está: primero tu nombre y tu estilo de DT,
+después el club.

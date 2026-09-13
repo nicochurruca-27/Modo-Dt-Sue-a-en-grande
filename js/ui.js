@@ -115,6 +115,8 @@ function render() {
   // El almanaque corriendo también se apaga acá: si se dejara prendido, seguiría
   // pasando días contra una pantalla que ya no existe.
   detenerLosDias();
+  document.body.dataset.fase = faseDeLaPantalla();
+  if (pantallaDeInicio) { renderInicio(); return; }
   if (s.screen === 'dt-create') renderDTCreate();
   else if (s.screen === 'club-select') renderClubSelect();
   else if (s.screen === 'presentation') renderPresentation();
@@ -136,6 +138,7 @@ function render() {
     endCareerBtn.addEventListener('click', () => {
       if (confirm('¿Seguro que querés terminar esta carrera ahora y empezar una nueva? Se pierde el progreso actual.')) {
         Engine.resetGame();
+        pantallaDeInicio = true;
         render();
       }
     });
@@ -1660,6 +1663,154 @@ const DT_STYLES = [
   { id: 'conservador', name: 'Conservador', desc: 'Cuidás cada peso y jugás con las cuentas claras. Arrancás con +10% de presupuesto inicial.' },
 ];
 
+// ---------- La pantalla de inicio ----------
+//
+// La puerta de entrada al juego. Antes no existía: abrías el archivo y lo
+// primero que veías era un formulario, sin siquiera el nombre del juego.
+//
+// Es la única pantalla que se sale del gris del resto de la aplicación a
+// propósito: cancha de noche, los escudos de los clubes pasando de fondo y la
+// pelota girando. El juego arranca acá, así que tiene que sentirse distinto.
+//
+// No es una pantalla del motor: el estado guardado se carga igual (para poder
+// contarte en qué carrera estabas) y esto es solo una capa de arriba. Por eso
+// vive en una variable de la pantalla y no en s.screen: así no ensucia la
+// partida guardada.
+let pantallaDeInicio = false;
+let borradoAConfirmar = false;
+
+// En qué momento del juego estamos, para que el CSS sepa qué esconder: en el
+// inicio y en la creación del DT no hay tabla, ni plantel, ni mercado, así que
+// las pestañas del celular y los paneles laterales no van (antes se veían las
+// cuatro pestañas vacías arriba del formulario).
+function faseDeLaPantalla() {
+  if (pantallaDeInicio) return 'inicio';
+  const pantalla = Engine.state ? Engine.state.screen : 'dt-create';
+  return ['dt-create', 'club-select', 'presentation'].includes(pantalla) ? 'creacion' : 'juego';
+}
+
+// Qué carrera hay guardada, para el botón de seguir. Devuelve null si no hay
+// ninguna o si quedó a medio crear (sin club elegido todavía).
+function carreraGuardada() {
+  const s = Engine.state;
+  if (!s || !s.clubId || !s.season) return null;
+  const club = Engine.getClub(s.clubId);
+  if (!club) return null;
+  return {
+    club,
+    dt: s.dt ? s.dt.name : null,
+    anio: anioDeTemporada(s.season.year),
+    division: club.division === 'D1' ? 'Primera División' : 'Primera Nacional',
+  };
+}
+
+// La pelota: un balón clásico (el pentágono del medio y cinco alrededor)
+// dibujado con polígonos, sin ninguna imagen de afuera. Gira despacio.
+function pelotaSvg() {
+  const pentagono = (cx, cy, r, giro) => {
+    const puntos = [];
+    for (let i = 0; i < 5; i++) {
+      const a = ((giro + i * 72 - 90) * Math.PI) / 180;
+      puntos.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+    }
+    return puntos.join(' ');
+  };
+  const afuera = [];
+  for (let i = 0; i < 5; i++) {
+    const a = ((i * 72 - 90) * Math.PI) / 180;
+    const cx = 70 + 52 * Math.cos(a);
+    const cy = 70 + 52 * Math.sin(a);
+    afuera.push(`<polygon points="${pentagono(cx, cy, 20, i * 72 + 36)}" fill="#0f172a" />`);
+  }
+  return `
+    <svg class="inicio-pelota" viewBox="0 0 140 140" role="img" aria-label="Pelota de fútbol">
+      <defs>
+        <clipPath id="pelota-borde"><circle cx="70" cy="70" r="60" /></clipPath>
+        <radialGradient id="pelota-luz" cx="35%" cy="28%">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="70%" stop-color="#e2e8f0" />
+          <stop offset="100%" stop-color="#94a3b8" />
+        </radialGradient>
+      </defs>
+      <circle cx="70" cy="70" r="60" fill="url(#pelota-luz)" />
+      <g clip-path="url(#pelota-borde)" class="inicio-pelota-gajos">
+        <polygon points="${pentagono(70, 70, 22, 0)}" fill="#0f172a" />
+        ${afuera.join('')}
+      </g>
+      <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(15,23,42,0.35)" stroke-width="2" />
+    </svg>
+  `;
+}
+
+// La pared de escudos que pasa de fondo. Se repite la lista dos veces para que
+// el deslizamiento cierre sin salto.
+function paredDeEscudosHtml() {
+  const clubes = (typeof CLUB_TEMPLATES === 'undefined' ? [] : CLUB_TEMPLATES)
+    .filter((c) => typeof CLUB_CRESTS !== 'undefined' && CLUB_CRESTS[c.id]);
+  if (!clubes.length) return '';
+  const fila = (lista, clase) => `
+    <div class="inicio-fila ${clase}">
+      ${lista.concat(lista).map((c) => clubCrest(c, 64)).join('')}
+    </div>
+  `;
+  const mitad = Math.ceil(clubes.length / 2);
+  return `
+    <div class="inicio-escudos" aria-hidden="true">
+      ${fila(clubes.slice(0, mitad), 'va')}
+      ${fila(clubes.slice(mitad), 'viene')}
+    </div>
+  `;
+}
+
+function renderInicio() {
+  const guardada = carreraGuardada();
+  const acciones = borradoAConfirmar
+    ? `
+      <div class="inicio-aviso">
+        <strong>¿Estás seguro?</strong>
+        <p>Vas a perder la carrera de ${guardada.dt ? `${guardada.dt} en ` : ''}${guardada.club.name}${guardada.anio ? `, que va por ${guardada.anio}` : ''}. No se puede deshacer.</p>
+        <div class="inicio-botones">
+          <button class="option-btn danger" id="inicio-borrar-btn">Sí, empezar de cero</button>
+          <button class="option-btn ghost" id="inicio-volver-btn">No, volver</button>
+        </div>
+      </div>
+    `
+    : guardada
+      ? `
+        <button class="inicio-principal" id="inicio-seguir-btn">
+          ${clubCrest(guardada.club, 44)}
+          <span>
+            <strong>Seguir mi carrera</strong>
+            <span class="inicio-detalle">${guardada.club.name} · ${guardada.division} · ${guardada.anio}</span>
+          </span>
+        </button>
+        <button class="option-btn ghost" id="inicio-nueva-btn">Empezar una nueva</button>
+      `
+      : `<button class="inicio-principal sola" id="inicio-seguir-btn"><span><strong>Empezar carrera</strong></span></button>`;
+
+  app.innerHTML = `
+    <div class="inicio">
+      ${paredDeEscudosHtml()}
+      <div class="inicio-contenido">
+        ${pelotaSvg()}
+        <h1 class="inicio-titulo">Modo DT<span>Sueño en Grande</span></h1>
+        <p class="inicio-bajada">Dirigí un club argentino de verdad: la liga con sus playoffs, la Copa Argentina, la Libertadores y la Sudamericana, el mercado de pases y una dirigencia que te mira.</p>
+        <div class="inicio-acciones">${acciones}</div>
+      </div>
+    </div>
+  `;
+
+  const entrar = () => { pantallaDeInicio = false; borradoAConfirmar = false; render(); };
+  const seguir = document.getElementById('inicio-seguir-btn');
+  if (seguir) seguir.addEventListener('click', entrar);
+  const nueva = document.getElementById('inicio-nueva-btn');
+  if (nueva) nueva.addEventListener('click', () => { borradoAConfirmar = true; render(); });
+  const volver = document.getElementById('inicio-volver-btn');
+  if (volver) volver.addEventListener('click', () => { borradoAConfirmar = false; render(); });
+  const borrar = document.getElementById('inicio-borrar-btn');
+  if (borrar) borrar.addEventListener('click', () => { Engine.resetGame(); entrar(); });
+}
+
 function renderDTCreate() {
   app.innerHTML = `
     <div class="card">
@@ -3160,11 +3311,14 @@ function setupMobileTabs() {
 }
 
 function init() {
+  // La partida se carga igual aunque la primera pantalla sea la de inicio: es
+  // lo que le deja contar en qué carrera estabas antes de que toques nada.
   if (Engine.hasSave()) {
     Engine.load();
   } else {
     Engine.state = { screen: 'dt-create' };
   }
+  pantallaDeInicio = true;
   setupMobileTabs();
   render();
 }

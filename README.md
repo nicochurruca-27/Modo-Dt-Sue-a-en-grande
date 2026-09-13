@@ -69,6 +69,12 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
+- **Pantalla de inicio**: el juego abre con su propia puerta de entrada —cancha
+  de noche, los escudos de los clubes pasando de fondo y la pelota girando, todo
+  dibujado en CSS y SVG, sin ninguna imagen de afuera—. Si tenés una carrera
+  guardada, el botón grande dice **Seguir mi carrera** con tu club, tu división
+  y el año, y al lado queda **Empezar una nueva**, que antes de borrar nada te
+  pregunta si estás seguro y te dice qué carrera vas a perder.
 - **El año arranca el 1° de enero, con la pretemporada**: enero entero —cuatro
   semanas de almanaque— es pretemporada, con el **mercado de verano abierto**:
   desde el calendario entrás y salís del mercado las veces que quieras y el
