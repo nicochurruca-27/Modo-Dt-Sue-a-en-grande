@@ -127,6 +127,13 @@ abrir seguís donde quedaste.
   febrero. Los resultados no vienen cargados —los grupos empiezan en cero—,
   así que lo que pase depende de vos. De la temporada 2 en adelante sale todo
   del sorteo automático.
+- **Energía**: cada jugador tiene una energía de 0 a 100 con su barrita abajo
+  de la camiseta (verde de 70 para arriba, naranja en el medio, roja abajo de
+  35). Jugar la gasta y los días la recuperan. Un jugador de jerarquía se cansa
+  menos y un pibe se repone más rápido, así que un plantel joven aguanta más
+  seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
+  lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
+  forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
   Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
   Copa Argentina, y los 3 mejores de la Tabla Anual que no hayan clasificado

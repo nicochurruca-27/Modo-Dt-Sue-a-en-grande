@@ -102,30 +102,14 @@ frene en los eventos:
 - Poder cambiar el planteo en el entretiempo o en el momento: pasar a algo más
   ofensivo si vas perdiendo, meterte atrás si estás ganando.
 
-Conviene hacerlo **después** de la energía, porque los cambios en vivo recién
-tienen sentido cuando un jugador cansado rinde menos y te obliga a sacarlo.
+La energía ya está, así que los cambios en vivo tienen sentido: un jugador
+cansado rinde menos y te obliga a sacarlo. Lo que falta para esto es que el
+partido produzca **hechos** y no solo un marcador: minuto, autor del gol,
+amarillas, lesiones. Con esos hechos, dibujarlos en vivo es casi gratis.
 
 ---
 
-## 4. Energía y desgaste
-
-Aprobado y sin empezar. Es lo próximo.
-
-- Cada jugador tiene energía; jugar la gasta y descansar la recupera.
-- Barra de color abajo de cada jugador: roja poca, naranja media, verde de 70
-  para arriba.
-- Pesa en el rendimiento desde el primer partido, y con la energía muy baja
-  sube la chance de lesión.
-- La edad manda para recuperarse (un pibe se repone más rápido) y el nivel para
-  cuánto se gasta (un jugador de jerarquía se cansa menos).
-
-Recién ahora tiene sentido: hasta que se arregló el calendario había un partido
-por semana y rotar no servía de nada. Con copa entre semana y liga el fin de
-semana, el desgaste pesa.
-
----
-
-## 5. Camisetas con los colores de cada club
+## 4. Camisetas con los colores de cada club
 
 En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy
 es siempre la misma: toma los colores del club del usuario. La idea es que cada
@@ -140,7 +124,7 @@ a rayas verticales, con banda cruzada, con franja horizontal).
 
 ---
 
-## 6. Detalles pendientes
+## 5. Detalles pendientes
 
 - **El usuario todavía gana de más.** Con la fuerza de los rivales saliendo de
   su plantel, en 60 temporadas medidas los títulos de liga bajaron a la mitad

@@ -143,6 +143,25 @@ const MAX_SQUAD = 36;
 // A partir de acá el juego empieza a avisar que te estás quedando sin lugar.
 const AVISO_PLANTEL = 3;
 const MIN_SQUAD = 14;
+
+// ---------- Energía ----------
+//
+// Cada jugador tiene una energía de 0 a 100. Jugar la gasta, los días la
+// recuperan. Recién ahora tiene sentido: hasta que se arregló el calendario
+// había un partido por semana y rotar no servía de nada. Con copa entre
+// semana y liga el fin de semana, una semana doble te deja el once fundido.
+//
+// Los números están puestos para que un titular que juega SOLO la liga se
+// mantenga arriba (gasta 29 y recupera 35 en la semana), y para que el que
+// juega absolutamente todo no exista: con 45 partidos en el año no hay
+// descanso que alcance. Hay que rotar, que es de lo que se trata.
+const ENERGIA_MAXIMA = 100;
+const ENERGIA_POR_PARTIDO = 30;
+const ENERGIA_POR_DIA = 5;
+// Abajo de esto el jugador empieza a rendir menos. Arriba, juega entero.
+const ENERGIA_SIN_MERMA = 80;
+// Lo peor que puede rendir un jugador reventado: el 72% de su valoración.
+const RENDIMIENTO_MINIMO = 0.72;
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];
 // Cómo se llama cada instancia de una copa internacional según cuántos
@@ -750,8 +769,12 @@ const Engine = {
     return this.applyAltPositionBonus(player, slot, table[key] || { color: 'red', mult: 0.5 }, slotIndex, slotCount);
   },
 
+  // Lo que rinde de verdad un jugador en la cancha: su valoración ajustada por
+  // dos cosas independientes, si está jugando en su puesto y cómo está
+  // físicamente.
   effectiveRating(player, slot, formation, slotIndex, slotCount) {
-    return Math.round(player.rating * this.positionFit(player, slot, formation, slotIndex, slotCount).mult);
+    const puesto = this.positionFit(player, slot, formation, slotIndex, slotCount).mult;
+    return Math.round(player.rating * puesto * this.factorDeEnergia(player));
   },
 
   getStartingXI() {
@@ -3080,6 +3103,8 @@ const Engine = {
     // De paso, esto también arregla los contratos: Mercado calcula los meses
     // que faltan hasta fin de año sobre este mismo contador.
     if (s.calendar) s.calendar.dayCount = 0;
+    // La pretemporada deja a todos enteros, por cansados que hayan terminado.
+    if (s.squad) s.squad.forEach((p) => { p.energia = ENERGIA_MAXIMA; });
     Economia.nuevaTemporada(s);
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
@@ -3270,6 +3295,7 @@ const Engine = {
     while (true) {
       cal.dayInWeek++;
       cal.dayCount++;
+      this.recuperarEnergia();
       // El club genera plata todos los días, no una vez al año: cada 7 días
       // de calendario entra el goteo fijo (TV, sponsors, cuota social).
       if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
@@ -3689,6 +3715,52 @@ const Engine = {
   // Después de cada partido: se descuentan las bajas en curso y se sortea si
   // alguno de los que jugó se lesiona o se va expulsado. Devuelve los avisos
   // para mostrarle al usuario en la pantalla del resultado.
+  // La energía de un jugador. Los que vienen de una partida guardada antes de
+  // que esto existiera no tienen el campo: se los toma enteros.
+  energiaDe(player) {
+    return player.energia == null ? ENERGIA_MAXIMA : player.energia;
+  },
+
+  // Cuánto rinde según cómo está físicamente. Hasta 80 juega entero; de ahí
+  // para abajo baja derecho hasta el 72% de su valoración.
+  factorDeEnergia(player) {
+    const e = this.energiaDe(player);
+    if (e >= ENERGIA_SIN_MERMA) return 1;
+    return RENDIMIENTO_MINIMO + (1 - RENDIMIENTO_MINIMO) * (e / ENERGIA_SIN_MERMA);
+  },
+
+  // Un jugador de jerarquía se cansa menos: está mejor entrenado y resuelve
+  // con menos esfuerzo.
+  costoDeUnPartido(player) {
+    return ENERGIA_POR_PARTIDO * (1 - (player.rating - 65) / 250);
+  },
+
+  // Un pibe se repone más rápido que un veterano. Es la diferencia más
+  // importante entre tener un plantel joven y uno de nombres grandes.
+  recuperacionPorDia(player) {
+    const edad = player.age;
+    const factor = edad <= 21 ? 1.2 : edad <= 25 ? 1.1 : edad <= 29 ? 1 : edad <= 33 ? 0.88 : 0.78;
+    return ENERGIA_POR_DIA * factor;
+  },
+
+  // Los once que jugaron llegan cansados al vestuario.
+  gastarEnergia(jugaron) {
+    this.state.squad.forEach((p) => {
+      if (!jugaron.has(p.id)) return;
+      p.energia = Math.max(0, this.energiaDe(p) - this.costoDeUnPartido(p));
+    });
+  },
+
+  // Un día de calendario de descanso para todo el plantel. Se llama una vez
+  // por día en advanceCalendarDay, así que una semana son siete pasadas.
+  recuperarEnergia() {
+    const s = this.state;
+    if (!s.squad) return;
+    s.squad.forEach((p) => {
+      p.energia = Math.min(ENERGIA_MAXIMA, this.energiaDe(p) + this.recuperacionPorDia(p));
+    });
+  },
+
   updateAvailability() {
     const s = this.state;
     const avisos = [];
@@ -3710,10 +3782,23 @@ const Engine = {
 
     const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
 
-    // Lesiones: alrededor de un jugador cada cuatro partidos. Las molestias
-    // leves son mucho más comunes que las lesiones largas.
-    if (Math.random() < 0.26) {
-      const p = sortear(titulares);
+    // Un jugador fundido se lesiona más. Se nota en dos lugares: sube la
+    // chance de que haya lesión en el partido, y el que se lesiona es casi
+    // siempre uno de los que venían cansados.
+    const energiaMedia = titulares.reduce((suma, p) => suma + this.energiaDe(p), 0) / titulares.length;
+    const riesgo = 0.26 * (1 + Math.max(0, ENERGIA_SIN_MERMA - energiaMedia) / 160);
+    // Sorteo con bolillas: cada jugador entra tantas veces como cansado esté.
+    // Uno entero entra una vez; uno en cero, cuatro.
+    const bolillero = [];
+    titulares.forEach((p) => {
+      const bolillas = 1 + Math.round(3 * (1 - this.energiaDe(p) / ENERGIA_MAXIMA));
+      for (let i = 0; i < bolillas; i++) bolillero.push(p);
+    });
+
+    // Lesiones: alrededor de un jugador cada cuatro partidos, más si el once
+    // viene fundido. Las molestias leves son mucho más comunes que las largas.
+    if (Math.random() < riesgo) {
+      const p = sortear(bolillero);
       const tipo = sortear([
         ...Array(5).fill({ detail: 'Molestia muscular', min: 1, max: 2 }),
         ...Array(3).fill({ detail: 'Desgarro', min: 2, max: 4 }),
@@ -3825,6 +3910,9 @@ const Engine = {
     const club = this.getClub(s.clubId);
     const factorClub = this.factorDeDesarrollo(club);
     const jugaron = new Set(this.getStartingXI().starters.map((e) => e.id));
+    // Los once llegan cansados. Se hace ANTES de mirar el desarrollo para que
+    // el orden sea el de la realidad: primero se jugó el partido.
+    this.gastarEnergia(jugaron);
     const notas = [];
 
     s.squad.forEach((p) => {
@@ -4431,6 +4519,7 @@ const Engine = {
       age: offer.age,
       nation: offer.nation,
       contractYears: 3,
+      energia: ENERGIA_MAXIMA,
     });
     s.market.splice(marketIndex, 1);
     Noticias.trasUnaOperacion(this, 'compra', offer, offer.price);

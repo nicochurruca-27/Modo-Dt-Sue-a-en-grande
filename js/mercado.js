@@ -519,6 +519,8 @@ const Mercado = {
         rating: j.rating, age: j.age, nation: j.nation, role: j.role,
         contractYears: 3,
         potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
+        // Llega de pretemporada: entero.
+        energia: ENERGIA_MAXIMA,
       });
       m.fichados.push(j.id);
       notas.push(a.tipo === 'fin-contrato'

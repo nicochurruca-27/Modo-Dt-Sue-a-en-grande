@@ -1106,6 +1106,7 @@ const PITCH_JERSEY_W = 40;
 const PITCH_JERSEY_H = 40;
 const PITCH_LABEL_H = 16; // alto de la placa con el nombre, debajo del dorsal
 const PITCH_LABEL2_H = 13; // alto de la placa chica con posición + valoración, debajo del nombre
+const PITCH_ENERGIA_H = 5; // alto de la barrita de energía, debajo de todo
 const PITCH_ROW_H = 80; // separación vertical entre el arranque de una fila y la siguiente
 const PITCH_COL_GAP = 12;
 const PITCH_MARGIN_X = 26;
@@ -1175,7 +1176,7 @@ function playerMarkerSvg(p, club, x, y, selected) {
   return `
     <g class="player-marker" data-player="${p.id}" transform="translate(${x}, ${y})">
       ${title}
-      ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + 18}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
+      ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 20}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
       ${fitStroke ? `<rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="none" stroke="${fitStroke}" stroke-width="2.5" />` : ''}
       <g transform="scale(${scale})">
         <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
@@ -1186,7 +1187,22 @@ function playerMarkerSvg(p, club, x, y, selected) {
       <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>
       <rect x="-3" y="${label2Y}" width="${w + 6}" height="${PITCH_LABEL2_H}" rx="3" fill="rgba(0,0,0,0.4)" />
       <text x="${w / 2}" y="${label2Y + PITCH_LABEL2_H - 3.5}" text-anchor="middle" font-size="9" font-weight="600" fill="#cbd5e1">${infoLine}</text>
+      ${barraDeEnergiaSvg(p, -3, label2Y + PITCH_LABEL2_H + 2, w + 6)}
     </g>
+  `;
+}
+
+// La barra de energía, abajo de todo en la camiseta. Verde de 70 para arriba,
+// naranja en el medio, roja abajo de 35: se lee de un vistazo cuál del once
+// está para jugar y cuál viene fundido, sin tener que abrir nada.
+function barraDeEnergiaSvg(p, x, y, ancho) {
+  const e = Engine.energiaDe(p);
+  const color = e >= 70 ? 'var(--accent)' : e >= 35 ? '#eab308' : 'var(--danger)';
+  const lleno = Math.max(1, Math.round((ancho - 2) * (e / 100)));
+  return `
+    <title>Energía: ${Math.round(e)}%</title>
+    <rect x="${x}" y="${y}" width="${ancho}" height="${PITCH_ENERGIA_H}" rx="2" fill="rgba(0,0,0,0.55)" />
+    <rect x="${x + 1}" y="${y + 1}" width="${lleno}" height="${PITCH_ENERGIA_H - 2}" rx="1.5" fill="${color}" />
   `;
 }
 
@@ -1208,7 +1224,7 @@ const WIDTH_FRACTION_BY_CATEGORY = {
 // poder acomodarlos en una grilla, en vez de posicionados sobre el campo.
 function benchJerseySvg(p, club) {
   const w = PITCH_JERSEY_W + 12;
-  const h = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + 12;
+  const h = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 14;
   const baja = Engine.outLabel(p);
   return `
     <div class="banco-card${baja ? ' unavailable' : ''}" title="${p.name}${baja ? ` — ${baja}` : ''}">
@@ -1231,7 +1247,7 @@ function buildPitchSvg(xi, club) {
   ];
   const maxCols = Math.max(...rows.map((r) => r.players.length), 1);
   const svgWidth = 2 * PITCH_MARGIN_X + maxCols * PITCH_JERSEY_W + Math.max(0, maxCols - 1) * PITCH_COL_GAP;
-  const rowContentH = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + 8;
+  const rowContentH = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 10;
   const svgHeight = 2 * PITCH_MARGIN_Y + Math.max(0, rows.length - 1) * PITCH_ROW_H + rowContentH;
   const fieldInnerWidth = svgWidth - 2 * PITCH_MARGIN_X;
 
