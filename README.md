@@ -134,6 +134,15 @@ abrir seguís donde quedaste.
   seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
   lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
   forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
+- **Masa salarial**: el plantel cuesta plata todas las semanas. No se cobra el
+  sueldo entero —el modelo económico ya lo tenía descontado— sino la
+  DIFERENCIA contra lo que gastaría en sueldos un club de tu tamaño: un
+  plantel normal no cuesta nada extra, uno inflado te come el presupuesto y
+  uno austero te devuelve plata. La escala salarial de cada club se calibra
+  con su plantel de arranque, así que empezás justo en el presupuesto y de ahí
+  en más depende de vos. Como los jugadores mejoran, sus sueldos suben solos:
+  tarde o temprano hay que vender o dejar ir a alguien. Se ve en el panel del
+  mercado.
 - **Estadísticas de los jugadores**: cada uno lleva partidos jugados, goles y
   asistencias de la temporada, y su acumulado de carrera. Se ven en el panel de
   plantel, abajo de la reserva. Como el motor no simula jugadas, los goles del

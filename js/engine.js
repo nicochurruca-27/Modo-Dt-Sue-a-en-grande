@@ -366,6 +366,12 @@ const Engine = {
         value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
         // Si vino una proyección investigada se usa esa; si no, la estimada.
         potential: p.projection || this.computePotential(p.rating, p.age, club),
+        // Cuánto se aparta su sueldo investigado de lo que diría la curva. Se
+        // calcula una sola vez, acá, y después el sueldo se mueve con el
+        // jugador sin perder esa proporción (ver Economia.sueldoBase).
+        factorSueldo: p.salary
+          ? p.salary / Math.max(1, Economia.curvaSalarial(p.rating, p.age))
+          : undefined,
       }));
     }
     const MED_ROLES = ['contención', 'mixto', 'ofensivo'];
@@ -2970,6 +2976,8 @@ const Engine = {
       noticias: [],
       lastDevelopmentNotes: [],
       finanzas: null,
+      // Cuánto de un sueldo "de catálogo" paga este club (ver Economia).
+      escalaSalarial: null,
       mercado: null,
       notasMercado: [],
       historialPuntos: {},
@@ -2984,6 +2992,9 @@ const Engine = {
     if (dt && dt.style === 'conservador') budget = Math.round(budget * 1.1);
     this.state.budget = budget;
     this.state.squad = this.generateSquad(club);
+    // La escala salarial se calibra con el plantel de arranque: arrancás justo
+    // en el presupuesto de sueldos de tu club y de ahí en más depende de vos.
+    Economia.calibrarEscalaSalarial(this);
     this.applyRealLineup(club);
     this.startNewSeason(true);
     // La presentación en sociedad solo aparece al arrancar la carrera (acá,

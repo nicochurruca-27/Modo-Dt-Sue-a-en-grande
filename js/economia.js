@@ -302,6 +302,117 @@ const Economia = {
     return PORCION_DT_POR_CATEGORIA[cat] !== undefined ? PORCION_DT_POR_CATEGORIA[cat] : this.PORCION_DT;
   },
 
+  // ---------- Masa salarial ----------
+  //
+  // Hasta acá el plantel no costaba un peso de mantener: los sueldos estaban
+  // descontados como un porcentaje fijo del ingreso (ver `margen`), así que
+  // daba exactamente lo mismo tener 18 jugadores que 36 llenos de figuras. La
+  // pregunta central de un DT —"¿puedo sostener este sueldo?"— no existía.
+  //
+  // La solución NO es cobrar el sueldo entero y sacar el descuento: eso
+  // rehace toda la economía, que está calibrada con datos reales y anda bien.
+  // Lo que se cobra es la DIFERENCIA contra lo que gastaría en sueldos un
+  // club de ese tamaño. Un plantel normal para tu club no cuesta nada extra
+  // —el modelo ya lo tenía contemplado—, uno inflado te come el presupuesto y
+  // uno austero te devuelve plata. Es además como piensa un club de verdad:
+  // no "cuánto pago" sino "cuánto me estoy pasando del presupuesto".
+  //
+  // De la masa salarial total de un club (el 61% al 78% del ingreso, según la
+  // categoría) esta parte es la que se va en los jugadores; el resto es
+  // cuerpo técnico, empleados y estructura. Sale de contrastar los sueldos
+  // investigados de Boca —que suman el 40% de su ingreso bruto— contra el 61%
+  // que el modelo le asigna a la categoría.
+  PROPORCION_JUGADORES: 0.65,
+
+  // El sueldo "de catálogo" de un jugador: lo que cobraría en un club grande.
+  // Si está investigado se usa ese; si no, sale de una curva ajustada sobre
+  // los sueldos reales de Boca, donde cada 5,5 puntos de valoración duplican
+  // el sueldo.
+  //
+  // La edad pesa muchísimo y por eso va aparte: en ese plantel real, Delgado
+  // (75 de valoración, 21 años) cobra 250 mil y Montero (75, 31 años) cobra un
+  // millón. Un pibe es barato aunque sea bueno, y ahí está media gracia de
+  // apostar a las inferiores.
+  // La curva pelada: lo que cobraría alguien de esa valoración y esa edad.
+  curvaSalarial(rating, age) {
+    const factorEdad = age <= 21 ? 0.35 : age <= 24 ? 0.7 : age <= 33 ? 1 : 1.15;
+    return Math.round(150000 * Math.pow(2, (rating - 60) / 5.5) * factorEdad);
+  },
+
+  sueldoBase(player) {
+    const curva = this.curvaSalarial(player.rating, player.age);
+    // Un jugador con sueldo investigado no cobra "la curva": cobra lo suyo.
+    // Pero ese número es el de HOY, y el jugador cambia — mejora, envejece.
+    // Si se usara el número fijo, el plantel de Boca costaría exactamente lo
+    // mismo en la temporada 1 que en la 15, con otros jugadores adentro.
+    //
+    // Así que se guarda, una sola vez, cuánto se apartaba de la curva (ver
+    // generateSquad) y de ahí en más el sueldo se mueve con él manteniendo esa
+    // proporción: el que estaba caro para lo que rinde sigue caro, y el que
+    // explota pasa a cobrar como lo que es.
+    if (player.factorSueldo != null) return Math.round(curva * player.factorSueldo);
+    if (player.salary) return player.salary;
+    return curva;
+  },
+
+  // La escala salarial del club: cuánto de ese sueldo de catálogo se paga acá.
+  // El mismo jugador no cobra lo mismo en Boca que en Platense, y sin esto el
+  // club chico arrancaba la carrera en rojo — su plantel generado costaba más
+  // que todo su presupuesto de sueldos.
+  //
+  // Se calibra UNA vez, al empezar la carrera, para que el plantel con el que
+  // arrancás caiga justo sobre la vara de tu club: empezás en cero y todo lo
+  // que pase de ahí es consecuencia de lo que hagas vos. Queda guardada en la
+  // partida, así que no se mueve sola de una temporada a la otra.
+  escalaSalarial(engine) {
+    const e = engine.state.escalaSalarial;
+    return e == null ? 1 : e;
+  },
+
+  calibrarEscalaSalarial(engine) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    const cruda = (s.squad || []).reduce((total, p) => total + this.sueldoBase(p), 0);
+    s.escalaSalarial = cruda > 0
+      ? Math.max(0.25, Math.min(4, this.masaSalarialNormal(club) / cruda))
+      : 1;
+  },
+
+  // El sueldo anual que tu club le paga a un jugador.
+  sueldoDe(engine, player) {
+    return Math.round(this.sueldoBase(player) * this.escalaSalarial(engine));
+  },
+
+  // Lo que te cuesta el plantel que tenés, por año.
+  masaSalarial(engine) {
+    return (engine.state.squad || []).reduce((total, p) => total + this.sueldoDe(engine, p), 0);
+  },
+
+  // Lo que gastaría en sueldos de jugadores un club de este tamaño. Es la vara
+  // contra la que se mide tu plantel.
+  masaSalarialNormal(club) {
+    const d = this.datosDe(club);
+    const bruto = d.fuentes.television.anual + d.fuentes.patrocinadores.anual
+      + d.fuentes.cuotaSocial.anual + d.fuentes.otros.anual;
+    const cat = this.categoriaDe(club);
+    const enSueldos = SUELDOS_SOBRE_ORDINARIOS[cat] !== undefined ? SUELDOS_SOBRE_ORDINARIOS[cat] : 0.7;
+    return Math.round(bruto * enSueldos * this.PROPORCION_JUGADORES);
+  },
+
+  // Cuánto te estás pasando (o ahorrando) por año.
+  excedenteSalarial(engine) {
+    const club = engine.getClub(engine.state.clubId);
+    return this.masaSalarial(engine) - this.masaSalarialNormal(club);
+  },
+
+  // La cuota semanal de ese excedente. Positiva es plata que sale.
+  cobrarSueldos(engine) {
+    const excedente = this.excedenteSalarial(engine);
+    const semanal = Math.round(excedente / this.SEMANAS_POR_ANIO);
+    if (!semanal) return;
+    this.registrar(engine, semanal > 0 ? 'Sueldos por encima del presupuesto' : 'Ahorro en sueldos', -semanal);
+  },
+
   // Lo que entra todas las semanas pase lo que pase: televisión, sponsors,
   // cuota social y otros. Las entradas NO están acá: se cobran el día que
   // jugás de local.
@@ -318,6 +429,7 @@ const Economia = {
     const club = engine.getClub(s.clubId);
     const monto = this.ingresoSemanalFijo(club);
     if (monto > 0) this.registrar(engine, 'TV, sponsors y cuota social', monto);
+    this.cobrarSueldos(engine);
   },
 
   // ---------- Recaudación de local ----------

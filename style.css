@@ -584,6 +584,21 @@ h1, h2, h3 {
 }
 .cuadro-svg { display: block; }
 
+/* Masa salarial: la pista ES el presupuesto de sueldos del club. Llena quiere
+   decir que lo usaste todo; pasarse no alarga la barra —no hay adónde— sino
+   que la pinta de rojo, y cuánto te estás pasando lo dice el texto. */
+.masa-salarial { margin: 8px 0 4px; }
+.masa-salarial p { margin: 5px 0 0; font-size: 0.82rem; }
+.masa-barra {
+  height: 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.masa-llena { height: 100%; background: var(--accent); }
+.masa-salarial.ajustado .masa-llena { background: #eab308; }
+.masa-salarial.pasado .masa-llena { background: var(--danger); }
 /* La tabla de rendimiento del plantel, plegada abajo de la reserva. */
 .rendimiento {
   margin-top: 14px;

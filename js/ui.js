@@ -2607,6 +2607,43 @@ function finanzasHtml() {
   `;
 }
 
+// La masa salarial contra el presupuesto de sueldos del club. Es lo que
+// convierte al plantel en una decisión económica: sin esto, tener 18
+// jugadores costaba lo mismo que tener 36 llenos de figuras.
+//
+// Lo que se muestra es la diferencia, no el total, porque es lo que se cobra
+// y lo que el DT puede mover: el club ya tiene presupuestado un plantel de su
+// tamaño, y lo que pesa es cuánto te estás pasando.
+function masaSalarialHtml() {
+  const s = Engine.state;
+  const club = Engine.getClub(s.clubId);
+  if (!club || typeof Economia === 'undefined') return '';
+  const masa = Economia.masaSalarial(Engine);
+  const vara = Economia.masaSalarialNormal(club);
+  const exc = masa - vara;
+  const semanal = Math.round(exc / Economia.SEMANAS_POR_ANIO);
+  const proporcion = vara > 0 ? masa / vara : 1;
+
+  // Con el plantel de arranque la diferencia es cero, y "estás $0 por debajo"
+  // no dice nada: ahí se avisa que estás justo.
+  const justo = Math.abs(exc) < vara * 0.01;
+  const nivel = justo || proporcion <= 1 ? 'bien' : proporcion <= 1.25 ? 'ajustado' : 'pasado';
+  const texto = justo
+    ? 'Estás justo en el presupuesto: el plantel no te cuesta nada extra.'
+    : exc < 0
+      ? `Te sobran ${money(-exc)}: entran ${money(-semanal)} de más por semana.`
+      : nivel === 'ajustado'
+        ? `Te estás pasando ${money(exc)}: se van ${money(semanal)} por semana.`
+        : `Te estás pasando ${money(exc)}, un ${Math.round((proporcion - 1) * 100)}% más de lo que el club presupuesta. Se van ${money(semanal)} por semana.`;
+
+  return `
+    <div class="masa-salarial ${nivel}">
+      <div class="masa-barra" role="img" aria-label="Sueldos: ${Math.round(proporcion * 100)}% del presupuesto"><div class="masa-llena" style="width:${Math.min(100, Math.round(proporcion * 100))}%"></div></div>
+      <p class="muted">Sueldos del plantel: <strong>${money(masa)}</strong> al año, sobre un presupuesto de ${money(vara)}. ${texto}</p>
+    </div>
+  `;
+}
+
 function renderMarketPanel() {
   const panel = document.getElementById('market-panel');
   if (!panel) return;
@@ -2635,6 +2672,7 @@ function renderMarketPanel() {
   panel.innerHTML = `
     <div class="card mercado-card">
       <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
+      ${masaSalarialHtml()}
       <p class="muted mercado-aviso">Podés negociar cuando quieras, pero nada se firma hasta que abra el mercado (al terminar el Apertura y en la pretemporada). Un acuerdo cerrado se concreta ahí.</p>
       ${avisoDePlantel()}
       ${finanzasHtml()}
