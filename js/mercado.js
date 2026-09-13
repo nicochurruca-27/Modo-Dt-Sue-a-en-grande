@@ -464,6 +464,23 @@ const Mercado = {
       });
     }
 
+    // La posición detallada (lateral derecho, defensor central, extremo
+    // izquierdo...). Los planteles investigados ya la traen; a los generados
+    // se les pone acá, en una pasada aparte y NO adentro del sorteo, por dos
+    // razones: el rol del mediocampista se sortea después y tienen que
+    // coincidir, y tocar la secuencia del generador sembrado cambiaría de
+    // golpe los planteles de las partidas ya empezadas.
+    //
+    // Se lleva una cuenta por puesto para que el reparto salga parejo: dos
+    // laterales por lado y centrales, y no seis defensores centrales.
+    const porPuesto = {};
+    vivos.forEach((j) => {
+      if (j.posDetail) return;
+      const n = porPuesto[j.pos] || 0;
+      j.posDetail = engine.posDetalladaPara(j.pos, n, j.role);
+      porPuesto[j.pos] = n + 1;
+    });
+
     // El ranking por valoración decide a quiénes el club considera
     // intocables: las figuras del plantel.
     const ranking = vivos.slice().sort((a, b) => b.rating - a.rating).map((p) => p.id);

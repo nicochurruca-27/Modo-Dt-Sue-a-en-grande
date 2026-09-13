@@ -356,6 +356,40 @@ const Engine = {
 
   // Si el club tiene un plantel real cargado en players.js, se usa ese en
   // vez de generar jugadores al azar. Ver REAL_ROSTERS en ese archivo.
+  // La posición detallada de un jugador generado (lateral derecho, defensor
+  // central, extremo izquierdo...). Los planteles investigados la traen de la
+  // investigación; los generados no la tenían, y eso se notaba apenas
+  // comprabas uno: en la camiseta aparecía la valoración pelada, sin el
+  // puesto, porque no había dato que mostrar.
+  //
+  // Sale del ÍNDICE dentro del plantel y no de un sorteo, a propósito: los
+  // planteles rivales se generan con un generador sembrado y consumir un
+  // número más correría toda la secuencia, cambiando de golpe los planteles
+  // de las partidas que ya están empezadas. Así, además, cada plantel queda
+  // armado como corresponde: dos laterales por lado, centrales, y no seis
+  // defensores centrales.
+  POS_DETALLE_POR_PUESTO: {
+    POR: ['arquero'],
+    DEF: ['lateral derecho', 'defensor central', 'defensor central', 'lateral izquierdo', 'defensor central', 'lateral derecho'],
+    MED: ['mediocampista defensivo', 'mediocampista mixto', 'volante por derecha', 'mediocampista ofensivo', 'volante por izquierda', 'mediocampista mixto'],
+    DEL: ['delantero centro', 'extremo izquierdo', 'extremo derecho', 'segundo delantero'],
+  },
+
+  // Para un mediocampista, el rol que ya tiene manda sobre el índice: si el
+  // generador lo hizo de contención, su puesto detallado tiene que decir eso.
+  POS_DETALLE_POR_ROL: {
+    contención: 'mediocampista defensivo',
+    mixto: 'mediocampista mixto',
+    ofensivo: 'mediocampista ofensivo',
+  },
+
+  posDetalladaPara(pos, indice, role) {
+    if (pos === 'MED' && role && this.POS_DETALLE_POR_ROL[role]) return this.POS_DETALLE_POR_ROL[role];
+    const opciones = this.POS_DETALLE_POR_PUESTO[pos];
+    if (!opciones || !opciones.length) return undefined;
+    return opciones[indice % opciones.length];
+  },
+
   generateSquad(club) {
     const real = REAL_ROSTERS[club.id];
     if (real && real.length >= 11) {
@@ -393,7 +427,11 @@ const Engine = {
       const nation = this.rollNation();
       const contractYears = 1 + Math.floor(Math.random() * 4); // 1-4 años de contrato restantes
       const role = pos === 'MED' ? MED_ROLES[Math.floor(Math.random() * MED_ROLES.length)] : undefined;
-      return { id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role, potential: this.computePotential(rating, age, club) };
+      return {
+        id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role,
+        posDetail: this.posDetalladaPara(pos, i, role),
+        potential: this.computePotential(rating, age, club),
+      };
     });
   },
 

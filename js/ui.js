@@ -1347,24 +1347,33 @@ function handlePlayerTap(id) {
     render();
     return;
   }
-  const isStarter = (pid) => s.startingSlots.some((e) => e.playerId === pid);
-  if (!isStarter(selectedPlayerId) && !isStarter(id)) {
-    // Dos suplentes entre sí: ninguno ocupa un casillero de la cancha, así
-    // que no hay nada que intercambiar. Solo se mueve la selección.
-    selectedPlayerId = id;
+  // Acá había un atajo que cortaba antes de llegar al motor: si ninguno de los
+  // dos era titular, daba por hecho que "no hay nada que intercambiar" y solo
+  // movía la selección. Eso era cierto cuando el banco no existía como lista
+  // ordenada, pero dejó de serlo: un suplente y uno de la reserva SÍ se
+  // cambian entre ellos, y el motor lo sabe hacer. El atajo hacía imposible
+  // mandar a alguien del banco a la reserva y subir a otro en su lugar.
+  //
+  // Ahora decide el motor, que es el que conoce las reglas.
+  const ok = Engine.swapPlayers(selectedPlayerId, id);
+  if (ok) {
+    selectedPlayerId = null;
     render();
     return;
   }
-  const ok = Engine.swapPlayers(selectedPlayerId, id);
-  if (!ok) {
-    // El único cambio que el motor rechaza es meter a la cancha a alguien
-    // lesionado o suspendido.
-    const lesionado = [selectedPlayerId, id]
-      .map((pid) => s.squad.find((p) => p.id === pid))
-      .find((p) => p && !Engine.isAvailable(p));
-    if (lesionado) alert(`${lesionado.name} no está disponible: ${Engine.outLabel(lesionado)}.`);
+  // El motor rechaza por dos motivos: meter a la cancha a alguien lesionado o
+  // suspendido, o que los dos estén en la reserva (ahí no hay lugar que
+  // intercambiar). El primero se avisa; en el segundo, simplemente se pasa la
+  // selección al que acabás de tocar.
+  const lesionado = [selectedPlayerId, id]
+    .map((pid) => s.squad.find((p) => p.id === pid))
+    .find((p) => p && !Engine.isAvailable(p));
+  if (lesionado) {
+    alert(`${lesionado.name} no está disponible: ${Engine.outLabel(lesionado)}.`);
+    selectedPlayerId = null;
+  } else {
+    selectedPlayerId = id;
   }
-  selectedPlayerId = null;
   render();
 }
 
