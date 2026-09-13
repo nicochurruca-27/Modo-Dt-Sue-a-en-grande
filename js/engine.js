@@ -4296,16 +4296,6 @@ const Engine = {
       opciones.push({ id: 'aguantar', label: 'Asegurar el empate', tacticMod: -2, riesgoRival: -4, nota: 'Un punto afuera no es poco: el equipo se para bien.' });
     }
     opciones.push({ id: 'igual', label: 'No tocar nada', tacticMod: 0, riesgoRival: 0, nota: 'El partido viene como lo planeaste.' });
-    // El cambio ofensivo, solo si hay a quién meter. El banco es s.banco (ver
-    // asegurarBanco), no viene con el once.
-    const s = this.state;
-    const banco = (this.asegurarBanco() || [])
-      .map((id) => s.squad.find((x) => x.id === id))
-      .filter((x) => x && this.isAvailable(x) && (x.pos === 'DEL' || x.pos === 'MED'))
-      .sort((a, b) => (b.pos === 'DEL' ? 1 : 0) - (a.pos === 'DEL' ? 1 : 0) || b.rating - a.rating);
-    if (banco.length) {
-      opciones.push({ id: 'cambio', label: `Meter a ${banco[0].name}`, tacticMod: 4, riesgoRival: 1, cambio: banco[0].id, nota: 'Piernas frescas arriba.' });
-    }
     return opciones;
   },
 
@@ -4317,26 +4307,63 @@ const Engine = {
     p.decision = op.label;
     p.nota = op.nota;
     p.riesgoRival = op.riesgoRival || 0;
-    // El cambio entra de verdad: sale el peor del once de arriba y entra el
-    // del banco, así el segundo tiempo se juega con ese equipo.
-    if (op.cambio) this.meterCambio(op.cambio);
+    // Los cambios ya se hicieron en el vestuario (ver hacerUnCambio): el
+    // segundo tiempo se juega con el once que quedó en s.startingSlots.
     this.jugarUnTiempo(2, (p.tacticMod || 0) + (op.tacticMod || 0));
     this.cerrarPartidoDelUsuario();
   },
 
-  // Mete al del banco por el peor de los de arriba que esté en cancha. El
-  // cambio se hace con swapPlayers, la misma que usa el panel de plantel: el
-  // once vive en s.startingSlots (casilleros), no en una lista de ids.
-  meterCambio(entraId) {
+  // ---------- Los cambios del entretiempo ----------
+  //
+  // Antes el vestuario te ofrecía una opción con un nombre puesto por el
+  // juego ("Meter a Fulano") y vos solo decías que sí. Ahora los cambios los
+  // hacés vos: la pantalla despliega el once y el banco y elegís quién sale y
+  // quién entra, como en el panel de plantel. El motor solo pone las reglas.
+  CAMBIOS_POR_PARTIDO: 3,
+
+  // Cuántos te quedan. Fuera del entretiempo no hay partido en curso, así que
+  // devuelve cero y la pantalla ni ofrece el panel.
+  cambiosQueQuedan() {
+    const p = this.state.partido;
+    if (!p) return 0;
+    return Math.max(0, this.CAMBIOS_POR_PARTIDO - ((p.cambios || []).length));
+  },
+
+  // Sale uno del once y entra uno del banco. Se apoya en swapPlayers, la
+  // misma de siempre: el once vive en s.startingSlots (casilleros), no en una
+  // lista de ids, y el que entra ocupa el casillero del que sale.
+  //
+  // El que salió no puede volver a entrar en el mismo partido, como en la
+  // cancha. Devuelve true solo si el cambio se hizo de verdad.
+  hacerUnCambio(saleId, entraId) {
     const s = this.state;
-    const sale = this.getStartingXI().starters
-      .map((e) => s.squad.find((x) => x.id === e.id))
-      .filter((x) => x && (x.pos === 'DEL' || x.pos === 'MED'))
-      .sort((a, b) => a.rating - b.rating)[0];
-    if (!sale) return;
-    if (this.swapPlayers(entraId, sale.id)) {
-      s.partido.cambio = { entra: entraId, sale: sale.id };
+    const p = s.partido;
+    if (!p || !saleId || !entraId || saleId === entraId) return false;
+    if (this.cambiosQueQuedan() <= 0) return false;
+
+    const esTitular = (s.startingSlots || []).some((e) => e.playerId === saleId);
+    if (!esTitular) return false;
+    const entra = s.squad.find((x) => x.id === entraId);
+    if (!entra) return false;
+    if ((s.startingSlots || []).some((e) => e.playerId === entraId)) return false;
+    if (!this.isAvailable(entra)) return false;
+    if ((p.cambios || []).some((c) => c.sale === entraId)) return false;
+
+    // El once de antes se guarda una sola vez: los cambios valen para este
+    // partido y al terminar el equipo vuelve a ser el que armaste vos en el
+    // panel de plantel (si no, tres cambios para ir a buscarlo un domingo te
+    // dejaban ese equipo puesto para la fecha siguiente sin avisar).
+    if (!p.onceAntes) {
+      p.onceAntes = s.startingSlots.map((e) => ({ ...e }));
+      p.bancoAntes = [...(s.banco || [])];
     }
+
+    if (!this.swapPlayers(entraId, saleId)) return false;
+    if (!p.cambios) p.cambios = [];
+    const sale = s.squad.find((x) => x.id === saleId);
+    p.cambios.push({ sale: saleId, entra: entraId, saleNombre: sale ? sale.name : '', entraNombre: entra.name });
+    this.save();
+    return true;
   },
 
   // Termina el partido con lo que salió de los dos tiempos y sigue por el
@@ -4345,6 +4372,12 @@ const Engine = {
     const s = this.state;
     const ctx = s.matchContext;
     const p = s.partido;
+    // Se deshacen los cambios del entretiempo: ya jugaron el segundo tiempo
+    // (el motor los usó en jugarUnTiempo) y el once vuelve a ser el tuyo.
+    if (p.onceAntes) {
+      s.startingSlots = p.onceAntes;
+      s.banco = p.bancoAntes;
+    }
     s.pendingMatch = {
       home: ctx.isHome ? s.clubId : ctx.opponentId,
       away: ctx.isHome ? ctx.opponentId : s.clubId,

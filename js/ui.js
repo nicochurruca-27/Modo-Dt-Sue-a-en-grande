@@ -2751,6 +2751,95 @@ function eventosDelPartidoHtml(eventos, hasta) {
   `).join('')}</ul>`;
 }
 
+// ---------- El panel de cambios ----------
+//
+// Los cambios los hacés vos. El panel se despliega abajo de las opciones del
+// vestuario y muestra el once y el banco: tocás al que sale y después al que
+// entra (o al revés), igual que en el panel de plantel.
+//
+// Las dos variables son de la pantalla, no del motor: qué jugador quedó
+// marcado esperando su par, y si el panel está abierto (para que no se cierre
+// solo cada vez que se vuelve a dibujar la pantalla después de un cambio).
+let cambioSeleccion = null;
+let panelDeCambiosAbierto = false;
+
+// Quiénes se comieron una amarilla en el primer tiempo: es justo el dato que
+// mirás para decidir si lo sacás antes de que se vaya expulsado.
+function amonestadosDelPartido(p) {
+  return new Set((p.eventos || [])
+    .filter((e) => e.tipo === 'amarilla' && e.mio && e.id)
+    .map((e) => e.id));
+}
+
+function fichaDeCambioHtml(jug, grupo, amonestados, bloqueado) {
+  const baja = Engine.outLabel(jug);
+  const elegido = cambioSeleccion && cambioSeleccion.id === jug.id;
+  const inhabilitado = bloqueado || !!baja;
+  return `
+    <button class="cambio-ficha${elegido ? ' elegido' : ''}${inhabilitado ? ' inhabilitado' : ''}"
+      data-cambio="${jug.id}" data-grupo="${grupo}" ${inhabilitado ? 'disabled' : ''}>
+      <span class="pos ${jug.pos}">${jug.pos}</span>
+      <span class="nombre">${jug.name}${amonestados.has(jug.id) ? ' <span class="amonestado">🟨</span>' : ''}</span>
+      <span class="valor">${baja || jug.rating}</span>
+    </button>
+  `;
+}
+
+function panelDeCambiosHtml(p) {
+  const s = Engine.state;
+  const quedan = Engine.cambiosQueQuedan();
+  const amonestados = amonestadosDelPartido(p);
+  const enCancha = Engine.getStartingXI().starters;
+  const salieron = new Set((p.cambios || []).map((c) => c.sale));
+  const banco = Engine.getBanco().filter((j) => !salieron.has(j.id));
+  const hechos = (p.cambios || []);
+  const sinCambios = quedan <= 0;
+
+  return `
+    <details class="collapsible cambios-panel" id="panel-cambios" ${panelDeCambiosAbierto ? 'open' : ''}>
+      <summary>Hacer un cambio <span class="muted">${sinCambios ? '· no te quedan' : `· te quedan ${quedan}`}</span></summary>
+      <div class="collapsible-body">
+        ${hechos.length ? `<ul class="cambios-hechos">${hechos.map((c) => `
+          <li><span class="sale">↓ ${c.saleNombre}</span><span class="entra">↑ ${c.entraNombre}</span></li>
+        `).join('')}</ul>` : ''}
+        ${sinCambios ? '<p class="muted">Ya usaste los tres cambios del partido.</p>' : `
+          <p class="muted">${cambioSeleccion
+            ? (cambioSeleccion.grupo === 'cancha'
+              ? 'Ahora elegí al que entra desde el banco.'
+              : 'Ahora elegí al que sale de la cancha.')
+            : 'Tocá al que sale y después al que entra (o al revés).'}</p>
+          <h4>En la cancha</h4>
+          <div class="cambio-lista">
+            ${enCancha.map((j) => fichaDeCambioHtml(j, 'cancha', amonestados, false)).join('')}
+          </div>
+          <h4>En el banco</h4>
+          <div class="cambio-lista">
+            ${banco.length
+              ? banco.map((j) => fichaDeCambioHtml(j, 'banco', amonestados, false)).join('')
+              : '<p class="muted">No te queda nadie en el banco.</p>'}
+          </div>
+        `}
+      </div>
+    </details>
+  `;
+}
+
+// Un toque en una ficha: si no había nadie marcado, la marca; si el marcado
+// era del otro grupo, ese es el cambio; si era del mismo, cambia la marca.
+function tocarFichaDeCambio(id, grupo) {
+  if (cambioSeleccion && cambioSeleccion.id === id) { cambioSeleccion = null; render(); return; }
+  if (cambioSeleccion && cambioSeleccion.grupo !== grupo) {
+    const sale = grupo === 'cancha' ? id : cambioSeleccion.id;
+    const entra = grupo === 'cancha' ? cambioSeleccion.id : id;
+    Engine.hacerUnCambio(sale, entra);
+    cambioSeleccion = null;
+    render();
+    return;
+  }
+  cambioSeleccion = { id, grupo };
+  render();
+}
+
 function renderEntretiempo() {
   const s = Engine.state;
   const p = s.partido;
@@ -2772,6 +2861,7 @@ function renderEntretiempo() {
       </div>
       <h2>${titular}</h2>
       ${eventosDelPartidoHtml(p.eventos)}
+      ${panelDeCambiosHtml(p)}
       <h3>¿Qué hacés en el vestuario?</h3>
       <div class="options" id="entretiempo-opciones">
         ${opciones.map((op, i) => `
@@ -2783,8 +2873,18 @@ function renderEntretiempo() {
       </div>
     </div>
   `;
+  const panel = document.getElementById('panel-cambios');
+  if (panel) panel.addEventListener('toggle', () => { panelDeCambiosAbierto = panel.open; });
+  app.querySelectorAll('.cambio-ficha').forEach((btn) => {
+    btn.addEventListener('click', () => tocarFichaDeCambio(btn.dataset.cambio, btn.dataset.grupo));
+  });
   app.querySelectorAll('#entretiempo-opciones .option-btn').forEach((btn) => {
-    btn.addEventListener('click', () => { Engine.resolverEntretiempo(Number(btn.dataset.i)); render(); });
+    btn.addEventListener('click', () => {
+      cambioSeleccion = null;
+      panelDeCambiosAbierto = false;
+      Engine.resolverEntretiempo(Number(btn.dataset.i));
+      render();
+    });
   });
 }
 

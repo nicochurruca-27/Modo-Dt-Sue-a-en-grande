@@ -1790,3 +1790,90 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 }
 
 .option-btn.apilado span { font-size: 0.8rem; opacity: 0.78; font-weight: 400; }
+
+/* El panel de cambios del entretiempo: el once arriba, el banco abajo, y se
+   toca uno de cada lado. Se despliega abajo del marcador para no tapar lo que
+   pasó en el primer tiempo. */
+.cambios-panel { margin: 4px 0 16px; }
+
+.cambios-panel h4 {
+  margin: 12px 0 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cambio-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.cambio-ficha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cambio-ficha:hover:not(.inhabilitado) { border-color: var(--accent); }
+
+/* El que quedó marcado esperando su par. */
+.cambio-ficha.elegido {
+  border-color: var(--accent);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.cambio-ficha.inhabilitado { opacity: 0.45; cursor: default; }
+
+.cambio-ficha .pos {
+  flex: 0 0 auto;
+  min-width: 34px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: #1e293b;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.cambio-ficha .nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cambio-ficha .valor {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+
+/* Los cambios que ya hiciste, para no perder la cuenta. */
+.cambios-hechos { list-style: none; margin: 0 0 10px; padding: 0; font-size: 0.86rem; }
+
+.cambios-hechos li {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px solid #1f2937;
+}
+
+.cambios-hechos .sale { color: #f87171; }
+.cambios-hechos .entra { color: var(--accent); }
