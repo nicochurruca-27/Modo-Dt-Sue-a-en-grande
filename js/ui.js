@@ -112,6 +112,9 @@ function render() {
   // Como render() rehace todo el HTML de cero, hay que apagarlo acá o el
   // temporizador viejo seguiría corriendo contra nodos que ya no existen.
   detenerCarruselNoticias();
+  // El almanaque corriendo también se apaga acá: si se dejara prendido, seguiría
+  // pasando días contra una pantalla que ya no existe.
+  detenerLosDias();
   if (s.screen === 'dt-create') renderDTCreate();
   else if (s.screen === 'club-select') renderClubSelect();
   else if (s.screen === 'presentation') renderPresentation();
@@ -1968,6 +1971,83 @@ function wireNoticias() {
   }, 5000);
 }
 
+// ---------- El almanaque corriendo ----------
+//
+// Antes "Avanzar" saltaba de una hasta el próximo día con algo: los días
+// pasaban por adentro pero no se veían. Ahora pasan DE A UNO y a la vista, con
+// la fecha moviéndose sola, y se frena cuando aparece algo (un mensaje del
+// club o el final de la semana, que destapa el partido).
+//
+// Se puede cortar en cualquier momento con el mismo botón, que mientras corre
+// dice "Detener".
+//
+// El tic NO llama a render(): solo le cambia el texto a la fecha. Es por dos
+// motivos: rehacer toda la pantalla tres veces por segundo es un desperdicio,
+// y —más importante— render() apaga este reloj igual que apaga el carrusel de
+// noticias, así que un render() adentro del tic se mataría a sí mismo. Cuando
+// el almanaque se frena ahí sí va un render() completo.
+const MS_POR_DIA = 300;
+let relojDelAlmanaque = null;
+
+function detenerLosDias() {
+  if (relojDelAlmanaque) {
+    clearTimeout(relojDelAlmanaque);
+    relojDelAlmanaque = null;
+  }
+}
+
+function losDiasEstanCorriendo() {
+  return relojDelAlmanaque !== null;
+}
+
+// En el celular se ve una pestaña por vez. Si los días estaban corriendo y el
+// jugador se fue a mirar el plantel, cuando aparece algo hay que traerlo de
+// vuelta a la pestaña del partido: si no, el almanaque se frena en un lugar
+// que no está mirando y parece que no pasó nada.
+function volverALaPestaniaDelPartido() {
+  const layout = document.querySelector('.layout');
+  if (!layout || layout.dataset.view === 'app') return;
+  layout.dataset.view = 'app';
+  document.querySelectorAll('#mobile-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === 'app');
+  });
+}
+
+function arrancarLosDias() {
+  detenerLosDias();
+  const tic = () => {
+    relojDelAlmanaque = null;
+    // Si mientras tanto se cambió de pantalla, no se toca nada más.
+    if (!Engine.state || Engine.state.screen !== 'calendar') { render(); return; }
+    if (Engine.avanzarUnDia() === 'frena') { volverALaPestaniaDelPartido(); render(); return; }
+    const fecha = document.getElementById('calendar-fecha');
+    if (!fecha) { render(); return; }
+    fecha.textContent = formatCalendarDate(Engine.state.calendar.dayCount);
+    relojDelAlmanaque = setTimeout(tic, MS_POR_DIA);
+  };
+  // El primero sale enseguida para que el botón se sienta.
+  relojDelAlmanaque = setTimeout(tic, 120);
+  pintarBotonDeAvanzar();
+}
+
+// El botón y la línea de abajo cambian según el almanaque esté corriendo o
+// quieto. Se tocan a mano y no con un render() por lo mismo de arriba.
+function pintarBotonDeAvanzar() {
+  const s = Engine.state;
+  const btn = document.getElementById('continue-btn');
+  const nota = document.getElementById('calendar-nota');
+  const corriendo = losDiasEstanCorriendo();
+  if (btn) {
+    btn.textContent = corriendo ? 'Detener' : 'Avanzar';
+    btn.classList.toggle('danger', corriendo);
+  }
+  if (nota) {
+    nota.textContent = corriendo
+      ? 'Pasando los días…'
+      : (s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.');
+  }
+}
+
 function renderCalendar() {
   const s = Engine.state;
   const cal = s.calendar;
@@ -1997,16 +2077,21 @@ function renderCalendar() {
   app.innerHTML = `
     ${header()}
     <div class="card">
-      <h2>${dateLabel}</h2>
-      <p class="muted">${s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.'}</p>
+      <h2 id="calendar-fecha">${dateLabel}</h2>
+      <p class="muted" id="calendar-nota">${s.lastDecisionNote ? s.lastDecisionNote : 'Otro día tranquilo en el club.'}</p>
       <button class="option-btn" id="continue-btn">Avanzar</button>
     </div>
     ${noticiasHtml()}
   `;
   document.getElementById('continue-btn').addEventListener('click', () => {
+    if (losDiasEstanCorriendo()) {
+      detenerLosDias();
+      Engine.save();
+      render();
+      return;
+    }
     s.lastDecisionNote = null;
-    Engine.advanceCalendarDay();
-    render();
+    arrancarLosDias();
   });
   wireNoticias();
 }

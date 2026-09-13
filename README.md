@@ -61,6 +61,13 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **El almanaque corre día a día**: tocás "Avanzar" y los días empiezan a
+  pasar solos, con la fecha moviéndose a la vista (un día cada 300 ms). Se
+  frena solo cuando aparece algo —un mensaje del club, o el final de la
+  semana, que destapa el partido— y lo podés cortar cuando quieras con el
+  mismo botón, que mientras corre dice "Detener". Antes "Avanzar" saltaba de
+  una hasta el próximo día con algo: los días pasaban por adentro pero no se
+  veían.
 - **Jugadores libres**: en cada ventana de pases algunos clubes del país dejan
   ir gente —grandes de edad, de la mitad floja del plantel y con el contrato
   terminándose, que es a quien un club deja ir de verdad— y esos jugadores

@@ -3857,30 +3857,42 @@ const Engine = {
   // hace falta tocarlo una vez por día) y se frena recién en el primer día
   // con algo: un mensaje, o el final de la semana (que revela el próximo
   // partido/evento).
-  advanceCalendarDay() {
+  // UN solo día del almanaque. Devuelve 'sigue' si el día pasó sin nada —o sea
+  // que se puede seguir avanzando— y 'frena' si pasó algo que te tiene que
+  // frenar: un mensaje del club, o el final de la semana, que destapa lo que
+  // se juega.
+  //
+  // Está separado de advanceCalendarDay porque la pantalla del calendario los
+  // pasa DE A UNO, con el almanaque moviéndose a la vista, y te deja cortar
+  // cuando quieras (ver arrancarLosDias en ui.js).
+  avanzarUnDia() {
     const s = this.state;
     const cal = s.calendar;
+    cal.dayInWeek++;
+    cal.dayCount++;
+    this.recuperarEnergia();
+    // El club genera plata todos los días, no una vez al año: cada 7 días
+    // de calendario entra el goteo fijo (TV, sponsors, cuota social).
+    if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
+    Noticias.tick(this);
 
-    while (true) {
-      cal.dayInWeek++;
-      cal.dayCount++;
-      this.recuperarEnergia();
-      // El club genera plata todos los días, no una vez al año: cada 7 días
-      // de calendario entra el goteo fijo (TV, sponsors, cuota social).
-      if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
-      Noticias.tick(this);
-
-      if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
-        cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
-        this.save();
-        return;
-      }
-
-      if (cal.dayInWeek >= 7) {
-        this[cal.nextAction]();
-        return;
-      }
+    if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
+      cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
+      this.save();
+      return 'frena';
     }
+
+    if (cal.dayInWeek >= 7) {
+      this[cal.nextAction]();
+      return 'frena';
+    }
+    return 'sigue';
+  },
+
+  // Pasa de largo todos los días sin nada y se frena en el primero que tenga
+  // algo. Es el salto de una: lo usa el que no quiere mirar pasar el almanaque.
+  advanceCalendarDay() {
+    while (this.avanzarUnDia() === 'sigue');
   },
 
   answerCalendarMessage(optionIndex) {
