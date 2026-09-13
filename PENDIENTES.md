@@ -3,6 +3,16 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
+**Hay una auditoría completa en `auditoria.html`** (13/9/2026): estado real de
+cada sistema, bugs, exploits, roadmap por fases y prioridades puntuadas. Este
+archivo es la lista de tareas; ese otro es el diagnóstico y el orden.
+
+El hallazgo principal de esa auditoría, que manda sobre casi todo lo de acá
+abajo: `Engine.clubStrength()` devuelve `44 + reputación * 6` para todo club
+que no sea el tuyo, así que los rivales no tienen plantel en la simulación
+aunque `mercado.js` sí se los genere. De ahí salen que ganes demasiadas copas,
+que la tabla tenga siempre la misma forma y que el mundo no se mueva.
+
 ---
 
 ## 1. Datos que faltan cargar

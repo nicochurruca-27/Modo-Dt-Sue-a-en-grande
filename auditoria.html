@@ -1,0 +1,995 @@
+<title>Auditoría de Modo DT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --papel: #eef1f4;
+    --superficie: #ffffff;
+    --superficie-2: #f7f9fa;
+    --tinta: #141d26;
+    --tinta-media: #4a5a68;
+    --tinta-suave: #74848f;
+    --linea: #d5dce2;
+    --linea-fuerte: #b6c2cb;
+    --acento: #0a6a86;
+    --acento-suave: #e1eef3;
+    --bien: #2c6e49;
+    --bien-fondo: #e3f0e8;
+    --medio: #96650a;
+    --medio-fondo: #f6eeda;
+    --mal: #a32b20;
+    --mal-fondo: #f7e4e2;
+    --sombra: 0 1px 2px rgba(20, 29, 38, .06), 0 8px 24px -16px rgba(20, 29, 38, .3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel: #0d141b;
+      --superficie: #141d26;
+      --superficie-2: #18232e;
+      --tinta: #e4ecf2;
+      --tinta-media: #a3b3c0;
+      --tinta-suave: #7d8f9c;
+      --linea: #263440;
+      --linea-fuerte: #3a4c5b;
+      --acento: #63c9e8;
+      --acento-suave: #17313c;
+      --bien: #79c79a;
+      --bien-fondo: #16302380;
+      --medio: #dcae55;
+      --medio-fondo: #2f260f80;
+      --mal: #e98a80;
+      --mal-fondo: #35191680;
+      --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --papel: #0d141b;
+    --superficie: #141d26;
+    --superficie-2: #18232e;
+    --tinta: #e4ecf2;
+    --tinta-media: #a3b3c0;
+    --tinta-suave: #7d8f9c;
+    --linea: #263440;
+    --linea-fuerte: #3a4c5b;
+    --acento: #63c9e8;
+    --acento-suave: #17313c;
+    --bien: #79c79a;
+    --bien-fondo: #16302380;
+    --medio: #dcae55;
+    --medio-fondo: #2f260f80;
+    --mal: #e98a80;
+    --mal-fondo: #35191680;
+    --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hoja { max-width: 820px; margin: 0 auto; }
+
+  h1, h2, h3, h4, .etiqueta, th, .chip, .tapa-meta, .indice a, .bar-nombre, .num {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  h1 {
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    font-weight: 800;
+    letter-spacing: -.025em;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -.012em;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: 1.08rem;
+    font-weight: 700;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  h4 {
+    font-size: .93rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+
+  p { margin: 0 0 14px; max-width: 68ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; max-width: 68ch; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--tinta-suave); }
+  strong { font-weight: 600; }
+  a { color: var(--acento); }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: .84em;
+  }
+
+  code {
+    background: var(--superficie-2);
+    border: 1px solid var(--linea);
+    border-radius: 3px;
+    padding: .08em .34em;
+    word-break: break-word;
+  }
+
+  /* ---- Tapa ---- */
+
+  .tapa {
+    padding-block: 56px 40px;
+    border-bottom: 3px solid var(--tinta);
+  }
+
+  .tapa-meta {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--acento);
+    margin: 0 0 18px;
+  }
+
+  .bajada {
+    font-size: 1.18rem;
+    line-height: 1.55;
+    color: var(--tinta-media);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  .tapa-datos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin-top: 26px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .78rem;
+    color: var(--tinta-suave);
+  }
+  .tapa-datos b { color: var(--tinta); font-weight: 600; }
+
+  /* ---- Índice ---- */
+
+  .indice {
+    margin-block: 28px 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 2px 22px;
+  }
+  .indice a {
+    font-size: .84rem;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--tinta-media);
+    padding: 4px 0;
+    display: block;
+    border-bottom: 1px solid transparent;
+  }
+  .indice a:hover { color: var(--acento); border-bottom-color: var(--linea); }
+  .indice a:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+  /* ---- Secciones ---- */
+
+  section { padding-block: 40px 0; }
+
+  .cabeza {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 22px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--linea-fuerte);
+  }
+  .num {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--acento);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+    padding-top: 3px;
+  }
+
+  .entrada {
+    font-size: 1.03rem;
+    color: var(--tinta-media);
+    border-left: 3px solid var(--acento);
+    padding-left: 16px;
+    margin-bottom: 22px;
+    max-width: 62ch;
+  }
+
+  /* ---- Tablas ---- */
+
+  .tabla-caja { overflow-x: auto; margin-bottom: 20px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-family: Archivo, sans-serif;
+    font-size: .85rem;
+  }
+  caption {
+    text-align: left;
+    font-size: .74rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+    font-weight: 600;
+    padding-bottom: 8px;
+  }
+  th {
+    text-align: left;
+    font-size: .7rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+    font-weight: 600;
+    padding: 0 12px 8px 0;
+    border-bottom: 1px solid var(--linea-fuerte);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--linea);
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  td:last-child, th:last-child { padding-right: 0; }
+  .n { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+  .obs { font-family: "Source Serif 4", serif; font-size: .95rem; color: var(--tinta-media); min-width: 240px; }
+
+  /* ---- Chips de estado ---- */
+
+  .chip {
+    display: inline-block;
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .chip-ok { background: var(--bien-fondo); color: var(--bien); border-color: var(--bien); }
+  .chip-parcial { background: var(--medio-fondo); color: var(--medio); border-color: var(--medio); }
+  .chip-mal { background: var(--mal-fondo); color: var(--mal); border-color: var(--mal); }
+  .chip-ausente { background: transparent; color: var(--tinta-suave); border-color: var(--linea-fuerte); border-style: dashed; }
+
+  /* ---- Hallazgos ---- */
+
+  .hallazgo {
+    background: var(--superficie);
+    border: 1px solid var(--linea);
+    border-left: 4px solid var(--linea-fuerte);
+    border-radius: 2px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--sombra);
+  }
+  .hallazgo > :last-child { margin-bottom: 0; }
+  .hallazgo.critico { border-left-color: var(--mal); }
+  .hallazgo.importante { border-left-color: var(--medio); }
+  .hallazgo.menor { border-left-color: var(--linea-fuerte); }
+  .hallazgo.foco { border-left-color: var(--acento); background: var(--acento-suave); }
+
+  .hallazgo-tope {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .grav {
+    font-family: Archivo, sans-serif;
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+  }
+
+  .cita-codigo {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .78rem;
+    background: var(--superficie-2);
+    border: 1px solid var(--linea);
+    border-radius: 3px;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    overflow-x: auto;
+    color: var(--tinta-media);
+    line-height: 1.5;
+  }
+
+  /* ---- Versiones simple/intermedia/avanzada ---- */
+
+  .versiones {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    max-width: none;
+  }
+  .versiones li {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 14px;
+    align-items: start;
+    margin: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--linea);
+    font-size: .95rem;
+  }
+  .versiones li:first-child { border-top: 0; padding-top: 0; }
+  .versiones b {
+    font-family: Archivo, sans-serif;
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+    padding-top: 3px;
+  }
+
+  /* ---- Puntajes ---- */
+
+  .puntajes { margin-bottom: 8px; }
+  .bar-fila {
+    display: grid;
+    grid-template-columns: 132px 1fr 30px;
+    align-items: center;
+    gap: 12px;
+    padding: 3px 0;
+  }
+  .bar-nombre { font-size: .8rem; font-weight: 500; }
+  .bar-pista {
+    height: 9px;
+    background: var(--superficie-2);
+    border: 1px solid var(--linea);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-valor { height: 100%; background: var(--acento); }
+  .bar-valor.alto { background: var(--bien); }
+  .bar-valor.bajo { background: var(--mal); }
+  .bar-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--tinta-media);
+  }
+  .escala {
+    display: grid;
+    grid-template-columns: 132px 1fr 30px;
+    gap: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .68rem;
+    color: var(--tinta-suave);
+    margin-top: 6px;
+  }
+  .escala-marcas { display: flex; justify-content: space-between; }
+
+  .total {
+    margin-top: 24px;
+    padding: 18px 20px;
+    background: var(--tinta);
+    color: var(--papel);
+    border-radius: 2px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .total-num {
+    font-family: Archivo, sans-serif;
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .total p { margin: 0; font-size: .95rem; opacity: .82; max-width: 46ch; }
+
+  /* ---- Fases ---- */
+
+  .fase {
+    border-top: 1px solid var(--linea-fuerte);
+    padding-top: 18px;
+    margin-top: 22px;
+  }
+  .fase:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .fase-tope {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .fase-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .74rem;
+    font-weight: 600;
+    color: var(--acento);
+    letter-spacing: .08em;
+  }
+  .fase-meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .72rem;
+    color: var(--tinta-suave);
+    margin: 4px 0 10px;
+  }
+
+  .cierre {
+    margin-top: 40px;
+    padding: 28px 26px;
+    border: 3px solid var(--tinta);
+    border-radius: 2px;
+    background: var(--superficie);
+  }
+  .cierre h2 { font-size: 1.3rem; }
+  .cierre > :last-child { margin-bottom: 0; }
+
+  .pie {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--linea);
+    font-size: .8rem;
+    color: var(--tinta-suave);
+    font-family: Archivo, sans-serif;
+  }
+
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    .bar-fila, .escala { grid-template-columns: 104px 1fr 28px; gap: 9px; }
+    .versiones li { grid-template-columns: 1fr; gap: 3px; }
+    .total-num { font-size: 2rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="hoja">
+
+  <header class="tapa">
+    <p class="tapa-meta">Auditoría técnica y de diseño · 13 de septiembre de 2026</p>
+    <h1>Modo DT: Sueño en Grande</h1>
+    <p class="bajada">Qué hay construido, qué está roto, qué falta, y en qué orden conviene atacarlo para que esto sea un simulador de director técnico y no un simulador de partidos.</p>
+    <div class="tapa-datos">
+      <span><b>11.476</b> líneas</span>
+      <span><b>9</b> módulos</span>
+      <span><b>192</b> métodos en el motor</span>
+      <span><b>0</b> dependencias externas</span>
+      <span>rama <b>claude/mandale-mecha-ugynzv</b></span>
+    </div>
+
+    <nav class="indice" aria-label="Secciones">
+      <a href="#resumen">1 · Resumen ejecutivo</a>
+      <a href="#mapa">2 · Mapa de sistemas</a>
+      <a href="#gameplay">3 · Diagnóstico de gameplay</a>
+      <a href="#fm">4 · Comparación con FM</a>
+      <a href="#problemas">5 · Principales problemas</a>
+      <a href="#oportunidades">6 · Oportunidades</a>
+      <a href="#bugs">7 · Bugs y exploits</a>
+      <a href="#arquitectura">8 · Arquitectura</a>
+      <a href="#roadmap">9 · Roadmap</a>
+      <a href="#top10">10 · Top 10 prioridades</a>
+      <a href="#no-hacer">11 · Lo que no hay que hacer</a>
+      <a href="#puntajes">12 · Puntajes</a>
+      <a href="#proximo">13 · El próximo paso</a>
+    </nav>
+  </header>
+
+  <!-- ============ 1 ============ -->
+  <section id="resumen">
+    <div class="cabeza"><span class="num">01</span><h2>Resumen ejecutivo</h2></div>
+
+    <p class="entrada">El juego está mucho más avanzado de lo que corresponde a cinco días en un área, y mucho menos de lo que parece en todas las demás. Esa asimetría es lo más importante de este informe.</p>
+
+    <h3>Lo mejor que tiene, lejos: la estructura del fútbol argentino</h3>
+    <p>Apertura y Clausura con sus playoffs, tabla anual, tabla de promedios con historial sembrado, dos descensos, Copa Argentina de 64 con cuadro dibujado, Libertadores y Sudamericana con fase previa, ocho grupos, el tercero que cae al playoff de la Sudamericana, Recopa, Trofeo de Campeones, cupos que se reparten entre campeones y tabla anual con cascada cuando un club gana dos cosas, y una primera temporada sembrada con el sorteo real. Eso no lo tiene casi ningún proyecto indie, y está bien hecho: verificado contra temporadas completas simuladas.</p>
+
+    <h3>La mayor debilidad: los rivales no existen</h3>
+    <p>Es una sola línea de código y explica media docena de síntomas que ya venías notando.</p>
+    <pre class="cita-codigo">clubStrength(clubId) {
+  if (clubId === this.state.clubId) return this.squadStrength();
+  return 44 + club.reputation * 6 + (Math.random() * 10 - 5);
+}</pre>
+    <p>Tu equipo vale lo que vale tu once. <strong>Todos los demás valen su reputación más ruido</strong>, un número que no cambia nunca: ni en la fecha 30, ni en la temporada 12. De ahí salen, en cadena, que ganes demasiadas copas, que la tabla tenga siempre la misma forma, que comprarle el crack a River no debilite a River, y que ningún club evolucione. No es un bug: es una decisión de andamio que ya cumplió su función y hoy es el techo del proyecto.</p>
+
+    <h3>La segunda debilidad: el partido es un dado</h3>
+    <p>Un partido se resuelve con dos Poisson y una diferencia de fuerza. La táctica entera es <em>un escalar sumado</em> (<code>option.tacticMod + formation.mod</code>). No hay eventos, ni goleadores, ni cambios, ni cansancio. Elegir 4-3-3 o 5-3-2 contra un rival ofensivo da exactamente lo mismo salvo por un número fijo.</p>
+
+    <h3>El mayor potencial</h3>
+    <p>El calendario ya genera el <em>ritmo</em> de una temporada de verdad: copa entre semana, liga el fin de semana, Copa Argentina cada mes y medio. Esa cadencia es la que hace que rotar, cansarse y lesionarse importen. El escenario está construido; faltan los actores.</p>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section id="mapa">
+    <div class="cabeza"><span class="num">02</span><h2>Mapa de sistemas</h2></div>
+
+    <p class="entrada">Estado real verificado en el código, no por lo que parece existir. <span class="chip chip-ok">Implementado</span> <span class="chip chip-parcial">Parcial</span> <span class="chip chip-mal">Deficiente</span> <span class="chip chip-ausente">Ausente</span></p>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Sistemas del juego</caption>
+        <thead>
+          <tr><th>Sistema</th><th>Estado</th><th>Calidad</th><th>Observaciones</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Competiciones</td><td><span class="chip chip-ok">Implementado</span></td><td class="n">9/10</td><td class="obs">Lo más sólido del proyecto. Formatos, cupos, cascadas y cruces correctos.</td></tr>
+          <tr><td>Calendario</td><td><span class="chip chip-ok">Implementado</span></td><td class="n">8/10</td><td class="obs">Una temporada = un año (266–273 días). Copa entre semana, liga el finde.</td></tr>
+          <tr><td>Desarrollo de jugadores</td><td><span class="chip chip-ok">Implementado</span></td><td class="n">7/10</td><td class="obs">Curva por edad, techo, minutos jugados, cantera del club. Muy bien calibrado. Solo corre para tu plantel.</td></tr>
+          <tr><td>Economía</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">6/10</td><td class="obs">Datos reales por club y categoría. Pero <strong>no hay masa salarial</strong>: el plantel no cuesta nada de mantener.</td></tr>
+          <tr><td>Mercado de pases</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">6/10</td><td class="obs">Negociación, estados de contrato, ventanas, acuerdos pendientes. Todo en una sola dirección: solo vos operás.</td></tr>
+          <tr><td>Lesiones y sanciones</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">6/10</td><td class="obs">Amarillas contadas una por una, lesiones con gravedad. Solo tu plantel; los rivales nunca se lesionan.</td></tr>
+          <tr><td>UI / navegación</td><td><span class="chip chip-ok">Implementado</span></td><td class="n">7/10</td><td class="obs">Responsive real, paneles estables, cuadros dibujados. Densidad buena.</td></tr>
+          <tr><td>Noticias</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">5/10</td><td class="obs">Enganchada a hechos reales del juego, pero la mitad es relleno inventado porque no hay mundo del que informar.</td></tr>
+          <tr><td>Formación y once</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">5/10</td><td class="obs">Sistema de casilleros y penalización por jugar fuera de puesto: muy bien resuelto. Pero casi no impacta el resultado.</td></tr>
+          <tr><td>Persistencia</td><td><span class="chip chip-parcial">Parcial</span></td><td class="n">5/10</td><td class="obs"><code>localStorage</code>, JSON plano. Sin versionado ni migración: un cambio de forma rompe partidas viejas.</td></tr>
+          <tr><td>Contratos</td><td><span class="chip chip-mal">Deficiente</span></td><td class="n">4/10</td><td class="obs">Se renuevan pagando una prima. Sin sueldo activo, renovar no tiene contrapeso: siempre conviene decir que sí.</td></tr>
+          <tr><td>Motor de partido</td><td><span class="chip chip-mal">Deficiente</span></td><td class="n">3/10</td><td class="obs">Dos Poisson y una resta. Sin eventos, sin minutos, sin cambios, sin cansancio.</td></tr>
+          <tr><td>Tácticas</td><td><span class="chip chip-mal">Deficiente</span></td><td class="n">2/10</td><td class="obs">Un escalar. No hay matchup, ni estilo, ni adaptación al rival ni al marcador.</td></tr>
+          <tr><td>Modelo de jugador</td><td><span class="chip chip-mal">Deficiente</span></td><td class="n">4/10</td><td class="obs">Un rating único. Sin atributos, sin forma, sin personalidad, sin moral individual.</td></tr>
+          <tr><td>IA de clubes</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">1/10</td><td class="obs">No existe. Ningún club decide nada nunca.</td></tr>
+          <tr><td>Mundo vivo</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">2/10</td><td class="obs">Solo tu club cambia. El resto del fútbol argentino está congelado.</td></tr>
+          <tr><td>Estadísticas de jugador</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">0/10</td><td class="obs">No hay goles, asistencias ni partidos jugados por jugador. Un partido produce solo un marcador.</td></tr>
+          <tr><td>Confianza de la dirigencia</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">0/10</td><td class="obs">El objetivo de temporada es texto decorativo. No se puede perder el trabajo.</td></tr>
+          <tr><td>Carrera del DT</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">2/10</td><td class="obs">Nombre, nacionalidad y estilo. No hay reputación, historial, ofertas ni cambio de club.</td></tr>
+          <tr><td>Juveniles / inferiores</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">1/10</td><td class="obs">La cantera modela el techo al generar el plantel inicial, pero nunca sube un pibe nuevo.</td></tr>
+          <tr><td>Préstamos</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">1/10</td><td class="obs">Existe la etiqueta <code>loanFrom</code> como dato; no existe la mecánica.</td></tr>
+          <tr><td>Scouting / staff / agentes</td><td><span class="chip chip-ausente">Ausente</span></td><td class="n">0/10</td><td class="obs">Correcto que no existan todavía. Ver sección 11.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Cómo están conectados hoy</h3>
+    <p>La cadena real, tal como corre:</p>
+    <pre class="cita-codigo">TU CLUB:  once → fuerza → partido → resultado → tabla → cupos → copas
+                ↘ desarrollo de jugadores ↗
+          economía → presupuesto → compra → plantel → once
+
+RIVALES:  reputación → fuerza → partido
+          (fin del grafo)</pre>
+    <p>El grafo del usuario tiene ciclos: jugás bien, cobrás más, comprás mejor, jugás mejor. El grafo de los rivales es una línea recta de dos nodos. <strong>Ahí está todo el problema del juego resumido en un dibujo.</strong></p>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section id="gameplay">
+    <div class="cabeza"><span class="num">03</span><h2>Diagnóstico de gameplay</h2></div>
+
+    <p class="entrada">La pregunta es si transmite "yo soy el DT de este club". Respuesta honesta: transmite "yo soy el dueño de este club". Que no es lo mismo, y es menos divertido.</p>
+
+    <h3>Qué decide hoy el usuario, y cuánto pesa</h3>
+    <div class="tabla-caja">
+      <table>
+        <caption>Decisiones disponibles y su impacto real</caption>
+        <thead><tr><th>Decisión</th><th>Impacto real</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Elegir el once</td><td class="obs">Cambia <code>squadStrength</code>, el promedio de los 11. Poner al mejor siempre es óptimo.</td><td><span class="chip chip-parcial">Medio</span></td></tr>
+          <tr><td>Formación</td><td class="obs">Un número fijo por formación. No depende del rival ni del plantel.</td><td><span class="chip chip-mal">Casi nulo</span></td></tr>
+          <tr><td>Charla táctica</td><td class="obs">Otro número fijo, más ánimo global.</td><td><span class="chip chip-mal">Casi nulo</span></td></tr>
+          <tr><td>Comprar / vender</td><td class="obs">Real y con consecuencia económica. La mejor mecánica del juego hoy.</td><td><span class="chip chip-ok">Alto</span></td></tr>
+          <tr><td>Renovar contratos</td><td class="obs">Cuesta plata, pero sin sueldos no hay razón para no renovar a todos.</td><td><span class="chip chip-mal">Bajo</span></td></tr>
+          <tr><td>Armar el banco</td><td class="obs">Cosmético: los suplentes no entran nunca a la cancha.</td><td><span class="chip chip-mal">Nulo</span></td></tr>
+          <tr><td>Mensajes del calendario</td><td class="obs">±ánimo global. El ánimo mueve la fuerza dividido tres.</td><td><span class="chip chip-mal">Bajo</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>De siete decisiones, <strong>una sola</strong> tiene consecuencia fuerte. Las otras seis son ruido alrededor de "poné a los mejores once y apretá Avanzar". Eso es lo que hay que cambiar, y no se arregla agregando decisiones nuevas: se arregla haciendo que las que ya existen tengan peso.</p>
+
+    <h3>Consecuencias que faltan</h3>
+    <ul>
+      <li><strong>Una mala racha no cuesta nada.</strong> Podés salir último diez temporadas seguidas y nadie te dice nada.</li>
+      <li><strong>Un plantel enorme no cuesta nada.</strong> 36 jugadores cuestan lo mismo que 18, porque no hay sueldos.</li>
+      <li><strong>Vender a la figura no debilita a nadie más que a vos.</strong> El club que lo compra no lo suma.</li>
+      <li><strong>Rotar no sirve.</strong> Sin cansancio, el once ideal juega los 50 partidos del año.</li>
+      <li><strong>El banco no se usa.</strong> Doce suplentes que miran.</li>
+    </ul>
+
+    <h3>Mundo vivo: 2 de 10</h3>
+    <p>De la lista que planteaste —clubes que compran, venden, renuevan, despiden DTs, suben juveniles, se lesionan, cambian de reputación, entran en crisis— <strong>no ocurre ninguna</strong>. Lo único que se mueve fuera de tu club son los resultados simulados de las otras zonas y divisiones, que salen del mismo dado de reputación.</p>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section id="fm">
+    <div class="cabeza"><span class="num">04</span><h2>Comparación con Football Manager</h2></div>
+
+    <p class="entrada">No por cantidad de funciones. Por los principios que hacen que un manager tenga profundidad, y cuáles de esos principios ya tenés.</p>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Principios de diseño de un simulador de manager</caption>
+        <thead><tr><th>Principio</th><th>En Modo DT</th><th>Comentario</th></tr></thead>
+        <tbody>
+          <tr><td>Progresión de jugadores</td><td><span class="chip chip-ok">Sí</span></td><td class="obs">Genuinamente bueno. Techo, edad, minutos y cantera.</td></tr>
+          <tr><td>Contexto competitivo</td><td><span class="chip chip-ok">Sí</span></td><td class="obs">Superior a lo esperable. Es tu ventaja diferencial.</td></tr>
+          <tr><td>Economía con datos reales</td><td><span class="chip chip-ok">Sí</span></td><td class="obs">Investigada por club y categoría.</td></tr>
+          <tr><td>Interdependencia entre sistemas</td><td><span class="chip chip-parcial">A medias</span></td><td class="obs">Fuerte dentro de tu club, inexistente hacia afuera.</td></tr>
+          <tr><td>Narrativa emergente</td><td><span class="chip chip-parcial">A medias</span></td><td class="obs">Las noticias están listas para contar historias que todavía no pasan.</td></tr>
+          <tr><td>Consecuencias de las decisiones</td><td><span class="chip chip-mal">Débil</span></td><td class="obs">Una sola decisión con peso real.</td></tr>
+          <tr><td>Información imperfecta</td><td><span class="chip chip-ausente">No</span></td><td class="obs">Ves el rating exacto de todos. No hay nada que descubrir ni en qué equivocarte.</td></tr>
+          <tr><td>IA con objetivos propios</td><td><span class="chip chip-ausente">No</span></td><td class="obs">El agujero más grande.</td></tr>
+          <tr><td>Mercado dinámico</td><td><span class="chip chip-ausente">No</span></td><td class="obs">Vos comprás; nadie más se mueve.</td></tr>
+          <tr><td>Jugadores como personajes</td><td><span class="chip chip-ausente">No</span></td><td class="obs">Nombre + puesto + un número.</td></tr>
+          <tr><td>Reputación en capas</td><td><span class="chip chip-ausente">No</span></td><td class="obs">Solo el club tiene reputación, y es fija.</td></tr>
+          <tr><td>Carrera del entrenador</td><td><span class="chip chip-ausente">No</span></td><td class="obs">Sos un club, no un DT.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>El principio que más salto te da si lo implementás primero:</strong> interdependencia. No porque sea el más vistoso, sino porque los otros cinco que faltan (mercado dinámico, IA, mundo vivo, narrativa, reputación) <em>dependen de él</em>. Sin clubes rivales que tengan plantel, no hay nada sobre lo que una IA pueda decidir.</p>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section id="problemas">
+    <div class="cabeza"><span class="num">05</span><h2>Principales problemas</h2></div>
+    <p class="entrada">Ordenados por impacto, de mayor a menor.</p>
+
+    <div class="hallazgo foco">
+      <div class="hallazgo-tope"><span class="grav">Problema 1 · Raíz</span></div>
+      <h3>Los clubes rivales no tienen plantel</h3>
+      <p><code>clubStrength()</code> devuelve reputación × 6 para todo el que no seas vos. El módulo <code>mercado.js</code> <em>sí</em> genera planteles rivales completos y coherentes con un generador sembrado —podés entrar a Vélez y ver sus 25 jugadores con contrato, edad y valoración— pero <strong>el motor de partido nunca los mira</strong>. Hay un mundo construido que la simulación ignora.</p>
+      <p>Consecuencias directas: ganás demasiadas copas (8 títulos en 42 copas jugadas, medido); la tabla tiene siempre la misma forma; comprar no cambia el equilibrio; ningún club puede crecer ni caer.</p>
+    </div>
+
+    <div class="hallazgo critico">
+      <div class="hallazgo-tope"><span class="grav">Problema 2</span></div>
+      <h3>El partido no distingue nada</h3>
+      <p>Un partido es <code>simulateScore(fuerzaA, fuerzaB, localía)</code>: dos variables de Poisson. No existen los minutos, los goleadores, las expulsiones, los cambios ni el cansancio. La táctica es un número sumado a la fuerza. El resultado es que <strong>no hay forma de ganar un partido siendo mejor DT</strong>, solo siendo dueño de mejores jugadores.</p>
+    </div>
+
+    <div class="hallazgo critico">
+      <div class="hallazgo-tope"><span class="grav">Problema 3</span></div>
+      <h3>No hay masa salarial</h3>
+      <p>Los sueldos están descontados como porcentaje dentro del ingreso neto (<code>economia.js</code>: "Se calcula sobre TODOS los ingresos ordinarios... pagados los sueldos"). O sea: el plantel que tengas <strong>no cuesta un peso por semana</strong>. Comprar 20 cracks cuesta solo los pases. La pregunta central de un manager —"¿puedo sostener este sueldo?"— no existe.</p>
+    </div>
+
+    <div class="hallazgo critico">
+      <div class="hallazgo-tope"><span class="grav">Problema 4</span></div>
+      <h3>No hay estadísticas de jugador</h3>
+      <p>Cero. Ni goles, ni asistencias, ni partidos jugados. Un partido genera un marcador y nada más. Sin esto no podés saber quién está rindiendo, no hay tabla de goleadores, no hay "mi 9 lleva 14 goles", y las noticias no tienen de qué hablar. Es el dato que alimenta media docena de sistemas futuros.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <div class="hallazgo-tope"><span class="grav">Problema 5</span></div>
+      <h3>No se puede fracasar</h3>
+      <p>El objetivo de temporada está marcado en el propio código como decorativo. No hay confianza de la dirigencia ni despido. La única forma de perder es descender dos categorías seguidas, que es rarísimo. <strong>Un juego donde no podés perder el trabajo no es una carrera, es una caja de arena.</strong></p>
+    </div>
+
+    <div class="hallazgo importante">
+      <div class="hallazgo-tope"><span class="grav">Problema 6</span></div>
+      <h3>El jugador es un número</h3>
+      <p><code>effectiveRating = rating × ajuste por posición</code>. No hay forma, ni moral individual, ni condición física, ni personalidad. El ánimo es <em>uno solo para todo el plantel</em>, un escalar entre −15 y 15. Todos tus jugadores están siempre igual de bien o igual de mal.</p>
+    </div>
+
+    <div class="hallazgo menor">
+      <div class="hallazgo-tope"><span class="grav">Problema 7</span></div>
+      <h3>No entran juveniles</h3>
+      <p><code>canteraDe()</code> modela muy bien qué tan buena es la cantera de cada club… pero solo al generar el plantel inicial. Nunca sube un pibe nuevo. La historia de "encontré un juvenil desconocido y lo hice debutar", que es la que nombraste como objetivo final, hoy es imposible.</p>
+    </div>
+  </section>
+
+  <!-- ============ 6 ============ -->
+  <section id="oportunidades">
+    <div class="cabeza"><span class="num">06</span><h2>Principales oportunidades</h2></div>
+    <p class="entrada">Dónde está el mayor salto de calidad por unidad de trabajo.</p>
+
+    <div class="hallazgo foco">
+      <h3>La más grande: ya tenés los planteles rivales construidos</h3>
+      <p><code>mercado.js</code> genera, para cualquier club, un plantel completo y estable con un generador sembrado por id de club y año. Es determinista: no ocupa un byte del guardado y da siempre lo mismo. <strong>Eso es la mitad del trabajo de "mundo vivo" ya hecho, sin usarse.</strong></p>
+      <ul class="versiones">
+        <li><b>Simple</b><span>Que <code>clubStrength()</code> lea el plantel sembrado del rival en vez de su reputación. Cambio chico, y de golpe cada club vale lo que vale su plantel de verdad, con variación año a año.</span></li>
+        <li><b>Intermedia</b><span>Guardar un <em>diff</em> por club: a quién compró, a quién vendió, cuánto creció cada jugador. La base sigue siendo la semilla; solo se guardan las diferencias. El save queda chico.</span></li>
+        <li><b>Avanzada</b><span>IA que decide esas altas y bajas con presupuesto y necesidades por puesto.</span></li>
+      </ul>
+    </div>
+
+    <div class="hallazgo foco">
+      <h3>El calendario ya pide a gritos el cansancio</h3>
+      <p>Con copa entre semana y liga el fin de semana, un club que llega lejos juega 50 y pico de partidos. La energía —que ya tenés aprobada y sin empezar— convierte de un saque tres cosas muertas en decisiones: el banco de 12, la rotación y el tamaño del plantel.</p>
+    </div>
+
+    <div class="hallazgo foco">
+      <h3>Las noticias están listas y sin material</h3>
+      <p>El módulo ya se engancha a hechos reales y sabe destacar. Hoy la mitad de lo que publica es relleno inventado (rumores, partes médicos de otros clubes) porque <em>no hay mundo del que informar</em>. Cada sistema de mundo vivo que agregues le da material gratis: el mismo código empieza a contar historias verdaderas sin tocarlo.</p>
+    </div>
+  </section>
+
+  <!-- ============ 7 ============ -->
+  <section id="bugs">
+    <div class="cabeza"><span class="num">07</span><h2>Bugs y exploits</h2></div>
+    <p class="entrada">Intenté romperlo a propósito. Lo que encontré, por gravedad.</p>
+
+    <div class="hallazgo critico">
+      <div class="hallazgo-tope"><span class="grav">🔴 Crítico</span><h4>Plantel gratis</h4></div>
+      <p>Sin masa salarial, el óptimo es llenar el plantel hasta 36 con lo mejor que puedas pagar y no vender nunca. No hay ninguna presión que empuje en la dirección contraria. Rompe la economía como sistema de decisiones.</p>
+    </div>
+
+    <div class="hallazgo critico">
+      <div class="hallazgo-tope"><span class="grav">🔴 Crítico</span><h4>Fábrica de juveniles</h4></div>
+      <p><code>playerValue</code> duplica el precio cada 6 puntos de valoración. Un pibe de 60 con techo 85 cuesta ~600 mil y vale ~11 millones cuando llega. Como el desarrollo depende de los minutos y no hay competencia por el puesto, el bucle "comprar pibes baratos, hacerlos jugar, venderlos" es dinero infinito con riesgo cero. El bucle <em>en sí</em> está bien —es el corazón de un manager— pero le falta todo lo que lo hace difícil: sueldos, presión por resultados, y que otro club te lo arrebate antes.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <div class="hallazgo-tope"><span class="grav">🟠 Importante</span><h4>Penal por sorteo puro</h4></div>
+      <p>Hay un 25% de probabilidad de penal en <em>cualquier</em> partido, y de quién es el penal se decide con una moneda, sin mirar quién atacó más ni la diferencia de nivel. Un equipo de la Nacional recibe tantos penales a favor contra Boca como Boca contra él.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <div class="hallazgo-tope"><span class="grav">🟠 Importante</span><h4>Guardado sin versión</h4></div>
+      <p><code>SAVE_KEY = 'dt-simulador-save-v3'</code> y el estado se serializa crudo, sin número de versión adentro ni migración al cargar. Cualquier cambio de forma del estado —uno de los que vamos a necesitar sí o sí— rompe en silencio las partidas existentes. Hoy sos vos solo; el día que haya gente jugando, esto duele.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <div class="hallazgo-tope"><span class="grav">🟠 Importante</span><h4>Los rivales nunca se lesionan ni se suspenden</h4></div>
+      <p>Las lesiones y las amarillas corren solo sobre tu plantel. Estructuralmente no pueden correr sobre los demás porque los demás no tienen plantel en la simulación.</p>
+    </div>
+
+    <div class="hallazgo menor">
+      <div class="hallazgo-tope"><span class="grav">🟡 Menor</span><h4>Renovar siempre conviene</h4></div>
+      <p>Sin sueldo activo, la única contra de renovar es la prima. Nunca hay motivo para dejar ir a nadie.</p>
+    </div>
+
+    <div class="hallazgo menor">
+      <div class="hallazgo-tope"><span class="grav">🟡 Menor</span><h4>Los cuatro descensos de la Nacional solo se miran para vos</h4></div>
+      <p>Ya está anotado en <code>PENDIENTES.md</code>. No hay una división más abajo de donde traer reemplazos, así que los otros clubes de la Nacional no se mueven nunca.</p>
+    </div>
+
+    <div class="hallazgo menor">
+      <div class="hallazgo-tope"><span class="grav">🟡 Menor</span><h4>Ánimo único para 36 jugadores</h4></div>
+      <p>Un escalar global. El suplente que no juega hace un año está tan contento como el capitán.</p>
+    </div>
+  </section>
+
+  <!-- ============ 8 ============ -->
+  <section id="arquitectura">
+    <div class="cabeza"><span class="num">08</span><h2>Arquitectura</h2></div>
+
+    <h3>Lo que está bien y hay que conservar</h3>
+    <ul>
+      <li><strong>Cero dependencias y cero paso de compilación.</strong> El juego abre con doble click en un archivo. Para un proyecto de una persona esto vale oro: nada se pudre, nada se rompe al actualizar.</li>
+      <li><strong>Los módulos de dominio están bien separados.</strong> <code>economia</code>, <code>mercado</code> y <code>noticias</code> son objetos con una responsabilidad clara y una interfaz chica contra el motor.</li>
+      <li><strong>Generación sembrada.</strong> La decisión de generar planteles rivales de forma determinista en vez de guardarlos es la mejor decisión técnica del proyecto, y todavía no rindió ni la mitad de lo que puede.</li>
+      <li><strong>Los comentarios explican el porqué, no el qué.</strong> Se puede volver a este código en tres meses.</li>
+    </ul>
+
+    <h3>Lo que está mal</h3>
+    <ul>
+      <li><strong><code>engine.js</code>: 4.740 líneas y 192 métodos en un solo objeto.</strong> Ya está en el límite. Copas internacionales, playoffs locales, calendario, mercado, partido y temporada conviven en el mismo espacio de nombres.</li>
+      <li><strong>Sin versionado del guardado.</strong> Ver sección 7.</li>
+      <li><strong>Estado global mutable sin frontera.</strong> Cualquier método toca cualquier parte de <code>this.state</code>. Funciona hoy porque el juego es chico y sos uno solo.</li>
+      <li><strong>Un incidente real esta semana:</strong> un commit que debía sacar un selector de CSS se llevó puesto 89 líneas, incluyendo el grid del banco de suplentes. Nadie se dio cuenta por dos días. No hay ninguna prueba automática que corra sola.</li>
+    </ul>
+
+    <h3>Qué refactorizar ahora, y qué no</h3>
+    <ul class="versiones">
+      <li><b>Sí, ahora</b><span>Versionar el guardado. Poner <code>version: N</code> adentro del estado y una función de migración que corra al cargar. Son 30 líneas y te salva de romper partidas en cada cambio de acá en adelante.</span></li>
+      <li><b>Sí, ahora</b><span>Sacar las copas internacionales de <code>engine.js</code> a su propio módulo. Es el bloque más grande y más autocontenido: ~900 líneas que casi no tocan el resto.</span></li>
+      <li><b>Todavía no</b><span>Reescribir el motor entero, separar en clases, meter un framework o un bundler. No hay problema que eso resuelva hoy, y perderías la propiedad de "abre con doble click".</span></li>
+      <li><b>Nunca</b><span>Empezar de cero. No hay nada acá que justifique tirar 11 mil líneas que funcionan.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============ 9 ============ -->
+  <section id="roadmap">
+    <div class="cabeza"><span class="num">09</span><h2>Roadmap</h2></div>
+    <p class="entrada">Seis fases en orden de dependencia. Cada una solo tiene sentido si la anterior está.</p>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 1</span><h3>Que los rivales existan</h3></div>
+      <p class="fase-meta">Dificultad 3/10 · Impacto 10/10 · Sin dependencias</p>
+      <p><strong>Objetivo:</strong> que la fuerza de cada club salga de su plantel de verdad y no de su reputación.</p>
+      <ul>
+        <li><code>clubStrength()</code> lee el plantel sembrado de <code>mercado.js</code> y devuelve la fuerza de sus mejores once.</li>
+        <li>Guardar un diff por club: altas, bajas y crecimiento de sus jugadores.</li>
+        <li>El desarrollo de jugadores, que ya funciona, corre también sobre los planteles rivales.</li>
+      </ul>
+      <p><strong>No tocar todavía:</strong> la IA que decide fichajes. Primero que haya planteles que mirar.</p>
+    </div>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 2</span><h3>Que el partido tenga adentro</h3></div>
+      <p class="fase-meta">Dificultad 6/10 · Impacto 9/10 · Depende de Fase 1</p>
+      <p><strong>Objetivo:</strong> que un partido produzca hechos, no solo un número.</p>
+      <ul>
+        <li>Energía por jugador: se gasta jugando, se recupera descansando, pesa en el rendimiento y en el riesgo de lesión.</li>
+        <li>Minuto a minuto: el partido genera eventos (gol con autor, amarilla, roja, lesión) en vez de un marcador.</li>
+        <li>Con eventos y energía ya existiendo, la <strong>vista en vivo con cambios</strong> sale casi gratis: es dibujar lo que el motor ya produce.</li>
+        <li>Estadísticas por jugador acumuladas: goles, asistencias, partidos.</li>
+      </ul>
+      <p><strong>No tocar todavía:</strong> la vista en vivo antes que el motor. Animar un dado sigue siendo un dado.</p>
+    </div>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 3</span><h3>Que se pueda fracasar</h3></div>
+      <p class="fase-meta">Dificultad 4/10 · Impacto 8/10 · Depende de Fase 1</p>
+      <ul>
+        <li>Masa salarial semanal: cada jugador cuesta. El plantel se vuelve una decisión económica.</li>
+        <li>Confianza de la dirigencia: el objetivo de temporada pasa a medirse, y si no lo cumplís te echan.</li>
+        <li>Reputación y carrera del DT: historial, títulos, y ofertas de otros clubes.</li>
+      </ul>
+    </div>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 4</span><h3>Mundo vivo</h3></div>
+      <p class="fase-meta">Dificultad 7/10 · Impacto 9/10 · Depende de Fases 1 y 3</p>
+      <ul>
+        <li>IA de clubes nivel 1: presupuesto, necesidad por puesto, compra y venta entre ellos.</li>
+        <li>Juveniles: cada club sube pibes según su cantera; los tuyos pueden explotar o no.</li>
+        <li>Ofertas por tus jugadores: otro club viene a buscarte a la figura y tenés que decidir.</li>
+        <li>Lesiones y suspensiones para todos.</li>
+      </ul>
+    </div>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 5</span><h3>Profundidad del jugador</h3></div>
+      <p class="fase-meta">Dificultad 6/10 · Impacto 7/10 · Depende de Fase 2</p>
+      <ul>
+        <li>De un rating a tres o cuatro atributos por puesto. No quince: tres o cuatro.</li>
+        <li>Forma y moral individual.</li>
+        <li>Personalidad simple: profesional, irregular, líder, conflictivo.</li>
+        <li>Tácticas que se crucen de verdad con la forma de jugar del rival.</li>
+      </ul>
+    </div>
+
+    <div class="fase">
+      <div class="fase-tope"><span class="fase-num">FASE 6</span><h3>Datos y pulido</h3></div>
+      <p class="fase-meta">Dificultad 2/10 · Impacto 5/10 · Transversal</p>
+      <ul>
+        <li>Planteles reales de los 28 clubes de Primera que faltan.</li>
+        <li>Escudos de la Nacional, la tercera y los 113 clubes del continente.</li>
+        <li>Los 34 clubes de la tercera para la Copa Argentina.</li>
+        <li>Balance, rendimiento, UX.</li>
+      </ul>
+      <p>Esta fase se puede ir haciendo en paralelo a cualquier otra: no bloquea nada y no la bloquea nada.</p>
+    </div>
+  </section>
+
+  <!-- ============ 10 ============ -->
+  <section id="top10">
+    <div class="cabeza"><span class="num">10</span><h2>Top 10 prioridades</h2></div>
+    <p class="entrada">Puntuadas y ordenadas. "Prioridad" pondera impacto contra dificultad y desbloqueo de otras cosas.</p>
+
+    <div class="tabla-caja">
+      <table>
+        <caption>Gameplay · Realismo · Inmersión · Dificultad · Prioridad (0–10)</caption>
+        <thead><tr><th>#</th><th>Qué</th><th>GP</th><th>RE</th><th>IN</th><th>DIF</th><th>PRI</th><th>Depende de</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>Fuerza del rival desde su plantel</td><td class="n">10</td><td class="n">10</td><td class="n">8</td><td class="n">3</td><td class="n">10</td><td class="obs">—</td></tr>
+          <tr><td class="n">2</td><td>Energía y desgaste</td><td class="n">9</td><td class="n">8</td><td class="n">7</td><td class="n">4</td><td class="n">9</td><td class="obs">—</td></tr>
+          <tr><td class="n">3</td><td>Estadísticas por jugador</td><td class="n">7</td><td class="n">8</td><td class="n">9</td><td class="n">3</td><td class="n">9</td><td class="obs">—</td></tr>
+          <tr><td class="n">4</td><td>Masa salarial</td><td class="n">9</td><td class="n">9</td><td class="n">6</td><td class="n">3</td><td class="n">9</td><td class="obs">—</td></tr>
+          <tr><td class="n">5</td><td>Confianza de la dirigencia y despido</td><td class="n">9</td><td class="n">8</td><td class="n">9</td><td class="n">4</td><td class="n">8</td><td class="obs">#1</td></tr>
+          <tr><td class="n">6</td><td>Partido con eventos por minuto</td><td class="n">8</td><td class="n">9</td><td class="n">9</td><td class="n">7</td><td class="n">8</td><td class="obs">#2, #3</td></tr>
+          <tr><td class="n">7</td><td>Versionado del guardado</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">1</td><td class="n">8</td><td class="obs">— (seguro barato)</td></tr>
+          <tr><td class="n">8</td><td>IA de clubes nivel 1</td><td class="n">9</td><td class="n">9</td><td class="n">9</td><td class="n">7</td><td class="n">7</td><td class="obs">#1</td></tr>
+          <tr><td class="n">9</td><td>Juveniles que suben cada año</td><td class="n">8</td><td class="n">7</td><td class="n">9</td><td class="n">5</td><td class="n">7</td><td class="obs">#1</td></tr>
+          <tr><td class="n">10</td><td>Vista del partido en vivo</td><td class="n">6</td><td class="n">4</td><td class="n">9</td><td class="n">5</td><td class="n">6</td><td class="obs">#6</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Si solo pudieras hacer cinco cosas en las próximas semanas</h3>
+    <ol>
+      <li><strong>Fuerza del rival desde su plantel.</strong> Desbloquea todo lo demás y es barato.</li>
+      <li><strong>Energía y desgaste.</strong> Le da sentido al banco, a la rotación y al calendario que ya construiste.</li>
+      <li><strong>Estadísticas por jugador.</strong> Barato, y alimenta noticias, mercado, moral y la vista en vivo.</li>
+      <li><strong>Masa salarial.</strong> Tres líneas de economía convierten al plantel en una decisión.</li>
+      <li><strong>Confianza de la dirigencia.</strong> Es lo que convierte una caja de arena en una carrera.</li>
+    </ol>
+    <p>Las cinco juntas son menos trabajo que el partido en vivo solo, y cambian el juego mucho más.</p>
+  </section>
+
+  <!-- ============ 11 ============ -->
+  <section id="no-hacer">
+    <div class="cabeza"><span class="num">11</span><h2>Las cinco cosas que no hay que hacer todavía</h2></div>
+
+    <div class="hallazgo importante">
+      <h4>1 · El partido en vivo, ahora</h4>
+      <p>Ya sé que es lo que más ganas te da, y va a estar. Pero hoy el motor produce un marcador de una sola tirada: una vista minuto a minuto encima de eso sería una animación de un número ya decidido, con cambios que no cambian nada. Hacer primero energía y eventos, y después la vista, es <em>menos</em> trabajo total y da un resultado incomparablemente mejor. No es un no: es un "en el orden correcto".</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <h4>2 · Scouting</h4>
+      <p>Ojear jugadores solo tiene sentido si hay información que no ves. Hoy ves el rating exacto de todos. Sin información imperfecta, un sistema de scouting es una pantalla que te dice lo que ya sabías.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <h4>3 · Cuerpo técnico y agentes</h4>
+      <p>Un ayudante de campo modifica entrenamiento, moral y desarrollo. Un agente modifica negociaciones. Hoy no hay entrenamiento, la moral es un escalar y las negociaciones son de una sola parte. Son capas sobre sistemas que todavía no existen.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <h4>4 · Selecciones nacionales</h4>
+      <p>Las fechas FIFA ya cumplen su función narrativa. Un sistema completo de selecciones es mucho trabajo para algo que no toca ninguna decisión tuya como DT de club.</p>
+    </div>
+
+    <div class="hallazgo importante">
+      <h4>5 · Quince atributos por jugador</h4>
+      <p>La tentación de copiar la ficha de FM es fuerte y es una trampa: quince atributos sin un motor que los use es quince veces más datos que cargar para el mismo resultado. Cuando toque, tres o cuatro por puesto alcanzan y sobran.</p>
+    </div>
+  </section>
+
+  <!-- ============ 12 ============ -->
+  <section id="puntajes">
+    <div class="cabeza"><span class="num">12</span><h2>Puntajes</h2></div>
+    <p class="entrada">Como simulador de director técnico, no como proyecto de cinco días. Pediste que no fuera amable.</p>
+
+    <div class="puntajes">
+      <div class="bar-fila"><span class="bar-nombre">Competiciones</span><div class="bar-pista"><div class="bar-valor alto" style="width:90%"></div></div><span class="bar-num">9</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Diversión potencial</span><div class="bar-pista"><div class="bar-valor alto" style="width:80%"></div></div><span class="bar-num">8</span></div>
+      <div class="bar-fila"><span class="bar-nombre">UX / UI</span><div class="bar-pista"><div class="bar-valor" style="width:70%"></div></div><span class="bar-num">7</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Desarrollo</span><div class="bar-pista"><div class="bar-valor" style="width:70%"></div></div><span class="bar-num">7</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Mercado</span><div class="bar-pista"><div class="bar-valor" style="width:60%"></div></div><span class="bar-num">6</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Economía</span><div class="bar-pista"><div class="bar-valor" style="width:50%"></div></div><span class="bar-num">5</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Arquitectura</span><div class="bar-pista"><div class="bar-valor" style="width:50%"></div></div><span class="bar-num">5</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Realismo</span><div class="bar-pista"><div class="bar-valor" style="width:50%"></div></div><span class="bar-num">5</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Gestión</span><div class="bar-pista"><div class="bar-valor bajo" style="width:40%"></div></div><span class="bar-num">4</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Jugadores</span><div class="bar-pista"><div class="bar-valor bajo" style="width:40%"></div></div><span class="bar-num">4</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Narrativa</span><div class="bar-pista"><div class="bar-valor bajo" style="width:40%"></div></div><span class="bar-num">4</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Simulación</span><div class="bar-pista"><div class="bar-valor bajo" style="width:30%"></div></div><span class="bar-num">3</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Replayability</span><div class="bar-pista"><div class="bar-valor bajo" style="width:30%"></div></div><span class="bar-num">3</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Tácticas</span><div class="bar-pista"><div class="bar-valor bajo" style="width:20%"></div></div><span class="bar-num">2</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Mundo vivo</span><div class="bar-pista"><div class="bar-valor bajo" style="width:20%"></div></div><span class="bar-num">2</span></div>
+      <div class="bar-fila"><span class="bar-nombre">Carrera del DT</span><div class="bar-pista"><div class="bar-valor bajo" style="width:20%"></div></div><span class="bar-num">2</span></div>
+      <div class="bar-fila"><span class="bar-nombre">IA de clubes</span><div class="bar-pista"><div class="bar-valor bajo" style="width:10%"></div></div><span class="bar-num">1</span></div>
+      <div class="escala" aria-hidden="true"><span></span><span class="escala-marcas"><span>0</span><span>5</span><span>10</span></span><span></span></div>
+    </div>
+
+    <div class="total">
+      <span class="total-num">4,5</span>
+      <p>Promedio como simulador de DT. Un juego de partidos con un contexto competitivo excepcional. El techo es alto justamente porque lo difícil de construir —la estructura del fútbol argentino— ya está.</p>
+    </div>
+  </section>
+
+  <!-- ============ 13 ============ -->
+  <section id="proximo">
+    <div class="cierre">
+      <div class="cabeza"><span class="num">13</span><h2>Si yo fuera el desarrollador, esto es lo primero que haría</h2></div>
+
+      <h3>Que <code>clubStrength()</code> lea el plantel del rival.</h3>
+
+      <p>Nada más que eso, primero. Es el cambio más chico de toda la lista y el que más cosas destraba.</p>
+
+      <p><strong>Por qué.</strong> Ya tenés escrito el generador que arma el plantel completo de cualquier club, sembrado por id y año, sin ocupar guardado. Hoy el motor de partido lo ignora y usa la reputación. Cambiar de dónde sale ese número hace que, de golpe: cada club valga lo que vale su plantel; un club con una buena camada sea fuerte ese año y más flojo tres años después; comprarle el 9 a Vélez debilite a Vélez de verdad; y las copas se pongan difíciles porque enfrente hay alguien.</p>
+
+      <p><strong>Qué tocar.</strong> <code>engine.js → clubStrength()</code>, leyendo <code>Mercado.plantel(club)</code>. Nada más en el primer paso.</p>
+
+      <p><strong>Riesgo.</strong> Medio, y hay que medirlo: cambia el balance de <em>todos</em> los partidos simulados del juego a la vez. La forma de probarlo es la que ya usamos: simular 40 temporadas antes y después y comparar títulos, promedio de goles y dispersión de la tabla. Si los rivales quedan demasiado fuertes o demasiado débiles, se calibra con un factor, no volviendo atrás.</p>
+
+      <p><strong>Y después.</strong> Energía. Con rivales que valen lo que valen y un plantel que se cansa, ya tenés un juego donde rotar, comprar y elegir el once son decisiones de verdad. Recién ahí el partido en vivo va a tener algo para mostrar.</p>
+    </div>
+
+    <p class="pie">Auditoría sobre el estado del repositorio al 13 de septiembre de 2026 · 11.476 líneas · rama claude/mandale-mecha-ugynzv</p>
+  </section>
+
+</div>
