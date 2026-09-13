@@ -1173,7 +1173,7 @@ function copasResultHtml(copas) {
     else if (c.userStage) tuyo = `<div class="me-line">Tu club llegó hasta ${c.userStage}.</div>`;
     return `
       <h4>${nombreDeCopa(c)}</h4>
-      <p>Campeón: <strong>${c.championName}</strong>${c.championPais ? ` <span class="muted">(${c.championPais})</span>` : ''}${c.runnerUpName ? `<br><span class="muted">Finalista: ${c.runnerUpName}</span>` : ''}</p>
+      <p>Campeón: <strong>${c.championName}</strong>${c.championPais ? ` <span class="muted">(${c.championPais})</span>` : ''}${c.runnerUpName ? `<br><span class="muted">Finalista: ${c.runnerUpName}</span>` : ''}${c.sinFinal ? '<br><span class="muted">No se jugó: ganó el Apertura y el Clausura, así que el trofeo es suyo.</span>' : ''}</p>
       ${tuyo}
     `;
   }).join('');

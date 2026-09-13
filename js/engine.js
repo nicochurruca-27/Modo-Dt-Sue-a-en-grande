@@ -1976,9 +1976,14 @@ const Engine = {
     };
   },
 
-  // Si el mismo club ganó el Apertura y el Clausura no se queda el trofeo de
-  // arriba: el rival sale de un partido entre los dos subcampeones, y si esos
-  // también son el mismo club, ese pasa directo a la final.
+  // El Trofeo de Campeones es campeón del Apertura contra campeón del
+  // Clausura, partido único.
+  //
+  // Si el mismo club ganó los dos, no hay partido: el trofeo es suyo y listo.
+  // Antes se le buscaba un rival entre los subcampeones y se lo hacía jugar
+  // igual, así que podías ganar el Apertura Y el Clausura y quedarte sin el
+  // Trofeo porque un subcampeón te ganaba un partido. Eso no existe: el que
+  // gana los dos torneos no tiene contra quién jugar.
   jugarTrofeoDeCampeones(d1Data) {
     const campeonApertura = d1Data.aperturaChampion;
     const campeonClausura = d1Data.clausuraChampion;
@@ -1986,11 +1991,25 @@ const Engine = {
     if (campeonApertura !== campeonClausura) {
       return this.finalDeUnPartido('Trofeo de Campeones', campeonApertura, campeonClausura);
     }
-    const subApertura = d1Data.aperturaRunnerUp;
-    const subClausura = d1Data.clausuraRunnerUp;
-    const definicion = this.finalDeUnPartido('Clasificación al Trofeo', subApertura, subClausura);
-    const rival = definicion ? definicion.championId : (subApertura || subClausura);
-    return this.finalDeUnPartido('Trofeo de Campeones', campeonApertura, rival);
+    const club = this.getClub(campeonApertura);
+    if (!club) return null;
+    return {
+      copa: 'Trofeo de Campeones',
+      // Se llama así y no "Copa Trofeo de Campeones" (ver nombreDeCopa).
+      nombrePropio: true,
+      articulo: 'el',
+      championId: campeonApertura,
+      championName: club.name,
+      championPais: 'Argentina',
+      // No hubo final, así que no hay finalista. El que llama lo tiene en
+      // cuenta: sin subcampeón, la Supercopa Argentina del año que viene sale
+      // por el camino principal (contra el campeón de la Copa Argentina).
+      runnerUpId: null,
+      runnerUpName: null,
+      sinFinal: true,
+      userWon: campeonApertura === this.state.clubId,
+      userStage: campeonApertura === this.state.clubId ? 'el título' : null,
+    };
   },
 
   // La Recopa: los dos campeones del año pasado, ida y vuelta. Se juega antes

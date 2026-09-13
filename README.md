@@ -61,6 +61,9 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **Trofeo de Campeones**: campeón del Apertura contra campeón del Clausura, a
+  partido único. Si el mismo club gana los dos torneos no hay partido: el
+  trofeo es suyo y se lo lleva sin jugar.
 - **La pantalla de fin de temporada cierra con la Tabla Anual entera** (los 30
   de Primera, las dos zonas y los dos torneos sumados), que es la tabla que
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
