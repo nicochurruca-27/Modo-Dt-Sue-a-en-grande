@@ -1603,3 +1603,123 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 .inicio-aviso strong { color: #fca5a5; }
 .inicio-aviso p { margin: 8px 0 14px; color: #e2e8f0; font-size: 0.92rem; line-height: 1.45; }
 .inicio-botones { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- La presentación en sociedad ---------- */
+/*
+   La conferencia de prensa del día que te presentan. Se tiñe con los colores
+   del club que estás dirigiendo (ver coloresDelClub en ui.js, que los saca de
+   js/colores.js), así la de Boca no se ve igual que la de Platense.
+
+   El fondo se arma SIEMPRE oscuro con el color del club encima y nunca al
+   revés: si se usara el color crudo, un club de blanco (Riestra) dejaba la
+   pantalla en blanco y uno de azul marino (Boca), ilegible. */
+.presenta {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 26px 18px 22px;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(var(--club), 0.55), transparent 70%),
+    radial-gradient(70% 50% at 85% 100%, rgba(var(--club2), 0.28), transparent 70%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+  border: 1px solid rgba(var(--club), 0.45);
+}
+
+.presenta-fondo { position: absolute; inset: 0; pointer-events: none; }
+
+/* La pared de prensa: el escudo repetido, como los paneles con logos que hay
+   atrás del que da la conferencia. */
+.presenta-pared {
+  position: absolute;
+  inset: -10% -10% auto -10%;
+  height: 62%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  justify-content: center;
+  align-content: flex-start;
+  opacity: 0.09;
+  transform: rotate(-4deg);
+}
+
+.presenta-pared img { width: 54px; height: 54px; }
+
+/* Los flashes de las cámaras. */
+.flash {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  box-shadow: 0 0 14px 5px rgba(255, 255, 255, 0.85);
+  animation: presenta-flash 4.5s ease-out infinite;
+}
+
+@keyframes presenta-flash {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  2% { opacity: 0.95; transform: scale(1); }
+  7% { opacity: 0; transform: scale(0.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; opacity: 0; }
+}
+
+.presenta-cuerpo { position: relative; z-index: 1; text-align: center; }
+
+.presenta-fecha {
+  margin: 0 0 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento);
+}
+
+.presenta-escudo img {
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.65));
+}
+
+.presenta-nombre {
+  margin: 10px 0 2px;
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.presenta-cargo { margin: 0 0 18px; color: #cbd5e1; font-size: 0.95rem; }
+.presenta-cargo strong { color: var(--acento); }
+
+/* Los datos del club con los que arrancás. */
+.presenta-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.presenta-dato {
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.presenta-dato span { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.presenta-dato strong { display: block; font-size: 0.92rem; margin-top: 2px; }
+
+.presenta-cita {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--acento);
+  background: rgba(2, 6, 23, 0.45);
+  border-radius: 0 10px 10px 0;
+  text-align: left;
+}
+
+.presenta-cita span { display: block; font-size: 1rem; line-height: 1.45; }
+.presenta-cita cite { display: block; margin-top: 6px; font-size: 0.76rem; color: var(--muted); font-style: normal; }
+
+.presenta-pregunta { margin: 0 0 10px; font-size: 1rem; }
+.presenta-opcion { text-align: center; }

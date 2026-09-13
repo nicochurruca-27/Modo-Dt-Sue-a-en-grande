@@ -69,6 +69,14 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
+- **La presentación en sociedad** es la conferencia de prensa del día que te
+  presentan: la pared de prensa con el escudo repetido, los flashes de las
+  cámaras, tu nombre, tu cancha, el presupuesto, con cuántos jugadores
+  arrancás, quién es la figura del plantel y el objetivo que te pone la
+  dirigencia. Se tiñe con **los colores del club** que estás dirigiendo, así la
+  de Boca no se ve igual que la de River. Los colores salen del propio escudo
+  (ver `tools/generar-colores.py` y `js/colores.js`), no de una lista escrita
+  a ojo.
 - **Pantalla de inicio**: el juego abre con su propia puerta de entrada —cancha
   de noche, los escudos de los clubes pasando de fondo y la pelota girando, todo
   dibujado en CSS y SVG, sin ninguna imagen de afuera—. Si tenés una carrera

@@ -145,7 +145,8 @@ club tenga la suya —la franja de River, el amarillo y azul de Boca, la de
 Racing— y que se vea en todos lados donde aparece un jugador: el once, el
 banco, la reserva y el mercado de pases.
 
-Los colores ya están cargados en `data.js` (`colors` de cada club) y en
+Los colores de cada club ya están en `js/colores.js` (sacados del escudo por
+`tools/generar-colores.py`) y los de los clubes del continente en
 `internacional.js`, así que es trabajo de dibujo, no de datos: hay que darle a
 `benchJerseySvg` y al dibujo del once una forma de camiseta por club (lisa,
 a rayas verticales, con banda cruzada, con franja horizontal).
@@ -189,11 +190,11 @@ Nico va a buscar los datos reales.
 
 Hecho: la pantalla de inicio (punto 1 de lo que charlamos).
 
-Queda pendiente, en este orden:
+Hecho también: la presentación en sociedad, ahora la conferencia de prensa con
+los colores del club.
 
-- **La presentación en sociedad**, que hoy es un escudo y dos líneas. Podría
-  ser la conferencia de prensa de verdad: tu nombre, el objetivo de la
-  dirigencia, el presupuesto con el que contás y con qué plantel arrancás.
+Queda pendiente:
+
 - **La pantalla de elegir club**, que podría contar bastante más de cada club
   antes de que te decidas (la reputación es hoy cinco estrellitas y nada más).
 

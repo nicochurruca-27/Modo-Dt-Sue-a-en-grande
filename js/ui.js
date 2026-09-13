@@ -1900,20 +1900,100 @@ function renderClubSelect() {
   });
 }
 
+// ---------- Los colores del club ----------
+//
+// Salen del propio escudo (ver tools/generar-colores.py y js/colores.js). Se
+// usan para teñir la presentación en sociedad, así la de Boca no se ve igual
+// que la de Platense.
+//
+// Nunca se usan crudos: el fondo se arma SIEMPRE oscuro con el color del club
+// por encima, y el color de los textos se aclara hasta que se lea. Si no, un
+// club de azul marino (Boca) quedaba con letras negras sobre negro y uno de
+// blanco (Riestra) con una pantalla blanca.
+function aRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function luz([r, g, b]) {
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+function aclararHasta(hex, minimo) {
+  let rgb = aRgb(hex);
+  let vueltas = 0;
+  while (luz(rgb) < minimo && vueltas++ < 12) {
+    rgb = rgb.map((c) => Math.round(c + (255 - c) * 0.22));
+  }
+  return `rgb(${rgb.join(', ')})`;
+}
+
+function coloresDelClub(clubId) {
+  const par = (typeof CLUB_COLORES !== 'undefined' && CLUB_COLORES[clubId]) || ['#334155', '#94a3b8'];
+  const [primario, secundario] = par;
+  // El acento es el que más se distingue del fondo: el segundo si tiene
+  // fuerza, y si no el primero aclarado.
+  const candidato = luz(aRgb(secundario)) > 0.75 ? primario : secundario;
+  return {
+    primario,
+    secundario,
+    tinte: aRgb(primario).join(', '),
+    tinte2: aRgb(secundario).join(', '),
+    acento: aclararHasta(candidato, 0.6),
+  };
+}
+
 function renderPresentation() {
   const s = Engine.state;
   const club = Engine.getClub(s.clubId);
   const dt = s.dt;
+  const c = coloresDelClub(club.id);
   const responses = Engine.presentationResponses();
+  const estadio = Engine.estadioDe(club.id);
+  const plantel = s.squad || [];
+  const figura = plantel.slice().sort((a, b) => b.rating - a.rating)[0];
+  const fecha = formatCalendarDate(0);
+
+  // Los flashes de las cámaras: unos cuantos puntos repartidos con tiempos
+  // distintos, para que titilen desordenados como en una conferencia.
+  const flashes = Array.from({ length: 14 }, (_, i) => {
+    const x = 4 + (i * 97) % 92;
+    const y = 6 + (i * 61) % 62;
+    return `<span class="flash" style="left:${x}%;top:${y}%;animation-delay:${(i * 0.47).toFixed(2)}s"></span>`;
+  }).join('');
+
+  const dato = (etiqueta, valor) => (valor
+    ? `<div class="presenta-dato"><span class="muted">${etiqueta}</span><strong>${valor}</strong></div>`
+    : '');
+
   app.innerHTML = `
-    <div class="card">
-      <h1>Presentación en sociedad</h1>
-      <div class="presentation-crest">${clubCrest(club, 96)}</div>
-      <p class="muted">La dirigencia de <strong>${club.name}</strong> te da la bienvenida${dt ? `, ${dt.name}` : ''}.</p>
-      <p>"Este año el objetivo es claro: <strong>${s.objective.text}</strong>"</p>
-      <h3>¿Cómo respondés?</h3>
-      <div class="options">
-        ${responses.map((opt, i) => `<button class="option-btn" data-i="${i}">${opt.label}</button>`).join('')}
+    <div class="presenta" style="--club: ${c.tinte}; --club2: ${c.tinte2}; --acento: ${c.acento}">
+      <div class="presenta-fondo" aria-hidden="true">
+        <div class="presenta-pared">${Array.from({ length: 24 }, () => clubCrest(club, 54)).join('')}</div>
+        ${flashes}
+      </div>
+      <div class="presenta-cuerpo">
+        <p class="presenta-fecha">${fecha} · Presentación oficial</p>
+        <div class="presenta-escudo">${clubCrest(club, 104)}</div>
+        <h1 class="presenta-nombre">${dt ? dt.name : 'Vos'}</h1>
+        <p class="presenta-cargo">Nuevo director técnico de <strong>${club.name}</strong></p>
+
+        <div class="presenta-datos">
+          ${dato('Casa', estadio)}
+          ${dato('Presupuesto', money(s.budget))}
+          ${dato('Plantel', `${plantel.length} jugadores`)}
+          ${dato('La figura', figura ? `${figura.name} (${figura.rating})` : null)}
+        </div>
+
+        <blockquote class="presenta-cita">
+          <span>“El objetivo de este año es claro: <strong>${s.objective.text}</strong>”</span>
+          <cite>La dirigencia, en la conferencia</cite>
+        </blockquote>
+
+        <h3 class="presenta-pregunta">Te pasan el micrófono. ¿Qué decís?</h3>
+        <div class="options">
+          ${responses.map((opt, i) => `<button class="option-btn presenta-opcion" data-i="${i}">${opt.label}</button>`).join('')}
+        </div>
       </div>
     </div>
   `;
@@ -1921,6 +2001,7 @@ function renderPresentation() {
     btn.addEventListener('click', () => { Engine.continueFromPresentation(Number(btn.dataset.i)); render(); });
   });
 }
+
 
 function competitionLabel() {
   const s = Engine.state;
