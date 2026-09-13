@@ -61,6 +61,13 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **El panel de la derecha, por competencia**: una carpeta por torneo y una
+  flechita para pasar de una a otra. La del torneo local se llama como el
+  torneo que se está jugando (Apertura, Clausura o Primera Nacional) y adentro
+  tiene, con su propia flechita, la tabla de tu zona, la de la otra y —cuando
+  llega diciembre— el cuadro de los playoffs. Después van la Copa Argentina,
+  las dos internacionales y la Recopa mientras se juega, y al final la Tabla
+  Anual, que va aparte porque no es de un torneo sino de los dos.
 - **Logos de los torneos**: cada cuadro —Copa Argentina, Libertadores,
   Sudamericana y la fase final de la Liga Profesional— lleva atrás el logo
   oficial de su torneo, a media luz, y los colores de la competencia de fondo.

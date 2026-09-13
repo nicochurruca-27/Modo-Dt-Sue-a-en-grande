@@ -8,7 +8,10 @@ const squadPanel = document.getElementById('squad-panel');
 
 let selectDivision = 'D1';
 let selectZone = 'A';
-let tablePanelTab = 'mine'; // 'mine' | 'other' | 'copas'
+// Qué carpeta del panel está abierta. Es siempre 'copa-<id>' (el torneo local
+// es 'copa-liga') o 'anual'. Si la guardada ya no existe, renderTablePanel
+// vuelve a la primera.
+let tablePanelTab = 'copa-liga';
 // Qué grupo de qué copa internacional se está mirando en la pestaña "Copas".
 // Arrancan en null para que el panel elija solo la copa y el grupo del
 // usuario la primera vez que se abre.
@@ -462,11 +465,37 @@ function faseFinalNombre(kind) {
   return 'Fase Final';
 }
 
+// Cómo se llama el torneo local que se está jugando. Es el nombre de la
+// carpeta de la liga en el panel: adentro están las dos zonas y, cuando llega
+// diciembre, los playoffs.
+function nombreDelTorneo() {
+  const season = Engine.state.season;
+  if (!season) return 'Liga';
+  if (season.myDivision === 'D2') return 'Primera Nacional';
+  return season.edition === 'clausura' ? 'Clausura' : 'Apertura';
+}
+
+// Qué se ve adentro de la carpeta de la liga: 0 tu zona, 1 la otra, 2 los
+// playoffs (solo cuando existen).
+let ligaPanelVista = 0;
+
+function vistasDeLaLiga() {
+  const s = Engine.state;
+  if (!s || !s.season) return [];
+  const miZona = s.season.myZone;
+  const otra = miZona === 'A' ? 'B' : 'A';
+  const lista = [
+    { id: 'mine', nombre: `Zona ${miZona}` },
+    { id: 'other', nombre: `Zona ${otra}` },
+  ];
+  const ff = faseFinalDelPanel();
+  if (ff) lista.push({ id: 'faseFinal', nombre: ff.nombre });
+  return lista;
+}
+
 function competenciasDelPanel() {
   const s = Engine.state;
-  const lista = [];
-  const faseFinal = faseFinalDelPanel();
-  if (faseFinal) lista.push({ id: 'faseFinal', nombre: faseFinal.nombre });
+  const lista = [{ id: 'liga', nombre: nombreDelTorneo() }];
   if (s.copaBracket && s.copaBracket.alive) lista.push({ id: 'copaArgentina', nombre: 'Copa Argentina' });
   // La Recopa son dos fechas de febrero: mientras se juega tiene su carpeta y
   // después desaparece.
@@ -632,6 +661,17 @@ function cuadroEscudoSvg(clubId, x, y, aroColor, m) {
 // `rondas` es una lista de rondas y cada ronda una lista de cruces en el orden
 // del cuadro. Sirve igual para los 64 de la Copa Argentina que para los 16 de
 // una llave internacional: lo único que cambia es cuántas rondas hay.
+// En qué casillero del cuadro va un cruce. Los cruces de los playoffs y de la
+// Copa Argentina traen su `pos`, que es su lugar fijo en el cuadro, y hay que
+// usarla: la lista puede venir INCOMPLETA (mientras no jugaste tu partido, tu
+// propio cruce todavía no está anotado), y contando por el índice del array
+// todos los cruces que van abajo del tuyo se subían un casillero y el cuadro
+// quedaba corrido. Los cruces de las copas internacionales no tienen `pos`
+// porque siempre vienen completos y en orden: ahí el índice alcanza.
+function posDelCruce(cruce, indice) {
+  return cruce && cruce.pos != null ? cruce.pos : indice;
+}
+
 function cuadroPorColumnas(rondas, total, mitad, sorteo) {
   const columnas = [];
   const casillerosIniciales = 2 ** total;
@@ -649,12 +689,12 @@ function cuadroPorColumnas(rondas, total, mitad, sorteo) {
       for (let k = 0; k < casilleros; k++) fila[k] = sorteo[desdeSorteo + k] || null;
     } else if (r === 0) {
       (rondas[0] || []).forEach((c, i) => {
-        const k = (i - desde) * 2;
+        const k = (posDelCruce(c, i) - desde) * 2;
         if (k >= 0 && k < casilleros) { fila[k] = c.a; fila[k + 1] = c.b; }
       });
     } else {
       (rondas[r - 1] || []).forEach((c, i) => {
-        const k = i - desde;
+        const k = posDelCruce(c, i) - desde;
         if (k >= 0 && k < casilleros) fila[k] = c.ganador;
       });
     }
@@ -939,7 +979,55 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') cerrarCuadroGrande();
 });
 
+// La tabla de una zona. Antes estaba escrita adentro de renderTablePanel;
+// ahora es el cuerpo de una de las vistas de la carpeta de la liga.
+function zonaHtml(letra) {
+  const s = Engine.state;
+  const zoneData = s.season.zones[`${s.season.myDivision}-${letra}`];
+  const table = zoneData ? Engine.sortTable(zoneData.table) : [];
+  const isD1 = s.season.myDivision === 'D1';
+  return `
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th></tr></thead>
+        <tbody>
+          ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1, table.length))).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${tableLegend(isD1
+      ? [{ zone: 'playoff', text: 'Clasifica a los playoffs (octavos de final)' }]
+      : [
+        { zone: 'champ', text: 'Juega la Final por el ascenso' },
+        { zone: 'playoff', text: 'Clasifica al Torneo Reducido' },
+        { zone: 'desc', text: 'Descienden al Federal A (se termina la carrera)' },
+      ])}
+  `;
+}
+
+// La carpeta del torneo local: las dos zonas y, cuando llega diciembre, los
+// playoffs, todo con la misma flechita que las copas. Antes las zonas eran
+// pestañas sueltas arriba de todo y la fase final una carpeta aparte, así que
+// las tres partes del mismo torneo estaban en tres lugares distintos.
+function ligaHtml() {
+  const vistas = vistasDeLaLiga();
+  if (ligaPanelVista >= vistas.length) ligaPanelVista = 0;
+  const vista = vistas[ligaPanelVista];
+  const cuerpo = vista.id === 'faseFinal' ? faseFinalHtml() : zonaHtml(vista.id === 'mine'
+    ? Engine.state.season.myZone
+    : (Engine.state.season.myZone === 'A' ? 'B' : 'A'));
+  return `
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="zona-prev-btn">◀</button>
+      <strong>${vista.nombre}</strong>
+      <button class="option-btn small" id="zona-next-btn">▶</button>
+    </div>
+    ${cuerpo}
+  `;
+}
+
 function competenciaHtml(id) {
+  if (id === 'liga') return ligaHtml();
   if (id === 'faseFinal') return faseFinalHtml();
   if (id === 'copaArgentina') return copaArgentinaHtml();
   if (id === 'recopa') return recopaHtml();
@@ -1044,7 +1132,13 @@ function engancharBotonesDeGrupos() {
   if (abrir) abrir.addEventListener('click', () => abrirCuadroGrande(abrir.dataset.cuadro));
 
   const elegida = tablePanelTab.startsWith('copa-') ? tablePanelTab.slice(5) : null;
-  if (elegida === 'faseFinal') {
+  if (elegida === 'liga') {
+    flechas('zona-prev-btn', 'zona-next-btn', vistasDeLaLiga().length, () => ligaPanelVista, (v) => { ligaPanelVista = v; });
+    // Dentro de la liga, los playoffs tienen su propia flechita de instancias.
+    const ff = faseFinalDelPanel();
+    const jugadas = ff ? (ff.llave.historial || []).filter((h) => h.cruces.some((c) => c.ganador)).length : 0;
+    flechas('etapa-prev-btn', 'etapa-next-btn', jugadas, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+  } else if (elegida === 'faseFinal') {
     const ff = faseFinalDelPanel();
     const jugadas = ff ? (ff.llave.historial || []).filter((h) => h.cruces.some((c) => c.ganador)).length : 0;
     flechas('etapa-prev-btn', 'etapa-next-btn', jugadas, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
@@ -1087,18 +1181,17 @@ function renderTablePanel() {
   if (!s || !s.season) { tablePanel.innerHTML = ''; return; }
   const club = Engine.getClub(s.clubId);
   const myZoneLetter = s.season.myZone;
-  const otherZoneLetter = myZoneLetter === 'A' ? 'B' : 'A';
 
   const tabs = [
-    { id: 'mine', label: `Zona ${myZoneLetter}` },
-    { id: 'other', label: `Zona ${otherZoneLetter}` },
-    // La Tabla Anual solo existe en Primera: la Nacional juega un torneo
-    // anual único, así que su tabla de zona ya es la del año.
-    ...(s.season.myDivision === 'D1' ? [{ id: 'anual', label: 'Anual' }] : []),
-    // Cada copa tiene su propia carpeta: la Copa Argentina está siempre, las
-    // dos internacionales aparecen a partir de la segunda temporada, y la
-    // Recopa solo mientras se juega (son dos fechas de febrero).
+    // Cada competencia tiene su propia carpeta: el torneo local (con sus dos
+    // zonas y sus playoffs adentro), la Copa Argentina, que está siempre, las
+    // dos internacionales, que aparecen a partir de la segunda temporada, y la
+    // Recopa, solo mientras se juega (son dos fechas de febrero).
     ...competenciasDelPanel().map((c) => ({ id: `copa-${c.id}`, label: c.nombre })),
+    // La Tabla Anual va aparte y no adentro del torneo: no es del Apertura ni
+    // del Clausura, suma los dos. Solo existe en Primera; la Nacional juega un
+    // torneo anual único, así que su tabla de zona ya es la del año.
+    ...(s.season.myDivision === 'D1' ? [{ id: 'anual', label: 'Anual' }] : []),
   ];
   // Si la pestaña guardada ya no existe (pasa al descender a la Nacional,
   // que no tiene Tabla Anual), se vuelve a la primera.
@@ -1123,32 +1216,10 @@ function renderTablePanel() {
       : '';
     body = competenciaHtml(id) + delAnioPasado;
   } else {
-    const zoneKey = `${s.season.myDivision}-${tablePanelTab === 'mine' ? myZoneLetter : otherZoneLetter}`;
-    const zoneData = s.season.zones[zoneKey];
-    const table = zoneData ? Engine.sortTable(zoneData.table) : [];
-    const isD1 = s.season.myDivision === 'D1';
-    body = `
-      <div class="table-wrap">
-        <table class="table compact">
-          <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th></tr></thead>
-          <tbody>
-            ${table.map((r, i) => tableRowHtml(r, i, zoneRowZone(i, isD1, table.length))).join('')}
-          </tbody>
-        </table>
-      </div>
-      ${tableLegend(isD1
-        ? [{ zone: 'playoff', text: 'Clasifica a los playoffs (octavos de final)' }]
-        : [
-          { zone: 'champ', text: 'Juega la Final por el ascenso' },
-          { zone: 'playoff', text: 'Clasifica al Torneo Reducido' },
-          { zone: 'desc', text: 'Descienden al Federal A (se termina la carrera)' },
-        ])}
-    `;
+    body = zonaHtml(myZoneLetter);
   }
 
-  const heading = tablePanelTab.startsWith('copa-') ? tabs[activeIndex].label
-    : tablePanelTab === 'anual' ? 'Tabla Anual'
-    : `Tabla — ${tabs[activeIndex].label}`;
+  const heading = tablePanelTab === 'anual' ? 'Tabla Anual' : tabs[activeIndex].label;
   tablePanel.innerHTML = `
     <div class="card side-card">
       <div class="panel-tab-switch">
@@ -1163,6 +1234,7 @@ function renderTablePanel() {
     tablePanelTab = tab;
     copaPanelGrupo = null;
     copaPanelEtapa = null;
+    ligaPanelVista = 0;
     renderTablePanel();
   };
   document.getElementById('table-prev-btn').addEventListener('click', () => irA(prevTab.id));

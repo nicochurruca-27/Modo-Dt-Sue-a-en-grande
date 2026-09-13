@@ -4873,6 +4873,12 @@ const Engine = {
       cruces.push(this.cruceAnotado(pair, resultado, idx));
     });
     s.bracket.userPos = userPos;
+    // De qué lado del cruce quedaste. El cuadro se dibuja por siembra (el `a`
+    // arriba y el `b` abajo), así que al anotar tu partido hay que respetar ese
+    // orden: si se anotaba por local/visitante, los dos escudos de TU cruce se
+    // daban vuelta en el cuadro apenas jugabas.
+    s.bracket.userEsA = !!(userEntry && pairs[userPos] && pairs[userPos][0]
+      && pairs[userPos][0].id === s.clubId);
     // Los otros cruces de la ronda quedan resueltos desde ahora, pero NO se
     // anotan todavía: si se anotaran acá, el cuadro te mostraría cómo salió el
     // resto de la ronda antes de que juegues tu partido. Se guardan y se
@@ -4881,8 +4887,23 @@ const Engine = {
     // Los cuadros de playoffs arrancan dibujados desde el sorteo, así que hay
     // que guardar quién se cruza con quién ya mismo: los resultados se
     // completan cuando termine la ronda.
+    //
+    // TU cruce va incluido, sin resultado. Antes se anotaba la ronda sin él y
+    // en el cuadro quedaba un agujero justo donde estaba tu club hasta que
+    // jugaras el partido.
     if (s.bracket.kind !== 'copa') {
-      this.anotarRondaDeLlave(s.bracket.stageIndex, cruces.map((c) => ({ ...c, ganador: null, golesA: null, golesB: null })));
+      const sinResultado = cruces.map((c) => ({ ...c, ganador: null, golesA: null, golesB: null }));
+      // Va con el par TAL COMO SALIÓ EL SORTEO (pairs[userPos]), no con tu club
+      // primero: el cuadro dibuja el `a` arriba y el `b` abajo, así que darlo
+      // vuelta acá hacía que tus dos escudos se intercambiaran apenas jugabas.
+      if (userEntry) {
+        sinResultado.push(this.cruceAnotado(
+          pairs[userPos],
+          { ganador: null, golesA: null, golesB: null, penales: false },
+          userPos,
+        ));
+      }
+      this.anotarRondaDeLlave(s.bracket.stageIndex, sinResultado);
     }
 
     s.bracket.pendingWinners = winners;
@@ -4939,6 +4960,21 @@ const Engine = {
 
     if (isBye) {
       if (s.bracket.kind === 'copa') this.anotarRondaDeCopa(s.bracket.stageIndex, s.bracket.pendingCruces || []);
+      else {
+        // Con fecha libre no hay partido tuyo que anotar, pero la ronda ya
+        // quedó pre-anotada sin resultados al sortearla: hay que pisarla con
+        // los resultados de verdad o el cuadro se queda en blanco.
+        s.bracket.historial = (s.bracket.historial || []).filter((r) => r.stageIndex !== s.bracket.stageIndex);
+        this.anotarRondaDeLlave(s.bracket.stageIndex, (s.bracket.pendingCruces || []).concat([{
+          pos: s.bracket.userPos || 0,
+          a: s.clubId,
+          b: null,
+          ganador: s.clubId,
+          golesA: null,
+          golesB: null,
+          penales: false,
+        }]));
+      }
       s.bracket.pendingCruces = null;
     }
 
@@ -4954,13 +4990,16 @@ const Engine = {
       else if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
       if (userWon) s.log.unshift(`${label}: avanzaste ${m.homeGoals}-${m.awayGoals} vs ${clubName(m.opponentId)}${m.shootout ? ' (por penales)' : m.extraTime ? ' (en el alargue)' : ''}.`);
       else s.log.unshift(`${label}: quedaste eliminado ante ${clubName(m.opponentId)}.`);
+      const soyA = !!s.bracket.userEsA;
+      const golesMios = m.isHome ? m.homeGoals : m.awayGoals;
+      const golesSuyos = m.isHome ? m.awayGoals : m.homeGoals;
       const cruces = (s.bracket.pendingCruces || []).concat([{
         pos: s.bracket.userPos || 0,
-        a: m.home,
-        b: m.away,
+        a: soyA ? s.clubId : m.opponentId,
+        b: soyA ? m.opponentId : s.clubId,
         ganador: userWon ? s.clubId : m.opponentId,
-        golesA: m.homeGoals,
-        golesB: m.awayGoals,
+        golesA: soyA ? golesMios : golesSuyos,
+        golesB: soyA ? golesSuyos : golesMios,
         penales: !!m.shootout,
       }]);
       if (s.bracket.kind === 'copa') this.anotarRondaDeCopa(s.bracket.stageIndex, cruces);
