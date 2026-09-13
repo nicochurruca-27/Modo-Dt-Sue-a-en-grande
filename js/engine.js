@@ -4687,6 +4687,10 @@ const Engine = {
   startTransferWindow(reason = 'between-editions') {
     const s = this.state;
     s.season.transferReason = reason;
+    // Los otros clubes también se mueven en cada ventana. Se hace ANTES de
+    // que vos negocies, así el mercado que ves ya tiene los cambios: el
+    // jugador que te gustaba puede haberse ido a otro lado.
+    Mercado.mercadoDeLosRivales(this);
     s.contractQueue = s.squad.filter((p) => p.contractYears <= 1).map((p) => p.id);
     this.showNextContractDecision();
   },

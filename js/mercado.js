@@ -28,6 +28,9 @@
 // generador lo completa con juveniles (ver `plantel`).
 const PLANTEL_MINIMO = 22;
 
+// Abajo de esto un club no vende a nadie más: ya está en el hueso.
+const MIN_PLANTEL_RIVAL = 18;
+
 const MERCADO_ESTADOS = {
   intocable: {
     label: 'Intocable',
@@ -142,6 +145,127 @@ const Mercado = {
     return Math.max(1, faltan);
   },
 
+  // ---------- El mercado de los otros clubes ----------
+  //
+  // Una vez por ventana de pases, los clubes rivales se compran y se venden
+  // jugadores entre ellos. Es la primera vez que pasa algo en el juego sin que
+  // el usuario lo haga: hasta acá el único que se movía era vos.
+  //
+  // Es a propósito una IA simple: el club que compra es uno sorteado con peso
+  // en su reputación (los grandes se mueven más), y lo que busca es un jugador
+  // que lo mejore de verdad, que su club esté dispuesto a soltar. No hay
+  // presupuesto, ni necesidades por puesto, ni política de fichajes: eso es el
+  // nivel siguiente. Esto es que el mundo deje de estar quieto.
+  TRANSFERENCIAS_POR_VENTANA: 9,
+
+  mercadoDeLosRivales(engine) {
+    const s = engine.state;
+    const anio = s.season ? s.season.year : 1;
+    const clubes = s.clubs.filter((c) => c.id !== s.clubId);
+    if (clubes.length < 4) return [];
+
+    // Bolillero de compradores: la reputación al cuadrado, así un grande se
+    // mueve mucho más seguido que uno chico, pero ninguno queda afuera.
+    const bolillero = [];
+    clubes.forEach((c) => {
+      const bolillas = Math.max(1, c.reputation * c.reputation);
+      for (let i = 0; i < bolillas; i++) bolillero.push(c);
+    });
+
+    const hechas = [];
+    const tocados = new Set();
+    for (let i = 0; i < this.TRANSFERENCIAS_POR_VENTANA; i++) {
+      const comprador = bolillero[Math.floor(Math.random() * bolillero.length)];
+      if (tocados.has(comprador.id)) continue;
+      const suyo = this.plantel(engine, comprador.id);
+      if (!suyo.length || suyo.length >= 30) continue;
+      // El nivel que ya tiene: solo tiene sentido comprar a alguien mejor.
+      const ordenado = suyo.slice().sort((a, b) => b.rating - a.rating);
+      const nivel = ordenado.slice(0, 11).reduce((a, p) => a + p.rating, 0) / Math.min(11, ordenado.length);
+
+      // Se miran tres clubes al azar, no los 65: armar un plantel cuesta.
+      const vendedores = engine.shuffled(clubes.filter((c) => c.id !== comprador.id && !tocados.has(c.id))).slice(0, 3);
+      let mejor = null;
+      vendedores.forEach((vendedor) => {
+        const plantel = this.plantel(engine, vendedor.id);
+        if (plantel.length <= MIN_PLANTEL_RIVAL) return;
+        const suyas = plantel.slice().sort((a, b) => b.rating - a.rating);
+        // Las dos figuras no se venden: un club no se desarma solo.
+        suyas.slice(2).forEach((j) => {
+          if (j.loanFrom || j.rating <= nivel) return;
+          const ganancia = j.rating - nivel;
+          if (!mejor || ganancia > mejor.ganancia) mejor = { jugador: j, vendedor, ganancia };
+        });
+      });
+      if (!mejor) continue;
+
+      this.transferir(s, mejor.jugador, mejor.vendedor.id, comprador.id, anio);
+      tocados.add(comprador.id);
+      tocados.add(mejor.vendedor.id);
+      hechas.push({ jugador: mejor.jugador, de: mejor.vendedor, a: comprador });
+    }
+
+    // La fuerza de los clubes que se movieron cambió: hay que recalcularla.
+    if (hechas.length) engine._fuerzas = {};
+    if (typeof Noticias !== 'undefined') Noticias.trasElMercadoDeLosRivales(engine, hechas);
+    return hechas;
+  },
+
+  // ---------- Lo que se movió en el mundo ----------
+  //
+  // Los planteles rivales salen de un generador sembrado y no se guardan (ver
+  // la cabecera del archivo). Pero si nunca se guardara NADA, el mundo no
+  // podría moverse: un club no podría vender ni comprar, y el pibe que viste
+  // el año pasado en Vélez estaría ahí para siempre.
+  //
+  // La solución es guardar solo la DIFERENCIA contra lo sembrado: a quién se
+  // le fue y quién le llegó. Son dos listas cortas por club, así que después
+  // de veinte temporadas el guardado sigue siendo chico.
+  movimientosDe(s, clubId) {
+    if (!s.mundo) s.mundo = {};
+    if (!s.mundo[clubId]) s.mundo[clubId] = { fuera: [], dentro: [] };
+    return s.mundo[clubId];
+  },
+
+  // Un jugador que llegó a un club por transferencia. Se guarda con su
+  // valoración y edad del día que llegó, y de ahí en más envejece y evoluciona
+  // solo, igual que los sembrados: si se guardara la valoración a secas, el
+  // fichaje quedaría congelado para siempre.
+  jugadorFichado(engine, j, anio) {
+    const anios = Math.max(0, anio - (j.desdeAnio || anio));
+    return {
+      id: j.id,
+      name: j.name,
+      pos: j.pos,
+      posDetail: j.posDetail,
+      nation: j.nation,
+      role: j.role,
+      projection: j.projection,
+      age: j.edadBase + anios,
+      rating: this.ratingConLosAnios(j.ratingBase, j.edadBase, j.projection || j.ratingBase, anios),
+      contractYears: Math.max(1, (j.contractYears || 3) - anios),
+    };
+  },
+
+  // Pasa un jugador de un club a otro, dejando anotado el movimiento en los
+  // dos lados.
+  transferir(s, jugador, deClubId, aClubId, anio) {
+    this.movimientosDe(s, deClubId).fuera.push(jugador.id);
+    this.movimientosDe(s, aClubId).dentro.push({
+      id: jugador.id,
+      name: jugador.name,
+      pos: jugador.pos,
+      posDetail: jugador.posDetail,
+      nation: jugador.nation,
+      role: jugador.role,
+      projection: jugador.projection,
+      ratingBase: jugador.rating,
+      edadBase: jugador.age,
+      contractYears: 3,
+      desdeAnio: anio,
+    });
+  },
+
   plantel(engine, clubId) {
     const s = engine.state;
     const m = this.init(s);
@@ -216,7 +340,15 @@ const Mercado = {
     // Los que se pasaron de edad se retiran y dejan el lugar libre. Vale para
     // los dos caminos: un plantel investigado también se queda sin sus
     // veteranos a medida que pasan las temporadas.
-    const vivos = base.filter((p) => p.age <= 39);
+    //
+    // Y acá se aplica lo que se movió de verdad: los que el club vendió (o le
+    // compraste vos) salen, y los que compró entran. Eso es lo único que se
+    // guarda en la partida — el resto del plantel sigue saliendo de la
+    // semilla, así que el guardado no engorda por más años que pasen.
+    const movimientos = this.movimientosDe(s, clubId);
+    const vivos = base
+      .filter((p) => p.age <= 39 && !movimientos.fuera.includes(p.id))
+      .concat(movimientos.dentro.map((j) => this.jugadorFichado(engine, j, anio)));
 
     // Y el club repone. Sin esto los planteles se vaciaban solos: como nadie
     // reemplaza a los que se retiran, River llegaba a la temporada 12 con 17

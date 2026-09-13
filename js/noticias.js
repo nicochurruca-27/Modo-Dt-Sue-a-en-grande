@@ -34,7 +34,11 @@ const NOTICIA_ORDEN_CATEGORIAS = ['ultimahora', 'resultados', 'lesiones', 'merca
 const Noticias = {
   // Cuántas noticias se guardan. Más que esto no sirve: el feed muestra las
   // últimas y el resto solo agranda el save.
-  MAX: 30,
+  // Cuánto se guarda del feed. Subió de 30 a 45 cuando el mundo empezó a
+  // generar noticias de verdad (pases entre rivales, goleadores, la
+  // dirigencia): con 30 y el relleno de todos los días, una noticia real
+  // duraba dos días en pantalla.
+  MAX: 45,
 
   // ---------- Utilidades ----------
 
@@ -177,6 +181,30 @@ const Noticias = {
   // publica solo al cruzar un escalón (de conforme a dudas, de dudas a
   // cuestionado...), así el feed avisa que la cosa se está poniendo fea sin
   // repetir lo mismo cada semana.
+  // El mercado de los otros clubes. No se publican las nueve operaciones: se
+  // eligen las que a un hincha le importarían —la de mayor valoración y la que
+  // involucre a un grande— y el resto queda como movimiento de fondo.
+  trasElMercadoDeLosRivales(engine, hechas) {
+    if (!hechas || !hechas.length) return;
+    const s = engine.state;
+    const notables = hechas
+      .slice()
+      .sort((a, b) => (b.jugador.rating + b.a.reputation * 3) - (a.jugador.rating + a.a.reputation * 3))
+      .slice(0, 2);
+    notables.forEach(({ jugador, de, a }) => {
+      this.push(s, 'mercado',
+        `${a.name} se llevó a ${jugador.name} de ${de.name}`,
+        `${jugador.age} años, valoración ${jugador.rating}. ${de.name} pierde una pieza y ${a.name} se refuerza.`,
+        { destacada: jugador.rating >= 78 });
+    });
+    if (hechas.length > notables.length) {
+      this.push(s, 'mercado',
+        `Se movieron ${hechas.length} pases en el mercado`,
+        'El resto de la liga también se reforzó en esta ventana.',
+        {});
+    }
+  },
+
   trasLaDirigencia(engine) {
     const s = engine.state;
     const estado = engine.estadoDeLaDirigencia();
@@ -301,10 +329,26 @@ const Noticias = {
     return this.alAzar(candidatos);
   },
 
+  // Un rumor de pase. Antes inventaba el nombre del jugador con el generador,
+  // porque el juego no modelaba los planteles rivales: se leía "Lanús va por
+  // Ezequiel Silva" y ese Ezequiel Silva no existía en ningún lado.
+  //
+  // Ahora los planteles rivales existen de verdad, así que el rumor es sobre
+  // alguien que podés ir a buscar al mercado. Si por lo que sea no se puede
+  // leer el plantel del club sorteado, se cae al nombre inventado de antes y
+  // no se publica nada raro.
   rumorDeMercado(engine) {
     const s = engine.state;
     const club = this.clubDeLaLigaAlAzar(engine, true);
-    const jugador = engine.randomPlayerName(engine.rollNation());
+    const objetivo = this.clubDeLaLigaAlAzar(engine, true);
+    let jugador = null;
+    if (objetivo && objetivo.id !== club.id && typeof Mercado !== 'undefined') {
+      const plantel = Mercado.plantel(engine, objetivo.id);
+      // Los que un club miraría: de los mejores, pero no la figura.
+      const candidatos = plantel.slice().sort((a, b) => b.rating - a.rating).slice(1, 8);
+      if (candidatos.length) jugador = this.alAzar(candidatos).name;
+    }
+    if (!jugador) jugador = engine.randomPlayerName(engine.rollNation());
     const plantillas = [
       [`${club.name} va por ${jugador}`, `En el club admiten el interés y esperan respuesta en las próximas horas.`],
       [`Sondeo de ${club.name} por ${jugador}`, `Todavía no hay oferta formal, pero el nombre gusta en la dirigencia.`],
@@ -478,9 +522,10 @@ const Noticias = {
   tick(engine) {
     const s = engine.state;
     this.init(s);
-    if (Math.random() > 0.45) return;
+    // El relleno bajó de 45% a 28% de los días por la misma razón: ya no hace
+    // falta inventar tanto para que el diario tenga algo.
+    if (Math.random() > 0.28) return;
     const generadores = [
-      () => this.rumorDeMercado(engine),
       () => this.rumorDeMercado(engine),
       () => this.parteMedicoRival(engine),
       () => this.premio(engine),

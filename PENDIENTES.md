@@ -67,25 +67,24 @@ los resultados al lado de los que ya se jugaron, si los hay.
 
 ---
 
-## 2. Planteles rivales que se muevan de verdad
+## 2. La IA de los clubes, lo que falta
 
-Los clubes rivales ya tienen plantel en la simulación: envejecen, crecen hacia
-su techo, se retiran y el club repone con juveniles. Falta lo que los haría un
-mundo de verdad:
+Los clubes rivales ya tienen plantel, envejecen, se retiran, reponen con
+juveniles y **se compran y se venden entre ellos** en cada ventana de pases, y
+todo eso se guarda. Falta subirle el nivel a esa IA, que hoy es a propósito
+simple (busca a alguien que lo mejore y listo):
 
-- **Que se guarden.** Hoy el plantel de un rival se regenera con la semilla
-  cada vez que se lo mira. Lo único que persiste son los jugadores que vos le
-  compraste (`s.mercado.fichados`). Hace falta guardar un *diff* por club —
-  altas, bajas y cuánto creció cada jugador— en vez del plantel entero, para
-  que el guardado no engorde.
-- **Que los juveniles de reposición sean los mismos de un año al otro.** Hoy
-  se sortean con el año adentro del id, así que el pibe que subió en la
-  temporada 10 no es el mismo que está en la 11. Se arregla solo cuando los
-  planteles se guarden.
-- **Que compren y vendan entre ellos.** Es la IA de clubes nivel 1: cada club
-  con su presupuesto, sus puestos flojos y su política. Depende de lo
-  anterior.
-- **Que se lesionen y acumulen amarillas**, como tu plantel.
+- **Presupuesto**: hoy un club ficha sin que le cueste nada. Debería poder
+  gastar solo lo que tiene, y vender para comprar.
+- **Necesidades por puesto**: un club con tres arqueros y sin centrales sigue
+  comprando delanteros.
+- **Que te vengan a comprar a vos.** Es lo que más falta: hoy los rivales se
+  mueven entre ellos y tu plantel es intocable. Que aparezca una oferta por tu
+  figura y tengas que decidir es la mitad de la historia que el juego quiere
+  contar.
+- **Política de juveniles**: que un club de cantera grande suba pibes propios
+  en vez de comprar.
+- **Que los rivales se lesionen y acumulen amarillas**, como tu plantel.
 
 ---
 

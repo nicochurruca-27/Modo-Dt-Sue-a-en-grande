@@ -134,6 +134,13 @@ abrir seguís donde quedaste.
   seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
   lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
   forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
+- **El mundo se mueve solo**: en cada ventana de pases los clubes rivales se
+  compran y se venden jugadores entre ellos, sin que vos hagas nada. Un club
+  busca a alguien que lo mejore de verdad y que su dueño esté dispuesto a
+  soltar; las dos figuras de cada plantel no se venden. Lo que se guarda en la
+  partida es solo la diferencia contra el plantel sembrado —quién se fue y
+  quién llegó—, así que después de ocho temporadas y unos 70 pases ocupa 15 KB.
+  Los pases más importantes salen en el diario.
 - **La dirigencia y el despido**: el objetivo de temporada dejó de ser un
   cartel. La dirigencia tiene una confianza de 0 a 100 que se mueve fecha a
   fecha según dónde estás contra lo que te pidieron y cómo venís de racha, y se
