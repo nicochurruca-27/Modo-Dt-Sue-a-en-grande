@@ -508,6 +508,46 @@ const Economia = {
     return this.masaSalarialSana(club);
   },
 
+  // Cuánto del camino hasta lo que cuesta tu plantel acompaña el club cada
+  // año, si la dirigencia está en un punto normal.
+  PASO_DE_SUELDOS: 0.35,
+  // Hasta dónde puede crecer el presupuesto, para que en una carrera de treinta
+  // años no se vaya a cualquier lado.
+  TECHO_DE_SUELDOS: 2.2,
+
+  // El club renegocia su presupuesto de sueldos al empezar cada temporada.
+  //
+  // Sin esto había una fuga garantizada, y se veía midiendo: el plantel se
+  // encarece solo con los años —un jugador en su mejor momento cobra más que
+  // el mismo pibe hace tres temporadas— así que la planilla subía un 25% en
+  // ocho temporadas contra un presupuesto congelado el día uno. El club
+  // quedaba pasado para siempre, pagando la diferencia todas las semanas, y
+  // terminaba sin un peso sin haber hecho nada malo. A un club chico eso lo
+  // fundía.
+  //
+  // El presupuesto va DETRÁS de lo que cuesta tu plantel, sin alcanzarlo: cada
+  // año recorta una parte de la diferencia. Crecer un porcentaje fijo no
+  // servía —probado— porque le erraba para los dos lados: si crecía menos que
+  // la planilla la fuga seguía, y si crecía más te regalaba plata todos los
+  // años. Yendo detrás del plantel se acomoda solo, sea cual sea el plantel.
+  //
+  // Cuánto acompaña depende de cómo te va: con la dirigencia conforme el club
+  // cubre más de la mitad de la diferencia; con la dirigencia enojada, casi
+  // nada. Ahí está la gracia: el margen para sostener un plantel caro te lo
+  // ganás en la cancha.
+  renegociarPresupuestoDeSueldos(engine) {
+    const s = engine.state;
+    if (!s.varaSalarial) return;
+    const club = engine.getClub(s.clubId);
+    if (!club) return;
+    const confianza = typeof engine.confianza === 'function' ? engine.confianza() : 50;
+    const paso = Math.max(0.08, Math.min(0.65, this.PASO_DE_SUELDOS + ((confianza - 50) / 100) * 0.5));
+    const objetivo = this.masaSalarial(engine);
+    const base = this.masaSalarialSana(club);
+    const nueva = s.varaSalarial + (objetivo - s.varaSalarial) * paso;
+    s.varaSalarial = Math.round(Math.max(base, Math.min(base * this.TECHO_DE_SUELDOS, nueva)));
+  },
+
   varaSalarial(engine) {
     const guardada = engine.state.varaSalarial;
     if (guardada) return guardada;

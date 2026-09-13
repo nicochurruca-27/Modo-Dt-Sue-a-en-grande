@@ -3676,6 +3676,10 @@ const Engine = {
     if (s.calendar) s.calendar.dayCount = 0;
     // La pretemporada deja a todos enteros, por cansados que hayan terminado.
     if (s.squad) s.squad.forEach((p) => { p.energia = ENERGIA_MAXIMA; });
+    // Y el club se sienta a renegociar cuánto puede gastar en sueldos: el
+    // plantel se encarece solo con los años, así que un presupuesto congelado
+    // termina hundiendo al club (ver Economia.renegociarPresupuestoDeSueldos).
+    Economia.renegociarPresupuestoDeSueldos(this);
     this.cerrarEstadisticasDelAnio();
     // Una temporada nueva es una hoja bastante limpia: el que la pasó mal
     // arranca con algo de aire, y el que la rompió no queda blindado para

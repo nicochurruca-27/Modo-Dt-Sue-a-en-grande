@@ -178,12 +178,14 @@ Lo que quedó pendiente de acá:
 
 - **La Primera Nacional sigue andando por categoría.** No hay datos publicados
   comparables de esos 36 clubes, así que usan la tabla de siempre.
-- **Un club chico que renueva todos los contratos se queda sin un peso.** Con
-  Aldosivi en automático, el presupuesto llega a cero en la temporada 6. NO es
-  culpa de este cambio: con el modelo viejo llegaba a cero en la 9, así que
-  esto lo adelanta pero no lo inventa. El problema de fondo es que el goteo
-  semanal de un club chico no alcanza para el costo de las renovaciones, y se
-  arregla del lado de las renovaciones, no del de los presupuestos.
+- ~~Un club chico se queda sin un peso.~~ Arreglado. El problema no eran las
+  renovaciones (le costaban $100k al año contra $641k de ingreso): era que el
+  plantel se encarece solo con los años —envejece y entra en su mejor momento,
+  donde se cobra más— y el presupuesto de sueldos estaba congelado el día uno.
+  En ocho temporadas la planilla subía un 25% contra una vara quieta, así que
+  el club quedaba pasado para siempre y pagaba la diferencia todas las semanas.
+  Ahora el club renegocia ese presupuesto cada temporada (ver
+  `Economia.renegociarPresupuestoDeSueldos`).
 - **La recaudación de local no usa el aforo**, que está cargado y sería el dato
   natural: hoy se estira junto con el resto de la economía del club. Queda para
   cuando se quiera afinar.

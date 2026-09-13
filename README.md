@@ -69,6 +69,13 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
+- **El presupuesto de sueldos se renegocia cada temporada.** El plantel se
+  encarece solo con los años (un jugador en su mejor momento cobra más que el
+  mismo pibe hace tres temporadas), así que un presupuesto fijo condenaba a
+  cualquier club a quedar pasado para siempre. Ahora el club va detrás de lo
+  que cuesta tu plantel sin alcanzarlo, y cuánto te acompaña depende de cómo te
+  esté yendo: con la dirigencia conforme cubre más de la mitad de la
+  diferencia; con la dirigencia enojada, casi nada.
 - **Cada club tiene su propia economía** (ver `js/finanzas.js`): el valor de su
   plantel, sus socios, el aforo de su cancha y en qué estado están sus cuentas,
   con datos reales de 2026. Antes la plata salía de la CATEGORÍA del club y la
