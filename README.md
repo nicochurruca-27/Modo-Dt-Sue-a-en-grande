@@ -69,6 +69,14 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
+- **Los partidos se juegan en dos tiempos, con entretiempo.** Antes un partido
+  era un botón: apretabas y salía el resultado entero. Ahora se juega el primer
+  tiempo y entrás al vestuario: ves cómo viene, **quién hizo cada gol y en qué
+  minuto**, quién quedó amonestado, y decidís qué hacer con el segundo tiempo
+  —ir a buscarlo, aguantar el resultado, no tocar nada o meter un delantero del
+  banco—. Esa decisión se juega de verdad: cambia la fuerza de tu equipo y la
+  exposición de tu defensa en los 45 restantes. Al final, la pantalla de
+  resultado muestra la planilla completa del partido.
 - **El presupuesto de sueldos se renegocia cada temporada.** El plantel se
   encarece solo con los años (un jugador en su mejor momento cobra más que el
   mismo pibe hace tres temporadas), así que un presupuesto fijo condenaba a

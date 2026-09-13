@@ -206,3 +206,26 @@ Queda pendiente:
 
 El orden del arranque queda como está: primero tu nombre y tu estilo de DT,
 después el club.
+
+---
+
+## 9. El partido minuto a minuto
+
+Hecho el primer escalón: el partido se juega en dos tiempos con entretiempo, y
+ya sabe partirse, generar eventos con su minuto y su autor, y recalcular a
+mitad de camino con lo que decidiste. Eso es justo lo que hace falta para
+después partirlo en noventa.
+
+Lo que falta para el minuto a minuto de verdad:
+
+- **Los eventos tienen que salir en el momento**, no todos juntos al terminar
+  el tiempo. Hoy se sortean los goles del tiempo entero y después se les pone
+  un minuto; para el minuto a minuto hay que recorrer los 90 minutos y sortear
+  qué pasa en cada uno.
+- **Poder intervenir en cualquier momento**, no solo en el entretiempo: un
+  cambio en el minuto 70, cambiar el esquema cuando te empatan.
+- **Más tipos de evento**: expulsiones, lesiones en el partido, penales dentro
+  del juego (hoy el penal es una pantalla aparte), palos, ocasiones.
+- **Los goles del rival con su autor** ya funcionan para los clubes argentinos
+  (sale del plantel sembrado). Los del continente no tienen plantel cargado, y
+  ahí el gol queda a nombre del club.

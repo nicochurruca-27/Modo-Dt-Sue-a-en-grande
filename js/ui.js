@@ -122,6 +122,7 @@ function render() {
   else if (s.screen === 'presentation') renderPresentation();
   else if (s.screen === 'calendar') renderCalendar();
   else if (s.screen === 'pre-match') renderPreMatch();
+  else if (s.screen === 'entretiempo') renderEntretiempo();
   else if (s.screen === 'penalty') renderPenalty();
   else if (s.screen === 'match-result') renderMatchResult();
   else if (s.screen === 'contract-renewal') renderContractRenewal();
@@ -2730,6 +2731,63 @@ function animatePenaltyResult(side) {
 
 let penaltyShooterId = null;
 
+// ---------- El entretiempo ----------
+//
+// El vestuario: cómo viene el partido, qué pasó en el primer tiempo (los goles
+// con su minuto y su autor, las amarillas) y qué hacés con el segundo tiempo.
+// Antes el partido era un solo botón y el resultado salía entero.
+
+// La lista de lo que pasó, minuto por minuto.
+function eventosDelPartidoHtml(eventos, hasta) {
+  const lista = (eventos || []).filter((e) => !hasta || e.minuto <= hasta);
+  if (!lista.length) return '<p class="muted">Todavía no pasó nada para contar.</p>';
+  const icono = { gol: '⚽', amarilla: '🟨' };
+  return `<ul class="partido-eventos">${lista.map((e) => `
+    <li class="${e.mio ? 'mio' : ''}">
+      <span class="minuto">${e.minuto}'</span>
+      <span class="icono">${icono[e.tipo] || '·'}</span>
+      <span class="quien">${e.nombre || (e.mio ? 'Tu equipo' : 'El rival')}${e.tipo === 'amarilla' ? ' <span class="muted">(amonestado)</span>' : ''}</span>
+    </li>
+  `).join('')}</ul>`;
+}
+
+function renderEntretiempo() {
+  const s = Engine.state;
+  const p = s.partido;
+  const ctx = s.matchContext;
+  const club = Engine.getClub(s.clubId);
+  const rival = Engine.getClub(ctx.opponentId);
+  const opciones = Engine.opcionesDeEntretiempo();
+  const dif = p.mios - p.suyos;
+  const titular = dif > 0 ? 'Vas ganando' : dif < 0 ? 'Vas perdiendo' : 'Van iguales';
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card entretiempo">
+      <p class="muted entretiempo-donde">Entretiempo · ${dondeSeJuega(ctx)}</p>
+      <div class="entretiempo-marcador">
+        <span class="lado">${clubCrest(club, 44)}<strong>${club.name}</strong></span>
+        <span class="cifras ${dif > 0 ? 'gana' : dif < 0 ? 'pierde' : ''}">${p.mios} - ${p.suyos}</span>
+        <span class="lado">${clubCrest(rival, 44)}<strong>${rival.name}</strong></span>
+      </div>
+      <h2>${titular}</h2>
+      ${eventosDelPartidoHtml(p.eventos)}
+      <h3>¿Qué hacés en el vestuario?</h3>
+      <div class="options" id="entretiempo-opciones">
+        ${opciones.map((op, i) => `
+          <button class="option-btn apilado" data-i="${i}">
+            <strong>${op.label}</strong>
+            <span>${op.nota}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  app.querySelectorAll('#entretiempo-opciones .option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.resolverEntretiempo(Number(btn.dataset.i)); render(); });
+  });
+}
+
 function renderPenalty() {
   penaltyShooterId = null;
   drawPenalty();
@@ -2849,6 +2907,7 @@ function renderMatchResult() {
       <div class="scoreline">${home.name} <strong>${m.homeGoals}</strong> - <strong>${m.awayGoals}</strong> ${away.name}</div>
       ${penaltyText ? `<p class="muted">${penaltyText}</p>` : ''}
       ${shootoutText ? `<p class="shootout-line">${shootoutText}</p>` : ''}
+      ${(m.eventos || []).length ? `<h3>Cómo se dio</h3>${eventosDelPartidoHtml(m.eventos)}` : ''}
       ${s.lastDecisionNote ? `<p class="muted">${s.lastDecisionNote}</p>` : ''}
       ${(s.lastAvailabilityNotes || []).length ? `
         <div class="injury-notes">

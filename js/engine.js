@@ -1162,10 +1162,14 @@ const Engine = {
   // en la cantidad de goles) y los dos lambdas tienen piso y techo cortitos
   // — el favorito no pasa de ~2,1 goles esperados y el más débil nunca baja
   // de ~0,65, así que siempre puede descontar o dar el golpe.
-  simulateScore(homeStrength, awayStrength, homeAdvantage) {
+  // `duracion` es qué parte de un partido se simula: 1 el partido entero,
+  // 0,5 un tiempo. Los goles esperados son proporcionales al tiempo jugado,
+  // así que alcanza con partir los lambdas. Por defecto vale 1, así que todo
+  // lo que ya llamaba a esto sigue igual.
+  simulateScore(homeStrength, awayStrength, homeAdvantage, duracion = 1) {
     const diff = homeStrength - awayStrength;
-    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16));
-    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
+    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16)) * duracion;
+    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40)) * duracion;
     return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
   },
 
@@ -4201,6 +4205,169 @@ const Engine = {
 
   // ---------- Un partido interactivo (liga, copa o cuadro eliminatorio) ----------
 
+  // ---------- El partido, por tiempos ----------
+  //
+  // Antes un partido era un botón: apretabas y salía el resultado. Ahora se
+  // juega en dos tiempos y en el entretiempo entrás al vestuario: ves cómo
+  // viene, quién hizo los goles y en qué minuto, quién está amonestado, y
+  // decidís si vas a buscarlo o lo aguantás. Ese cambio se juega de verdad en
+  // el segundo tiempo.
+  //
+  // Es el escalón previo al minuto a minuto: el partido ya sabe partirse y
+  // recalcular a mitad de camino, que es lo que hace falta para después
+  // partirlo en noventa.
+
+  // Cuántas amarillas por titular y por tiempo. Es la mitad de la que había
+  // por partido entero (0,16), así que el total por partido no cambia.
+  AMARILLAS_POR_TIEMPO: 0.08,
+
+  // Los jugadores del rival, para poder decir quién le hizo el gol. Los clubes
+  // del continente no tienen plantel cargado: ahí el gol queda a nombre del
+  // club.
+  jugadoresDelRival(rivalId) {
+    if (typeof Mercado === 'undefined' || !this.state.clubs.some((c) => c.id === rivalId)) return [];
+    try {
+      return Mercado.plantel(this, rivalId) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // Juega un tiempo y devuelve lo que pasó. `tacticMod` es lo que sumó la
+  // decisión de antes del partido (primer tiempo) o la del vestuario (segundo).
+  jugarUnTiempo(numero, tacticMod) {
+    const s = this.state;
+    const ctx = s.matchContext;
+    const p = s.partido;
+    const mia = this.squadStrength() + tacticMod + this.currentFormation().mod + s.morale / 3;
+    const suya = this.clubStrength(ctx.opponentId) + (p.riesgoRival || 0);
+    const ventaja = ctx.isNeutral ? 0 : 4;
+    const local = ctx.isHome ? mia : suya;
+    const visitante = ctx.isHome ? suya : mia;
+    const score = this.simulateScore(local, visitante, ventaja, 0.5);
+    const mios = ctx.isHome ? score.homeGoals : score.awayGoals;
+    const suyos = ctx.isHome ? score.awayGoals : score.homeGoals;
+
+    const desde = numero === 1 ? 1 : 46;
+    const minuto = () => desde + Math.floor(Math.random() * 45);
+    const enCancha = this.getStartingXI().starters
+      .map((e) => s.squad.find((x) => x.id === e.id))
+      .filter(Boolean);
+    const bolGoles = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
+    const delRival = this.jugadoresDelRival(ctx.opponentId);
+    const rivalArriba = delRival.filter((j) => j.pos === 'DEL' || j.pos === 'MED');
+
+    for (let g = 0; g < mios; g++) {
+      const autor = bolGoles.length ? bolGoles[Math.floor(Math.random() * bolGoles.length)] : null;
+      p.eventos.push({ minuto: minuto(), tipo: 'gol', mio: true, nombre: autor ? autor.name : null, id: autor ? autor.id : null });
+    }
+    for (let g = 0; g < suyos; g++) {
+      const autor = rivalArriba.length ? rivalArriba[Math.floor(Math.random() * rivalArriba.length)] : null;
+      p.eventos.push({ minuto: minuto(), tipo: 'gol', mio: false, nombre: autor ? autor.name : null });
+    }
+    // Las amarillas se cuentan acá, tiempo por tiempo, para poder mostrarlas
+    // con su minuto. La suspensión a la quinta se resuelve igual que siempre,
+    // al terminar el partido (ver aplicarBajas).
+    enCancha.filter((j) => this.isAvailable(j)).forEach((j) => {
+      if (Math.random() > this.AMARILLAS_POR_TIEMPO) return;
+      p.eventos.push({ minuto: minuto(), tipo: 'amarilla', mio: true, nombre: j.name, id: j.id });
+    });
+
+    p.mios += mios;
+    p.suyos += suyos;
+    p.eventos.sort((a, b) => a.minuto - b.minuto);
+    return { mios, suyos };
+  },
+
+  // Lo que te ofrece el cuerpo técnico en el vestuario. Cambia según cómo
+  // venga el partido: no te van a ofrecer aguantar un 0-2.
+  opcionesDeEntretiempo() {
+    const p = this.state.partido;
+    const dif = p.mios - p.suyos;
+    const opciones = [];
+    if (dif < 0) {
+      opciones.push({ id: 'todos', label: 'Ir a buscarlo con todo', tacticMod: 5, riesgoRival: 5, nota: 'El equipo se va arriba. Si no lo empatás, te la pueden hacer de contra.' });
+      opciones.push({ id: 'atacar', label: 'Adelantar el equipo', tacticMod: 3, riesgoRival: 2, nota: 'Más gente en campo rival, con la defensa un poco más expuesta.' });
+    } else if (dif > 0) {
+      opciones.push({ id: 'aguantar', label: 'Aguantar el resultado', tacticMod: -2, riesgoRival: -4, nota: 'El equipo se repliega y le cierra los caminos.' });
+      opciones.push({ id: 'atacar', label: 'Ir por más', tacticMod: 3, riesgoRival: 2, nota: 'A liquidarlo, aunque quede más espacio atrás.' });
+    } else {
+      opciones.push({ id: 'atacar', label: 'Ir a ganarlo', tacticMod: 3, riesgoRival: 2, nota: 'A buscar los tres puntos, con algo más de riesgo.' });
+      opciones.push({ id: 'aguantar', label: 'Asegurar el empate', tacticMod: -2, riesgoRival: -4, nota: 'Un punto afuera no es poco: el equipo se para bien.' });
+    }
+    opciones.push({ id: 'igual', label: 'No tocar nada', tacticMod: 0, riesgoRival: 0, nota: 'El partido viene como lo planeaste.' });
+    // El cambio ofensivo, solo si hay a quién meter. El banco es s.banco (ver
+    // asegurarBanco), no viene con el once.
+    const s = this.state;
+    const banco = (this.asegurarBanco() || [])
+      .map((id) => s.squad.find((x) => x.id === id))
+      .filter((x) => x && this.isAvailable(x) && (x.pos === 'DEL' || x.pos === 'MED'))
+      .sort((a, b) => (b.pos === 'DEL' ? 1 : 0) - (a.pos === 'DEL' ? 1 : 0) || b.rating - a.rating);
+    if (banco.length) {
+      opciones.push({ id: 'cambio', label: `Meter a ${banco[0].name}`, tacticMod: 4, riesgoRival: 1, cambio: banco[0].id, nota: 'Piernas frescas arriba.' });
+    }
+    return opciones;
+  },
+
+  resolverEntretiempo(optionIndex) {
+    const s = this.state;
+    const p = s.partido;
+    const opciones = this.opcionesDeEntretiempo();
+    const op = opciones[optionIndex] || opciones[opciones.length - 1];
+    p.decision = op.label;
+    p.nota = op.nota;
+    p.riesgoRival = op.riesgoRival || 0;
+    // El cambio entra de verdad: sale el peor del once de arriba y entra el
+    // del banco, así el segundo tiempo se juega con ese equipo.
+    if (op.cambio) this.meterCambio(op.cambio);
+    this.jugarUnTiempo(2, (p.tacticMod || 0) + (op.tacticMod || 0));
+    this.cerrarPartidoDelUsuario();
+  },
+
+  // Mete al del banco por el peor de los de arriba que esté en cancha. El
+  // cambio se hace con swapPlayers, la misma que usa el panel de plantel: el
+  // once vive en s.startingSlots (casilleros), no en una lista de ids.
+  meterCambio(entraId) {
+    const s = this.state;
+    const sale = this.getStartingXI().starters
+      .map((e) => s.squad.find((x) => x.id === e.id))
+      .filter((x) => x && (x.pos === 'DEL' || x.pos === 'MED'))
+      .sort((a, b) => a.rating - b.rating)[0];
+    if (!sale) return;
+    if (this.swapPlayers(entraId, sale.id)) {
+      s.partido.cambio = { entra: entraId, sale: sale.id };
+    }
+  },
+
+  // Termina el partido con lo que salió de los dos tiempos y sigue por el
+  // camino de siempre (el penal, si toca, y la pantalla de resultado).
+  cerrarPartidoDelUsuario() {
+    const s = this.state;
+    const ctx = s.matchContext;
+    const p = s.partido;
+    s.pendingMatch = {
+      home: ctx.isHome ? s.clubId : ctx.opponentId,
+      away: ctx.isHome ? ctx.opponentId : s.clubId,
+      homeGoals: ctx.isHome ? p.mios : p.suyos,
+      awayGoals: ctx.isHome ? p.suyos : p.mios,
+      isHome: ctx.isHome,
+      opponentId: ctx.opponentId,
+      context: ctx.context,
+      penalty: null,
+      shootout: null,
+      eventos: p.eventos,
+    };
+    s.partido = null;
+
+    if (Math.random() < 0.25) {
+      s.pendingMatch.penalty = { side: Math.random() < 0.5 ? 'user' : 'rival', resolved: false, scored: null };
+      s.screen = 'penalty';
+      this.save();
+    } else {
+      this.finalizePendingScore();
+    }
+  },
+
   chooseDecision(optionIndex) {
     const s = this.state;
     const option = s.currentDecision.options[optionIndex];
@@ -4216,33 +4383,19 @@ const Engine = {
       }
     }
 
-    const ctx = s.matchContext;
-    const myStrength = this.squadStrength() + option.tacticMod + this.currentFormation().mod + s.morale / 3;
-    const oppStrength = this.clubStrength(ctx.opponentId);
-    const homeAdvantage = ctx.isNeutral ? 0 : 4;
-    const homeStrength = ctx.isHome ? myStrength : oppStrength;
-    const awayStrength = ctx.isHome ? oppStrength : myStrength;
-    const score = this.simulateScore(homeStrength, awayStrength, homeAdvantage);
-
-    s.pendingMatch = {
-      home: ctx.isHome ? s.clubId : ctx.opponentId,
-      away: ctx.isHome ? ctx.opponentId : s.clubId,
-      homeGoals: score.homeGoals,
-      awayGoals: score.awayGoals,
-      isHome: ctx.isHome,
-      opponentId: ctx.opponentId,
-      context: ctx.context,
-      penalty: null,
-      shootout: null,
+    // Se juega el primer tiempo y se para en el vestuario. El segundo se
+    // juega con lo que decidas ahí (ver resolverEntretiempo).
+    s.partido = {
+      tacticMod: option.tacticMod,
+      riesgoRival: 0,
+      mios: 0,
+      suyos: 0,
+      eventos: [],
+      cambio: null,
     };
-
-    if (Math.random() < 0.25) {
-      s.pendingMatch.penalty = { side: Math.random() < 0.5 ? 'user' : 'rival', resolved: false, scored: null };
-      s.screen = 'penalty';
-      this.save();
-    } else {
-      this.finalizePendingScore();
-    }
+    this.jugarUnTiempo(1, option.tacticMod);
+    s.screen = 'entretiempo';
+    this.save();
   },
 
   getPenaltyShooters() {
@@ -4491,12 +4644,16 @@ const Engine = {
       avisos.push(`${p.name} se lesionó: ${tipo.detail.toLowerCase()}. Se pierde ${matches} ${matches === 1 ? 'partido' : 'partidos'}.`);
     }
 
-    // Amarillas. Se cuentan de verdad, una por una: a la quinta el jugador se
-    // pierde el próximo partido y el contador vuelve a cero. El contador es
-    // por torneo (ver limpiarAmarillas), así que lo que juntó en el Apertura
-    // no se arrastra al Clausura.
-    titulares.filter((p) => this.isAvailable(p)).forEach((p) => {
-      if (Math.random() > 0.16) return; // da algo menos de 2 amarillas por partido
+    // Amarillas. Ya NO se sortean acá: las tarjetas salen con su minuto
+    // mientras se juega cada tiempo (ver jugarUnTiempo), así se pueden mostrar
+    // en el entretiempo. Acá solo se cuentan, que es lo que define la
+    // suspensión: a la quinta el jugador se pierde el próximo partido y el
+    // contador vuelve a cero. El contador es por torneo (ver limpiarAmarillas),
+    // así que lo que juntó en el Apertura no se arrastra al Clausura.
+    const tarjetas = ((s.pendingMatch && s.pendingMatch.eventos) || []).filter((e) => e.tipo === 'amarilla' && e.mio);
+    tarjetas.forEach((ev) => {
+      const p = s.squad.find((x) => x.id === ev.id);
+      if (!p || !this.isAvailable(p)) return;
       p.amarillas = (p.amarillas || 0) + 1;
       if (p.amarillas >= 5) {
         p.amarillas = 0;
@@ -4644,9 +4801,14 @@ const Engine = {
     const bolAsist = this.bolilleroDe(enCancha, this.ASISTENCIAS_POR_PUESTO);
     if (!bolGoles.length) return;
     const alAzar = (lista) => lista[Math.floor(Math.random() * lista.length)];
+    // El partido ya dijo quién hizo cada gol y en qué minuto: se usa ESO, si
+    // no el goleador del entretiempo y el de la planilla podrían ser dos
+    // jugadores distintos.
+    const enLaCancha = ((m.eventos || []).filter((e) => e.tipo === 'gol' && e.mio && e.id)
+      .map((e) => s.squad.find((p) => p.id === e.id)).filter(Boolean));
 
     for (let g = 0; g < mios; g++) {
-      const autor = alAzar(bolGoles);
+      const autor = enLaCancha[g] || alAzar(bolGoles);
       this.estadisticasDe(autor).goles++;
       if (Math.random() < this.CHANCE_DE_ASISTENCIA && bolAsist.length) {
         // El que asiste no puede ser el mismo que hizo el gol.
