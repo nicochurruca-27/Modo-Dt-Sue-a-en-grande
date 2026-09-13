@@ -90,6 +90,12 @@ const FECHAS_DE_COPAS = {
   D1: {
     apertura: {
       recopa: [0, 1],
+      // Las dos llaves de la previa de la Libertadores que puede jugar un
+      // argentino (Fase 2 y Fase 3), ida y vuelta cada una. Van pegadas al
+      // arranque del año, antes de los grupos, como en la realidad. Solo se
+      // usan cuando la previa la juega TU club: si no, ya quedó resuelta al
+      // armar las copas.
+      previa: [0, 1, 2, 3],
       grupos: [4, 6, 8, 10, 12, 14],
       copaArgentina: [2, 9, 15],
     },
@@ -101,6 +107,7 @@ const FECHAS_DE_COPAS = {
   D2: {
     unico: {
       recopa: [0, 1],
+      previa: [0, 1, 2, 3],
       grupos: [4, 6, 8, 10, 12, 14],
       copaArgentina: [2, 9, 15, 22, 27, 33],
       llaves: { playoff: [18, 19], octavos: [20, 21], cuartos: [24, 25], semis: [28, 29], final: [31] },
@@ -1416,6 +1423,255 @@ const Engine = {
   // Ver FASES_PREVIAS en internacional.js para el formato de cada copa. Una
   // copa sin formato cargado, o con menos equipos de los que ese formato
   // espera, se resuelve en una sola ronda cruzando a todos de a dos.
+  // ---------- La previa de la Libertadores ----------
+  //
+  // Son tres fases encadenadas y eliminatorias, ida y vuelta cada una: la
+  // Fase 1 la juegan los 6 peor rankeados del continente, la Fase 2 esos 3
+  // ganadores más 13 que entran ahí, y la Fase 3 los 8 que quedan. De ahí
+  // salen los 4 que se meten en los grupos; los 4 que pierden no se van a
+  // casa, caen a los grupos de la Sudamericana.
+  //
+  // El orden en que entran importa, porque el que entra último juega menos
+  // llaves. Se ordena por nivel —los más flojos arrancan antes, como en el
+  // ranking de CONMEBOL— y el argentino NUNCA arranca en la Fase 1: su cupo
+  // entra en la Fase 2. Antes se mezclaban los 19 al azar y a tu club le podía
+  // tocar ganar tres llaves seguidas para meterse en los grupos.
+  ordenDeLaPrevia(ids, byId) {
+    const nivelDe = (id) => (byId[id] ? byId[id].nivel : 0);
+    const esArgentino = (id) => !!(byId[id] && byId[id].pais === 'Argentina');
+    // Se mezcla primero para que entre equipos del mismo nivel el orden cambie
+    // cada año: Array.sort es estable, así que ese azar sobrevive al orden.
+    return this.shuffled(ids).sort((x, y) => {
+      if (esArgentino(x) !== esArgentino(y)) return esArgentino(x) ? 1 : -1;
+      return nivelDe(x) - nivelDe(y);
+    });
+  },
+
+  // Cómo se llama la fase que se está jugando, para la pantalla de partido y
+  // para el panel.
+  cuandoDeLaPrevia(previa, pierna) {
+    return {
+      etapa: { etapa: 'previa', nombre: `Fase ${previa.fase + 1} de la previa` },
+      pierna,
+      piernas: 2,
+    };
+  },
+
+  // Arma la previa de una copa. Si tu club NO está en ella se resuelve entera
+  // acá mismo, como siempre. Si está, queda parada en la primera fase que te
+  // toca: esa se juega de verdad, fecha a fecha (ver avanzarPreviaDeCopas).
+  armarPrevia(copaNombre, ids, clubes) {
+    const s = this.state;
+    const formato = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copaNombre]) || {};
+    const fases = formato.encadenadas || [];
+    const enOrden = formato.cruceEntreCompatriotas ? ids.slice() : this.ordenDeLaPrevia(ids, clubes);
+    const laJuegoYo = fases.length && enOrden.length >= fases[0] && enOrden.includes(s.clubId);
+
+    if (!laJuegoYo) {
+      const r = this.jugarFasesPrevias(copaNombre, enOrden, clubes);
+      return {
+        jugaron: enOrden,
+        camino: r.camino,
+        eliminados: r.eliminados,
+        pasan: r.pasan,
+        terminada: true,
+      };
+    }
+
+    const previa = {
+      jugaron: enOrden,
+      camino: { fases: [], deLocal: false },
+      eliminados: [],
+      pasan: [],
+      terminada: false,
+      fases,
+      fase: 0,
+      // Qué par de fechas del calendario le toca a la fase que se juega ahora
+      // (ver `previa` en FECHAS_DE_COPAS): la primera que jugás usa el par 0,
+      // la siguiente el 1.
+      parDeFechas: 0,
+      esperando: enOrden.slice(),
+      vivos: [],
+      cruces: [],
+      historial: [],
+    };
+    this.abrirFaseDePrevia(previa);
+    // Las fases anteriores a la tuya se juegan solas: no tiene sentido hacerte
+    // mirar la Fase 1 si vos entrás en la Fase 2.
+    this.seguirLaPreviaHastaTuCruce(previa, { clubes });
+    return previa;
+  },
+
+  // Reparte los cruces de la fase que arranca: entran los que ganaron la
+  // anterior más los que recién se suman, y se sortea quién juega con quién.
+  abrirFaseDePrevia(previa) {
+    const s = this.state;
+    const cuantos = previa.fases[previa.fase] || previa.vivos.length;
+    const entran = previa.esperando.splice(0, Math.max(0, cuantos - previa.vivos.length));
+    previa.vivos = this.shuffled(previa.vivos.concat(entran));
+    previa.cruces = [];
+    for (let i = 0; i < previa.vivos.length; i += 2) {
+      const a = previa.vivos[i];
+      const b = previa.vivos[i + 1];
+      if (!a) continue;
+      previa.cruces.push(this.nuevoCruce(a, b || null));
+      if (a === s.clubId || b === s.clubId) {
+        previa.camino.fases.push(previa.fase + 1);
+        previa.camino.deLocal = a === s.clubId;
+      }
+    }
+  },
+
+  // Cierra la fase: define cada cruce por global (y por penales si quedó
+  // igualado) y abre la que sigue. Al cerrar la última, los que perdieron son
+  // los que caen a los grupos de la Sudamericana.
+  cerrarFaseDePrevia(previa, clubes) {
+    const pasan = [];
+    const perdedores = [];
+    previa.cruces.forEach((cruce) => {
+      if (!cruce.b) { cruce.ganador = cruce.a; pasan.push(cruce.a); return; }
+      if (!cruce.ganador) {
+        if (cruce.gA > cruce.gB) cruce.ganador = cruce.a;
+        else if (cruce.gB > cruce.gA) cruce.ganador = cruce.b;
+        else {
+          cruce.ganador = this.copaTieWinner(cruce.a, cruce.b, clubes);
+          cruce.penales = cruce.ganador;
+        }
+      }
+      pasan.push(cruce.ganador);
+      perdedores.push(cruce.ganador === cruce.a ? cruce.b : cruce.a);
+    });
+    previa.historial.push({ fase: previa.fase + 1, cruces: previa.cruces });
+    previa.vivos = pasan;
+    previa.fase++;
+    if (previa.fase >= previa.fases.length) {
+      previa.terminada = true;
+      // Si algún año entraran más equipos de los que el formato contempla, los
+      // que nunca llegaron a jugar pasan derecho.
+      previa.pasan = pasan.concat(previa.esperando.splice(0));
+      previa.eliminados = perdedores;
+      previa.cruces = [];
+      return;
+    }
+    this.abrirFaseDePrevia(previa);
+  },
+
+  // Juega solas las fases en las que tu club no está. Se usa al armar la copa
+  // (para saltear la Fase 1) y cada vez que cierra una fase: si te eliminaron,
+  // el resto de la previa se resuelve de una y la copa sigue su camino.
+  seguirLaPreviaHastaTuCruce(previa, copa) {
+    const s = this.state;
+    let vueltas = 0;
+    while (!previa.terminada && vueltas++ < 10) {
+      if (previa.cruces.some((c) => c.a === s.clubId || c.b === s.clubId)) return;
+      const cuando = this.cuandoDeLaPrevia(previa, 0);
+      for (let pierna = 0; pierna < 2; pierna++) {
+        previa.cruces.forEach((cruce) => {
+          if (cruce.ganador || !cruce.b) return;
+          this.jugarPartidoDeLlave(copa, cruce, { ...cuando, pierna });
+        });
+      }
+      this.cerrarFaseDePrevia(previa, copa.clubes);
+    }
+  },
+
+  // La previa que se está jugando de verdad ahora mismo, si hay alguna.
+  previaEnJuego() {
+    const ci = this.state.copasInter;
+    if (!ci || !ci.copas) return null;
+    return Object.values(ci.copas)
+      .find((copa) => copa && copa.previa && !copa.previa.terminada && copa.previa.cruces
+        && copa.previa.cruces.length) || null;
+  },
+
+  // Un partido de la previa. Si tu cruce no está vivo no habría que llegar
+  // acá, pero por las dudas la fecha se resuelve sola.
+  avanzarPreviaDeCopas(copa, pierna) {
+    const s = this.state;
+    const previa = copa.previa;
+    const cruce = previa.cruces.find((c) => !c.ganador && (c.a === s.clubId || c.b === s.clubId));
+    if (!cruce) {
+      this.simularPiernaDePrevia(copa, pierna, null);
+      if (pierna === 1) this.cerrarPiernaFinalDePrevia(copa);
+      this.seguirEnLaMismaSemana();
+      return;
+    }
+    const cuando = this.cuandoDeLaPrevia(previa, pierna);
+    const soyA = cruce.a === s.clubId;
+    const rivalId = soyA ? cruce.b : cruce.a;
+    const soyLocal = this.localDelCruce(cruce, cuando) === s.clubId;
+    s.matchContext = {
+      context: 'copa-inter',
+      copa: copa.copa,
+      opponentId: rivalId,
+      isHome: soyLocal,
+      sede: this.estadioDe(soyLocal ? s.clubId : rivalId),
+      // `previa` es lo que separa esto de una llave de octavos en adelante:
+      // se juega igual, pero lo que está en juego es entrar a la copa.
+      previa: true,
+      llave: {
+        etapa: 'previa',
+        nombre: cuando.etapa.nombre,
+        pierna,
+        piernas: 2,
+        decisiva: pierna === 1,
+        globalMio: soyA ? cruce.gA : cruce.gB,
+        globalRival: soyA ? cruce.gB : cruce.gA,
+      },
+    };
+    this.pickDecision();
+    s.screen = 'pre-match';
+    this.save();
+  },
+
+  simularPiernaDePrevia(copa, pierna, excepto) {
+    const cuando = this.cuandoDeLaPrevia(copa.previa, pierna);
+    copa.previa.cruces.forEach((cruce) => {
+      if (cruce.ganador || !cruce.b || cruce === excepto) return;
+      this.jugarPartidoDeLlave(copa, cruce, cuando);
+    });
+  },
+
+  // Después de la vuelta: se cierra la fase, se siguen las que vengan si ya
+  // quedaste afuera y, cuando la previa termina, recién ahí se sortean los
+  // grupos de las dos copas.
+  cerrarPiernaFinalDePrevia(copa) {
+    const s = this.state;
+    const previa = copa.previa;
+    const fase = previa.fase + 1;
+    const seguiasVivo = previa.cruces.some((c) => c.a === s.clubId || c.b === s.clubId);
+    this.cerrarFaseDePrevia(previa, copa.clubes);
+    this.seguirLaPreviaHastaTuCruce(previa, copa);
+    previa.parDeFechas = (previa.parDeFechas || 0) + 1;
+    if (!previa.terminada) {
+      if (seguiasVivo && !previa.cruces.some((c) => c.a === s.clubId || c.b === s.clubId)) {
+        Noticias.trasLaPrevia(this, copa, fase, 'afuera');
+      }
+      return;
+    }
+    this.sortearGruposDeLasDosCopas();
+    if (!seguiasVivo) return;
+    const comoTerminaste = (previa.pasan || []).includes(s.clubId)
+      ? 'grupos'
+      : (previa.eliminados || []).includes(s.clubId) ? 'sudamericana' : 'afuera';
+    Noticias.trasLaPrevia(this, copa, fase, comoTerminaste);
+  },
+
+  // Por si una partida llega a la fase de grupos con la previa a medio jugar
+  // (una partida vieja, un calendario raro): se termina sola y se sortean los
+  // grupos, que es mejor que quedarse sin copas.
+  terminarPreviaSimulando() {
+    const copa = this.previaEnJuego();
+    if (!copa) return;
+    const previa = copa.previa;
+    let vueltas = 0;
+    while (!previa.terminada && vueltas++ < 10) {
+      for (let pierna = 0; pierna < 2; pierna++) this.simularPiernaDePrevia(copa, pierna, null);
+      this.cerrarFaseDePrevia(previa, copa.clubes);
+    }
+    this.sortearGruposDeLasDosCopas();
+  },
+
   jugarFasesPrevias(copa, previa, byId) {
     const formato = (typeof FASES_PREVIAS === 'undefined' ? null : FASES_PREVIAS[copa]) || {};
     // El camino del usuario, para cobrar la previa por lo que jugó de verdad:
@@ -1462,7 +1718,10 @@ const Engine = {
     let vivos = [];
     let eliminadosUltima = [];
     fases.forEach((cuantosJuegan, i) => {
-      vivos = vivos.concat(esperando.splice(0, Math.max(0, cuantosJuegan - vivos.length)));
+      // `previa` viene ordenada por ranking (ver ordenDeLaPrevia): define QUIÉN
+      // entra en cada fase, no contra quién juega. Los cruces de adentro de
+      // cada fase se sortean, igual que en abrirFaseDePrevia.
+      vivos = this.shuffled(vivos.concat(esperando.splice(0, Math.max(0, cuantosJuegan - vivos.length))));
       const r = cruzar(vivos, i + 1);
       vivos = r.pasan;
       eliminadosUltima = r.eliminados;
@@ -2093,37 +2352,23 @@ const Engine = {
     if (!hayVigentes) s.ultimasCopas = (s.ultimasCopas || []).concat(this.sembrarCampeonesVigentes());
 
     const internacionales = this.sortearCuposInternacionales();
-    // Nadie puede jugar las dos copas el mismo año, ni siquiera cuando hay que
-    // completar cupos: acá está todo lo que ya tiene dueño.
-    const ocupados = new Set(qualification.map((q) => q.clubId)
-      .concat(internacionales.map((c) => c.id)));
     const campeones = this.campeonesVigentes(qualification, internacionales);
-    campeones.forEach((c) => ocupados.add(c.id));
-    const libertadores = this.armarCopa('Libertadores', qualification, internacionales, {
-      aGrupos: campeones,
-      // Si sobrara un cupo, el que se va es un campeón vigente: nunca uno que
-      // se ganó el lugar en la cancha.
-      prescindibles: campeones.map((c) => c.id),
-      ocupados,
-    });
-    const sudamericana = this.armarCopa('Sudamericana', qualification, internacionales, {
-      aGrupos: libertadores ? libertadores.bajanAGrupos : [],
-      ocupados,
-    });
+    const libertadores = this.armarCopa('Libertadores', qualification, internacionales, { aGrupos: campeones });
+    const sudamericana = this.armarCopa('Sudamericana', qualification, internacionales, {});
     if (!libertadores && !sudamericana) return;
 
-    // `bajanAGrupos` era solo para armar la otra copa: no se guarda.
-    const limpia = (copa) => {
-      if (!copa) return null;
-      const { bajanAGrupos, ...resto } = copa;
-      return resto;
-    };
     s.copasInter = {
       year: s.season.year,
       fecha: 0,
-      copas: { Libertadores: limpia(libertadores), Sudamericana: limpia(sudamericana) },
+      copas: { Libertadores: libertadores, Sudamericana: sudamericana },
       recopa: this.armarRecopa(),
+      // Lo único que hace falta guardar para poder sortear los grupos más
+      // tarde, si la previa quedó en juego.
+      porSortear: { prescindibles: campeones.map((c) => c.id) },
     };
+    // Si la previa no la jugás vos ya quedó resuelta, así que los grupos se
+    // sortean acá mismo y el año arranca como siempre.
+    if (!this.previaEnJuego()) this.sortearGruposDeLasDosCopas();
   },
 
   // Arma las dos copas de la temporada 1 con los grupos reales cargados a
@@ -2167,7 +2412,8 @@ const Engine = {
       armada[copa] = {
         copa,
         clubes,
-        previa: { jugaron: [], camino: { fases: [], deLocal: false }, eliminados: [] },
+        previa: { jugaron: [], camino: { fases: [], deLocal: false }, eliminados: [], pasan: [], terminada: true },
+        enGrupos: Object.keys(clubes),
         grupos,
       };
     }
@@ -2199,6 +2445,11 @@ const Engine = {
     };
   },
 
+  // Arma el padrón de una copa y su previa. NO sortea los grupos: eso se hace
+  // aparte (ver sortearGruposDeLasDosCopas), porque cuando la previa la jugás
+  // vos todavía no se sabe quién entra a los grupos ni quién cae de una copa a
+  // la otra. En el caso normal —la previa no la jugás vos— las dos cosas pasan
+  // uná atrás de la otra y no se nota la diferencia.
   armarCopa(copa, qualification, internacionales, desdeLaOtraCopa) {
     const deLaOtra = desdeLaOtraCopa || {};
     const entrants = this.copaEntrants(copa, qualification, internacionales)
@@ -2208,26 +2459,63 @@ const Engine = {
       e.id, { id: e.id, nombre: e.nombre, pais: e.pais, nivel: e.nivel },
     ]));
 
-    const previa = this.shuffled(entrants.filter((e) => e.fase === 'previa').map((e) => e.id));
-    const resultadoPrevia = this.jugarFasesPrevias(copa, previa, clubes);
-    const enGrupos = this.completarCuposDeGrupos(
-      copa,
-      entrants.filter((e) => e.fase === 'grupos').map((e) => e.id).concat(resultadoPrevia.pasan),
-      clubes,
-      deLaOtra,
-    );
-
     return {
       copa,
       clubes,
-      previa: {
-        jugaron: previa,
-        camino: resultadoPrevia.camino,
-        eliminados: resultadoPrevia.eliminados,
-      },
-      grupos: this.sortearGruposDeCopa(enGrupos, clubes),
-      bajanAGrupos: resultadoPrevia.eliminados.map((id) => ({ ...clubes[id], fase: 'grupos' })),
+      previa: this.armarPrevia(copa, entrants.filter((e) => e.fase === 'previa').map((e) => e.id), clubes),
+      // Los que ya tienen su lugar en los grupos sin jugar nada. Los de la
+      // previa se suman cuando la previa termina.
+      enGrupos: entrants.filter((e) => e.fase === 'grupos').map((e) => e.id),
+      grupos: [],
     };
+  },
+
+  // El sorteo de los 8 grupos de cada copa, con la previa ya resuelta. Se hace
+  // para las dos juntas porque los que pierden la última fase previa de la
+  // Libertadores caen a los grupos de la Sudamericana.
+  sortearGruposDeLasDosCopas() {
+    const ci = this.state.copasInter;
+    if (!ci) return;
+    const lib = ci.copas.Libertadores;
+    const suda = ci.copas.Sudamericana;
+    const prescindibles = (ci.porSortear || {}).prescindibles || [];
+    // Nadie puede jugar las dos copas el mismo año, ni siquiera cuando hay que
+    // completar cupos: acá está todo lo que ya tiene dueño en alguna de las
+    // dos. Se arma de nuevo cada vez (un Set no sobrevive a guardar la
+    // partida) a partir de los dos padrones, que son los mismos datos.
+    const ocupados = new Set();
+    [lib, suda].filter(Boolean).forEach((copa) => {
+      Object.keys(copa.clubes).forEach((id) => ocupados.add(id));
+    });
+
+    if (lib) {
+      lib.grupos = this.sortearGruposDeCopa(this.completarCuposDeGrupos(
+        'Libertadores',
+        lib.enGrupos.concat(lib.previa.pasan || []),
+        lib.clubes,
+        // Si sobrara un cupo, el que se va es un campeón vigente: nunca uno
+        // que se ganó el lugar en la cancha.
+        { prescindibles, ocupados },
+      ), lib.clubes);
+    }
+    if (suda) {
+      const bajan = (lib && lib.previa.eliminados) || [];
+      bajan.forEach((id) => { if (!suda.clubes[id]) suda.clubes[id] = { ...lib.clubes[id] }; });
+      suda.grupos = this.sortearGruposDeCopa(this.completarCuposDeGrupos(
+        'Sudamericana',
+        suda.enGrupos.concat(suda.previa.pasan || [], bajan),
+        suda.clubes,
+        { ocupados },
+      ), suda.clubes);
+    }
+    delete ci.porSortear;
+  },
+
+  // ¿Ya están sorteados los grupos? Mientras se juega una previa todavía no.
+  gruposSorteados() {
+    const ci = this.state.copasInter;
+    if (!ci || !ci.copas) return false;
+    return Object.values(ci.copas).filter(Boolean).every((copa) => (copa.grupos || []).length);
   },
 
   // Las dos copas arrancan la fase de grupos con 32 equipos, siempre: 8 grupos
@@ -2517,6 +2805,10 @@ const Engine = {
   avanzarFechaDeCopas() {
     const s = this.state;
     const ci = s.copasInter;
+    // Los grupos se sortean recién cuando termina la previa. Si por lo que sea
+    // se llegó hasta acá con la previa abierta, se termina sola: mejor eso que
+    // un año sin copas.
+    if (!this.gruposSorteados()) this.terminarPreviaSimulando();
     const mio = this.partidoDeCopaDelUsuario(ci.fecha);
 
     if (!mio) {
@@ -2863,6 +3155,29 @@ const Engine = {
     s.pendingMatch = null;
     s.matchContext = null;
     this.cerrarLoQueTermino(cuando);
+    this.seguirEnLaMismaSemana();
+  },
+
+  // Después de TU partido de la previa: se anota, se juegan los otros cruces
+  // de la misma fase y, si era la vuelta, se cierra la fase.
+  resolverPreviaDelUsuario() {
+    const s = this.state;
+    const m = s.pendingMatch;
+    const ctx = s.matchContext;
+    const copa = s.copasInter.copas[ctx.copa];
+    const cruce = copa.previa.cruces.find((c) => c.a === s.clubId || c.b === s.clubId);
+    this.anotarPartidoDeLlave(cruce, m.home, m.away, m.homeGoals, m.awayGoals);
+    if (m.shootout) {
+      cruce.ganador = m.shootout.userWon ? s.clubId : ctx.opponentId;
+      cruce.penales = cruce.ganador;
+    }
+    s.log.unshift(`Copa ${ctx.copa} — ${ctx.llave.nombre}: ${this.getClub(m.home).name} ${m.homeGoals}-${m.awayGoals} ${this.getClub(m.away).name}${m.shootout ? ' (por penales)' : ''}`);
+    if (m.isHome) Economia.cobrarPartidoDeLocal(this, false);
+
+    this.simularPiernaDePrevia(copa, ctx.llave.pierna, cruce);
+    s.pendingMatch = null;
+    s.matchContext = null;
+    if (ctx.llave.pierna === 1) this.cerrarPiernaFinalDePrevia(copa);
     this.seguirEnLaMismaSemana();
   },
 
@@ -3502,6 +3817,16 @@ const Engine = {
     return rondas.map((ronda) => this.diaDeLaFecha(ronda));
   },
 
+  // Los días de la ida y la vuelta de la fase de previa que se está jugando.
+  diasDeLaFaseDePrevia(previa) {
+    const rondas = (this.calendarioDeCopas() || {}).previa;
+    if (!rondas || !rondas.length || !previa) return null;
+    const par = (previa.parDeFechas || 0) * 2;
+    const dias = [rondas[par], rondas[par + 1]]
+      .map((ronda) => (ronda == null ? null : this.diaDeLaFecha(ronda)));
+    return dias.some((d) => d != null) ? dias : null;
+  },
+
   // Lo mismo para una instancia de las llaves de las copas internacionales
   // (repechaje, octavos, cuartos, semis, final). Devuelve null cuando todavía
   // no se puede saber: en Primera las llaves se juegan en el CLAUSURA, así que
@@ -3605,6 +3930,18 @@ const Engine = {
       && !(season.copaInterShown || []).includes(`r${season.roundIndex}`)) {
       season.copaInterShown = (season.copaInterShown || []).concat([`r${season.roundIndex}`]);
       this.avanzarRecopa(recopaRounds.indexOf(season.roundIndex));
+      return;
+    }
+
+    // La previa de la Libertadores, en febrero. Solo cae acá cuando la jugás
+    // vos: si no, ya quedó resuelta al armar las copas y esto no existe.
+    const previaRounds = calendario.previa || [];
+    const copaEnPrevia = s.copasInter ? this.previaEnJuego() : null;
+    if (copaEnPrevia && previaRounds.includes(season.roundIndex)
+      && !(season.copaInterShown || []).includes(`p${season.roundIndex}`)) {
+      season.copaInterShown = (season.copaInterShown || []).concat([`p${season.roundIndex}`]);
+      // Cada fase es ida y vuelta: las fechas van de a pares.
+      this.avanzarPreviaDeCopas(copaEnPrevia, previaRounds.indexOf(season.roundIndex) % 2);
       return;
     }
 
@@ -4319,6 +4656,8 @@ const Engine = {
       s.season.roundIndex++;
       if (this.confianza() <= 0) { this.echarAlDT(); return; }
       this.enterEditionRound();
+    } else if (m.context === 'copa-inter' && s.matchContext.previa) {
+      this.resolverPreviaDelUsuario();
     } else if (m.context === 'copa-inter' && s.matchContext.copa === 'Recopa') {
       this.resolverRecopaDelUsuario();
     } else if (m.context === 'copa-inter' && s.matchContext.llave) {

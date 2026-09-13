@@ -119,6 +119,17 @@ abrir seguís donde quedaste.
   no clasifican siempre los mismos: los grandes van casi todos los años y los
   chicos se cuelan de vez en cuando. El campeón de cada copa y hasta dónde llegó tu club
   quedan en la pestaña "Copas" del panel.
+- **La fase previa de la Libertadores, jugada**: de los 6 cupos argentinos, el
+  último (el tercero de los que entran por Tabla Anual) no va directo a los
+  grupos: va a la previa. Son tres fases eliminatorias encadenadas, ida y
+  vuelta cada una. El argentino entra en la Fase 2 —nunca en la Fase 1, que es
+  para los peor rankeados del continente— así que juega hasta cuatro partidos
+  en febrero, en las cuatro primeras fechas del Apertura, encima de la liga.
+  Si gana la Fase 3 se mete en los grupos de la Libertadores; si la pierde cae
+  a los grupos de la Sudamericana; si pierde antes se queda sin copa. Cuando
+  la previa la jugás vos se juega de verdad, partido por partido, y los grupos
+  de las dos copas se sortean recién cuando termina. Si no la jugás vos, se
+  resuelve sola al armar el año, como cualquier otro resultado del continente.
 - **El repechaje de la Sudamericana**: entre los grupos y los octavos, los 8
   segundos de grupo de la Sudamericana se cruzan con los 8 terceros de la
   Libertadores, que se caen de esa copa. Los cruces no se sortean: van por

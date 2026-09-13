@@ -284,6 +284,35 @@ const Noticias = {
   // Resultado de los torneos que se resuelven al cerrar el año: la
   // Libertadores y la Sudamericana, y también los títulos nacionales (el
   // Campeón de Liga, el Trofeo de Campeones y las dos Supercopas).
+  // Cómo te fue en la previa de la Libertadores. Es la única instancia del
+  // año que define en qué copa jugás (o si te quedás sin ninguna), así que
+  // merece su noticia: antes se resolvía en silencio y te enterabas al ver los
+  // grupos sorteados.
+  trasLaPrevia(engine, copa, fase, comoTerminaste) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    if (!club) return;
+    const donde = `la Fase ${fase} de la previa de la ${copa.copa}`;
+    if (comoTerminaste === 'grupos') {
+      this.push(s, 'internacional',
+        `${club.name} está en la Copa ${copa.copa}`,
+        `Ganó ${donde} y se metió en la fase de grupos. El sorteo ya está hecho.`,
+        { clubId: s.clubId, destacada: true });
+      return;
+    }
+    if (comoTerminaste === 'sudamericana') {
+      this.push(s, 'internacional',
+        `${club.name} se cayó de la Libertadores`,
+        `Perdió ${donde}. No queda eliminado: va a la fase de grupos de la Copa Sudamericana.`,
+        { clubId: s.clubId, destacada: true });
+      return;
+    }
+    this.push(s, 'internacional',
+      `${club.name} se quedó sin copa`,
+      `Perdió ${donde} y este año no juega ningún torneo internacional. Recién en la última fase el que pierde cae a la Sudamericana.`,
+      { clubId: s.clubId, destacada: true });
+  },
+
   trasLasCopas(engine, copas) {
     if (!copas || !copas.length) return;
     const s = engine.state;

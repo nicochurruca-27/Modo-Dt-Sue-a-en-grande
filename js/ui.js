@@ -947,6 +947,28 @@ function competenciaHtml(id) {
   return faseDeGruposHtml();
 }
 
+// La previa de la Libertadores mientras se juega. Solo aparece cuando la juega
+// tu club: si no, ya está resuelta antes de que arranque el año y el panel va
+// derecho a los grupos.
+function previaHtml(copa) {
+  const s = Engine.state;
+  const previa = copa.previa;
+  if (!previa || previa.terminada || !(previa.cruces || []).length) {
+    return '<p class="muted">Los grupos se sortean cuando termine la fase previa.</p>';
+  }
+  const total = (previa.fases || []).length;
+  const cuando = Engine.diasDeLaFaseDePrevia(previa);
+  const mio = previa.cruces.find((c) => c.a === s.clubId || c.b === s.clubId);
+  return `
+    <h4>Fase previa</h4>
+    <p class="muted nota-repechaje">Son <strong>${total} fases eliminatorias</strong>, ida y vuelta, antes de la fase de grupos. El que gana la última se mete en los grupos de la Libertadores; el que la pierde no queda eliminado, cae a los grupos de la Sudamericana. El que pierde antes se queda sin copa. Son cuatro partidos en cuatro semanas, encima de la liga: conviene rotar.</p>
+    <div class="panel-tab-switch"><strong>Fase ${previa.fase + 1} de ${total}</strong></div>
+    ${fechaDeLaEtapaHtml({ cruces: previa.cruces }, cuando)}
+    ${mio ? '' : '<p class="muted">Tu club ya no está en la previa.</p>'}
+    <ul class="llave-lista">${previa.cruces.map((c) => cruceHtml(copa, c, false)).join('')}</ul>
+  `;
+}
+
 function faseDeGruposHtml() {
   const copa = copaDelPanel();
   if (!copa) return '';
@@ -955,6 +977,9 @@ function faseDeGruposHtml() {
   if (copa.llave) {
     return llaveHtml(copa);
   }
+  // En febrero, mientras se juega la previa, los grupos todavía no están
+  // sorteados: lo que hay para mirar es la previa.
+  if (!(copa.grupos || []).length) return previaHtml(copa);
   const grupo = copa.grupos[copaPanelGrupo];
   const esMiGrupo = grupo.ids.includes(Engine.state.clubId);
   const filas = Engine.posicionesDeGrupo(grupo)
