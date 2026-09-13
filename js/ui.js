@@ -950,22 +950,39 @@ function competenciaHtml(id) {
 // La previa de la Libertadores mientras se juega. Solo aparece cuando la juega
 // tu club: si no, ya está resuelta antes de que arranque el año y el panel va
 // derecho a los grupos.
+// Las fases de la previa que ya se pueden mirar: las que terminaron más la que
+// se está jugando. Igual que instanciasDeLaLlave, pero para la previa.
+function instanciasDeLaPrevia(previa) {
+  const cerradas = previa.historial || [];
+  if (previa.terminada || !(previa.cruces || []).length) return cerradas;
+  return cerradas.concat([{ fase: previa.fase + 1, cruces: previa.cruces }]);
+}
+
 function previaHtml(copa) {
   const s = Engine.state;
   const previa = copa.previa;
-  if (!previa || previa.terminada || !(previa.cruces || []).length) {
+  const instancias = instanciasDeLaPrevia(previa || {});
+  if (!previa || !instancias.length) {
     return '<p class="muted">Los grupos se sortean cuando termine la fase previa.</p>';
   }
   const total = (previa.fases || []).length;
+  if (copaPanelEtapa === null || copaPanelEtapa >= instancias.length) copaPanelEtapa = instancias.length - 1;
+  const inst = instancias[copaPanelEtapa];
+  // La fecha solo tiene sentido para la que se está jugando: una fase ya
+  // cerrada devuelve '' sola (ver fechaDeLaEtapaHtml).
   const cuando = Engine.diasDeLaFaseDePrevia(previa);
-  const mio = previa.cruces.find((c) => c.a === s.clubId || c.b === s.clubId);
+  const mio = (previa.cruces || []).some((c) => c.a === s.clubId || c.b === s.clubId);
   return `
     <h4>Fase previa</h4>
     <p class="muted nota-repechaje">Son <strong>${total} fases eliminatorias</strong>, ida y vuelta, antes de la fase de grupos. El que gana la última se mete en los grupos de la Libertadores; el que la pierde no queda eliminado, cae a los grupos de la Sudamericana. El que pierde antes se queda sin copa. Son cuatro partidos en cuatro semanas, encima de la liga: conviene rotar.</p>
-    <div class="panel-tab-switch"><strong>Fase ${previa.fase + 1} de ${total}</strong></div>
-    ${fechaDeLaEtapaHtml({ cruces: previa.cruces }, cuando)}
+    <div class="panel-tab-switch">
+      <button class="option-btn small" id="etapa-prev-btn">◀</button>
+      <strong>Fase ${inst.fase} de ${total}</strong>
+      <button class="option-btn small" id="etapa-next-btn">▶</button>
+    </div>
+    ${fechaDeLaEtapaHtml(inst, cuando)}
     ${mio ? '' : '<p class="muted">Tu club ya no está en la previa.</p>'}
-    <ul class="llave-lista">${previa.cruces.map((c) => cruceHtml(copa, c, false)).join('')}</ul>
+    <ul class="llave-lista">${inst.cruces.map((c) => cruceHtml(copa, c, false)).join('')}</ul>
   `;
 }
 
@@ -1040,6 +1057,10 @@ function engancharBotonesDeGrupos() {
       flechas('grupo-prev-btn', 'grupo-next-btn', copa.grupos.length, () => copaPanelGrupo, (v) => { copaPanelGrupo = v; });
       if (copa.llave) {
         flechas('etapa-prev-btn', 'etapa-next-btn', instanciasDeLaLlave(copa).length, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
+      } else if (!copa.grupos.length && copa.previa) {
+        // En febrero, mientras se juega la previa, las flechas pasan de una
+        // fase a otra: la Fase 1 ya se jugó sola y también se puede mirar.
+        flechas('etapa-prev-btn', 'etapa-next-btn', instanciasDeLaPrevia(copa.previa).length, () => copaPanelEtapa, (v) => { copaPanelEtapa = v; });
       }
     }
   }
