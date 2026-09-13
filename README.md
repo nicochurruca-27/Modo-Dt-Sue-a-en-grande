@@ -134,6 +134,14 @@ abrir seguís donde quedaste.
   seguido. Abajo de 80 empieza a rendir menos, y el que viene fundido se
   lesiona bastante más. Con copa entre semana y liga el fin de semana no hay
   forma de jugar los 50 partidos del año con los mismos once: hay que rotar.
+- **Estadísticas de los jugadores**: cada uno lleva partidos jugados, goles y
+  asistencias de la temporada, y su acumulado de carrera. Se ven en el panel de
+  plantel, abajo de la reserva. Como el motor no simula jugadas, los goles del
+  equipo se reparten con un bolillero entre los que jugaron: un delantero entra
+  muchas más veces que un defensor y adentro de cada línea pesa la valoración.
+  En una temporada eso da un reparto parecido al real (unos dos tercios para
+  los delanteros, un cuarto para los mediocampistas, el resto para los de
+  atrás).
 - **Cupos a copas internacionales** (según el formato real de AFA): 6 a
   Libertadores —campeón del Apertura, campeón del Clausura, campeón de la
   Copa Argentina, y los 3 mejores de la Tabla Anual que no hayan clasificado

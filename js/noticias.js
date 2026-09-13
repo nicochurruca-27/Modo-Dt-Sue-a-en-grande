@@ -169,6 +169,21 @@ const Noticias = {
   },
 
   // Una operación de mercado que hizo el usuario de verdad.
+  // Cada gol de tu equipo pasa por acá. La mayoría no son noticia: solo se
+  // publica cuando el goleador llega a una cifra redonda, que es cuando un
+  // diario de verdad escribiría algo. Sin esto, un gol por partido serían
+  // cincuenta titulares iguales al año.
+  trasUnGol(engine, jugador) {
+    const s = engine.state;
+    const goles = engine.estadisticasDe(jugador).goles;
+    if (goles < 10 || goles % 5 !== 0) return;
+    const club = engine.getClub(s.clubId);
+    this.push(s, 'resultados',
+      `${jugador.name} llegó a los ${goles} goles`,
+      `Va ${goles} en la temporada con la camiseta de ${club.name}${jugador.age <= 21 ? `, y tiene ${jugador.age} años` : ''}.`,
+      { clubId: s.clubId, destacada: goles >= 20 });
+  },
+
   trasUnaOperacion(engine, tipo, jugador, monto) {
     const s = engine.state;
     const club = engine.getClub(s.clubId);

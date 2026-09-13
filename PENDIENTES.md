@@ -89,7 +89,21 @@ mundo de verdad:
 
 ---
 
-## 3. Sistema de partido en vivo
+## 3. Estadísticas que todavía faltan
+
+Los jugadores del usuario ya llevan partidos, goles y asistencias. Falta:
+
+- **Tabla de goleadores del torneo.** Hoy solo se sabe lo de tu plantel: los
+  jugadores de los clubes rivales no juegan los partidos simulados, así que no
+  hay a quién anotarle un gol. Sale gratis el día que la simulación de un
+  partido entre dos rivales mire los planteles (punto 2).
+- **Historial por temporada.** Hoy se guarda el año en curso y el acumulado de
+  carrera, pero no queda "en 2027 hizo 22 goles".
+- **Goles separados por competencia** (liga / Copa Argentina / internacionales).
+
+---
+
+## 4. Sistema de partido en vivo
 
 El cambio más grande que queda. Hoy el partido se resuelve de una: elegís la
 charla táctica y aparece el resultado final.
@@ -109,7 +123,7 @@ amarillas, lesiones. Con esos hechos, dibujarlos en vivo es casi gratis.
 
 ---
 
-## 4. Camisetas con los colores de cada club
+## 5. Camisetas con los colores de cada club
 
 En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy
 es siempre la misma: toma los colores del club del usuario. La idea es que cada
@@ -124,7 +138,7 @@ a rayas verticales, con banda cruzada, con franja horizontal).
 
 ---
 
-## 5. Detalles pendientes
+## 6. Detalles pendientes
 
 - **El usuario todavía gana de más.** Con la fuerza de los rivales saliendo de
   su plantel, en 60 temporadas medidas los títulos de liga bajaron a la mitad

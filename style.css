@@ -584,6 +584,32 @@ h1, h2, h3 {
 }
 .cuadro-svg { display: block; }
 
+/* La tabla de rendimiento del plantel, plegada abajo de la reserva. */
+.rendimiento {
+  margin-top: 14px;
+  border-top: 1px solid #334155;
+  padding-top: 10px;
+}
+.rendimiento summary {
+  cursor: pointer;
+  list-style: none;
+}
+.rendimiento summary::-webkit-details-marker { display: none; }
+.rendimiento summary h3 {
+  display: inline;
+  margin: 0;
+}
+/* La flechita la dibujamos nosotros para que gire al abrir. */
+.rendimiento summary h3::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--muted);
+  transition: transform .15s;
+}
+.rendimiento[open] summary h3::before { transform: rotate(90deg); }
+.rendimiento summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
 /* El botón para abrir el cuadro en grande, abajo del cuadro chico. */
 .cuadro-abrir {
   width: 100%;

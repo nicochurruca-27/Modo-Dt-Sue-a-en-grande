@@ -1222,6 +1222,43 @@ const WIDTH_FRACTION_BY_CATEGORY = {
 // Un suplente dibujado como los de la cancha: la misma camiseta, el mismo
 // dorsal y la misma placa con el nombre. Va en su propio <svg> chiquito para
 // poder acomodarlos en una grilla, en vez de posicionados sobre el campo.
+// Los números del plantel en la temporada: partidos, goles y asistencias.
+// Hasta ahora un partido dejaba solo un marcador y no había forma de saber
+// quién estaba rindiendo. Se muestran los que jugaron, ordenados por goles.
+//
+// Arranca plegado: el que quiere mirar números los abre, y el que no, no se
+// come una tabla de 30 filas abajo de la reserva.
+function rendimientoHtml() {
+  const s = Engine.state;
+  const conMinutos = (s.squad || [])
+    .map((p) => ({ p, st: Engine.estadisticasDe(p) }))
+    .filter((x) => x.st.pj > 0)
+    .sort((a, b) => b.st.goles - a.st.goles || b.st.asistencias - a.st.asistencias || b.st.pj - a.st.pj);
+  if (!conMinutos.length) return '';
+
+  const fila = ({ p, st }) => `
+    <tr>
+      <td class="col-club"><span class="table-club">${truncateLastName(p.name)}</span></td>
+      <td class="muted">${p.pos}</td>
+      <td>${st.pj}</td>
+      <td>${st.goles || ''}</td>
+      <td>${st.asistencias || ''}</td>
+    </tr>`;
+
+  return `
+    <details class="rendimiento">
+      <summary><h3>Rendimiento del plantel</h3></summary>
+      <p class="muted">Lo que lleva cada uno en esta temporada, entre la liga y las copas.</p>
+      <div class="table-wrap">
+        <table class="table compact">
+          <thead><tr><th class="col-club">Jugador</th><th>Pos</th><th>PJ</th><th>G</th><th>A</th></tr></thead>
+          <tbody>${conMinutos.map(fila).join('')}</tbody>
+        </table>
+      </div>
+    </details>
+  `;
+}
+
 function benchJerseySvg(p, club) {
   const w = PITCH_JERSEY_W + 12;
   const h = PITCH_JERSEY_H + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 14;
@@ -1397,6 +1434,7 @@ function renderSquadPanel() {
           ${reserva.map((p) => benchJerseySvg(p, club)).join('')}
         </div>
       ` : ''}
+      ${rendimientoHtml()}
     </div>
   `;
 

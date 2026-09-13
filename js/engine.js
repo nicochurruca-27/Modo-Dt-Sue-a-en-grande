@@ -3105,6 +3105,7 @@ const Engine = {
     if (s.calendar) s.calendar.dayCount = 0;
     // La pretemporada deja a todos enteros, por cansados que hayan terminado.
     if (s.squad) s.squad.forEach((p) => { p.energia = ENERGIA_MAXIMA; });
+    this.cerrarEstadisticasDelAnio();
     Economia.nuevaTemporada(s);
 
     s.season.backgroundResult = this.simulateFullDivisionYear(otherDivision);
@@ -3905,6 +3906,90 @@ const Engine = {
     return 0.055;
   },
 
+  // ---------- Estadísticas de los jugadores ----------
+  //
+  // Hasta acá un partido producía un marcador y nada más: no había forma de
+  // saber quién estaba rindiendo, ni tabla de goleadores, ni "mi 9 lleva 14".
+  //
+  // El motor no simula jugadas, así que no sabe quién la metió. Los goles se
+  // reparten con un bolillero entre los que jugaron: un delantero entra
+  // muchas más veces que un defensor y, adentro de cada línea, pesa la
+  // valoración. En una temporada eso da un reparto parecido al real — el 9
+  // termina arriba de la tabla y el central mete tres de pelota parada.
+  GOLES_POR_PUESTO: { DEL: 10, MED: 4, DEF: 1.2, POR: 0 },
+  ASISTENCIAS_POR_PUESTO: { DEL: 4, MED: 7, DEF: 2, POR: 0.1 },
+  // Cuántos goles llevan asistencia. El resto son de pelota parada, rebote,
+  // jugada individual o en contra.
+  CHANCE_DE_ASISTENCIA: 0.62,
+
+  // Los números de un jugador en la temporada. Se crean cuando hacen falta,
+  // así un jugador que llega a mitad de año o una partida vieja no rompen.
+  estadisticasDe(player) {
+    if (!player.stats) player.stats = { pj: 0, goles: 0, asistencias: 0 };
+    return player.stats;
+  },
+
+  carreraDe(player) {
+    if (!player.carrera) player.carrera = { pj: 0, goles: 0, asistencias: 0 };
+    return player.carrera;
+  },
+
+  // Un bolillero con los que jugaron: cada uno entra tantas veces como diga
+  // su puesto, multiplicado por lo bueno que es.
+  bolilleroDe(jugadores, pesos) {
+    const bolillero = [];
+    jugadores.forEach((p) => {
+      const peso = (pesos[p.pos] || 0) * (0.5 + p.rating / 100);
+      const bolillas = Math.round(peso * 10);
+      for (let i = 0; i < bolillas; i++) bolillero.push(p);
+    });
+    return bolillero;
+  },
+
+  // Reparte los goles de tu equipo entre los que jugaron y suma un partido a
+  // cada uno. Se llama una vez por partido, con el marcador ya cerrado.
+  anotarEstadisticas(m, jugaron) {
+    const s = this.state;
+    if (!m || !s.squad) return;
+    const enCancha = s.squad.filter((p) => jugaron.has(p.id));
+    if (!enCancha.length) return;
+    enCancha.forEach((p) => { this.estadisticasDe(p).pj++; });
+
+    // Los goles de los penales de la tanda no cuentan como goles del partido,
+    // igual que en la realidad.
+    const mios = m.isHome ? m.homeGoals : m.awayGoals;
+    if (!mios) return;
+
+    const bolGoles = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
+    const bolAsist = this.bolilleroDe(enCancha, this.ASISTENCIAS_POR_PUESTO);
+    if (!bolGoles.length) return;
+    const alAzar = (lista) => lista[Math.floor(Math.random() * lista.length)];
+
+    for (let g = 0; g < mios; g++) {
+      const autor = alAzar(bolGoles);
+      this.estadisticasDe(autor).goles++;
+      if (Math.random() < this.CHANCE_DE_ASISTENCIA && bolAsist.length) {
+        // El que asiste no puede ser el mismo que hizo el gol.
+        const candidatos = bolAsist.filter((p) => p.id !== autor.id);
+        if (candidatos.length) this.estadisticasDe(alAzar(candidatos)).asistencias++;
+      }
+      if (typeof Noticias !== 'undefined') Noticias.trasUnGol(this, autor);
+    }
+  },
+
+  // Al cerrar la temporada, lo del año se suma a la carrera y las cuentas del
+  // año vuelven a cero.
+  cerrarEstadisticasDelAnio() {
+    (this.state.squad || []).forEach((p) => {
+      const anio = this.estadisticasDe(p);
+      const carrera = this.carreraDe(p);
+      carrera.pj += anio.pj;
+      carrera.goles += anio.goles;
+      carrera.asistencias += anio.asistencias;
+      p.stats = { pj: 0, goles: 0, asistencias: 0 };
+    });
+  },
+
   developSquadAfterMatch(userWon, userLost) {
     const s = this.state;
     const club = this.getClub(s.clubId);
@@ -3964,6 +4049,7 @@ const Engine = {
     const userWon = winner === s.clubId;
     const userLost = winner !== null && !userWon;
     this.developSquadAfterMatch(userWon, userLost);
+    this.anotarEstadisticas(m, new Set(this.getStartingXI().starters.map((e) => e.id)));
 
     if (m.context === 'league') {
       // Los dos equipos suman en su propia tabla: en un interzonal, cada uno
