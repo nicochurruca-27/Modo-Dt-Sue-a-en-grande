@@ -61,6 +61,19 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **Jugadores libres**: en cada ventana de pases algunos clubes del país dejan
+  ir gente —grandes de edad, de la mitad floja del plantel y con el contrato
+  terminándose, que es a quien un club deja ir de verdad— y esos jugadores
+  quedan sin equipo. Los podés fichar sin pagar pase: lo único que sumás es el
+  sueldo. Son jugadores REALES del mundo del juego, no inventados: se van de
+  su club y podés haberlos visto jugar el año pasado. El que nadie ficha en
+  dos ventanas se lo lleva otro o se retira. Para traer a alguien que sí tiene
+  club, el camino sigue siendo buscarlo en el panel Mercado y negociar.
+- **El mercado abre dos veces al año**, como en la realidad: en la
+  pretemporada (enero) y a mitad de año, al terminar el Apertura (junio).
+  Fuera de esas dos ventanas se puede negociar todo lo que quieras, pero nada
+  se firma: el panel Mercado dice si está abierto o cerrado y cuándo es la
+  próxima.
 - **El panel de la derecha, por competencia**: una carpeta por torneo y una
   flechita para pasar de una a otra. La del torneo local se llama como el
   torneo que se está jugando (Apertura, Clausura o Primera Nacional) y adentro

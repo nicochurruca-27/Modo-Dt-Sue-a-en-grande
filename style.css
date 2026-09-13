@@ -587,6 +587,10 @@ h1, h2, h3 {
 /* Cuándo se juega la instancia de copa que se está mirando. */
 .fecha-etapa { font-size: 0.76rem; margin: 2px 0 6px; }
 
+/* El aviso de que el mercado está abierto: es la única ventana del año en
+   la que se firma, así que se ve. */
+.mercado-aviso.abierto { color: var(--accent); }
+
 /* Los cuadros dibujados (Copa Argentina, las copas, la fase final). Son
    anchos, así que si no entran se deslizan, igual que la cancha. */
 .cuadro-scroll {

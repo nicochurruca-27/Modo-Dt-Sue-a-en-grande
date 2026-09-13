@@ -2570,6 +2570,7 @@ function renderContractRenewal() {
 
 function renderTransfer() {
   const s = Engine.state;
+  const libres = Engine.jugadoresLibres();
   const windowLabel = {
     'between-editions': 'Mercado de pases — entre el Apertura y el Clausura',
     'pre-season': 'Mercado de pases — pretemporada',
@@ -2586,18 +2587,19 @@ function renderTransfer() {
           <ul>${s.notasMercado.map((n) => `<li>${n}</li>`).join('')}</ul>
         </div>
       ` : ''}
-      <h3>Ofertas disponibles</h3>
-      <div class="options" id="market-list">
-        ${s.market.map((p, i) => {
-          const caro = s.budget < p.price;
+      <h3>Jugadores libres</h3>
+      <p class="muted">Se quedaron sin club y no cuestan pase: lo único que sumás es el sueldo. Para traer a alguien que está en otro club, buscalo en el panel Mercado y negociá.</p>
+      <div class="options" id="libres-list">
+        ${libres.map((p, i) => {
           const lleno = s.squad.length >= MAX_SQUAD;
+          const deDonde = p.desdeClub && Engine.getClub(p.desdeClub) ? Engine.getClub(p.desdeClub).name : null;
           return `
           <div class="pick-row">
-            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — <strong>${money(p.price)}</strong>${caro ? ' <span class="muted">(no te alcanza)</span>' : ''}</span>
-            <button class="option-btn small" data-i="${i}" ${caro || lleno ? 'disabled' : ''}>Comprar</button>
+            <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años)${deDonde ? ` <span class="muted">— venía de ${deDonde}</span>` : ''}</span>
+            <button class="option-btn small" data-i="${i}" ${lleno ? 'disabled' : ''}>Fichar gratis</button>
           </div>
         `;
-        }).join('') || '<p class="muted">No quedan ofertas esta ronda.</p>'}
+        }).join('') || '<p class="muted">Por ahora no hay ningún jugador sin club.</p>'}
       </div>
       <details class="collapsible">
         <summary>Vender jugadores de tu plantel (${s.squad.length})</summary>
@@ -2616,8 +2618,8 @@ function renderTransfer() {
       <button class="option-btn" id="continue-btn">Continuar temporada</button>
     </div>
   `;
-  app.querySelectorAll('#market-list button').forEach((btn) => {
-    btn.addEventListener('click', () => { Engine.buyPlayer(Number(btn.dataset.i)); render(); });
+  app.querySelectorAll('#libres-list button').forEach((btn) => {
+    btn.addEventListener('click', () => { Engine.ficharLibre(Number(btn.dataset.i)); render(); });
   });
   app.querySelectorAll('#squad-list button').forEach((btn) => {
     btn.addEventListener('click', () => { Engine.sellPlayer(Number(btn.dataset.i)); render(); });
@@ -2970,7 +2972,9 @@ function renderMarketPanel() {
     <div class="card mercado-card">
       <div class="mercado-cabecera"><h3>Mercado de pases</h3><span class="muted">${money(s.budget)}</span></div>
       ${masaSalarialHtml()}
-      <p class="muted mercado-aviso">Podés negociar cuando quieras, pero nada se firma hasta que abra el mercado (al terminar el Apertura y en la pretemporada). Un acuerdo cerrado se concreta ahí.</p>
+      ${s.screen === 'transfer'
+        ? '<p class="mercado-aviso abierto"><strong>El mercado está abierto.</strong> Es ahora: lo que negociaste durante el año se firma en esta ventana y podés fichar a los que están libres.</p>'
+        : `<p class="muted mercado-aviso"><strong>El mercado está cerrado.</strong> Abre dos veces al año, como en la realidad: en la pretemporada (enero) y a mitad de año, al terminar el Apertura (junio). La próxima es en ${Engine.proximaVentanaDeMercado() || 'la próxima ventana'}. Mientras tanto podés negociar todo lo que quieras: el acuerdo que cierres se firma solo cuando abra.</p>`}
       ${avisoDePlantel()}
       ${finanzasHtml()}
 

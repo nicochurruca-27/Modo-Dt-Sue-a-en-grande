@@ -293,6 +293,99 @@ const Mercado = {
     return hechas;
   },
 
+  // ---------- Jugadores libres ----------
+  //
+  // Antes la pantalla del mercado ofrecía cinco jugadores inventados en el
+  // momento: no existían en ningún lado, no tenían club ni pasado, y aparecían
+  // y desaparecían solos. Ahora lo que se ofrece son jugadores LIBRES de
+  // verdad: veteranos a los que un club del país no les renovó y quedaron sin
+  // equipo. Salen del mismo mundo que todo lo demás, así que se los puede
+  // haber visto jugar el año pasado.
+  //
+  // Cuestan cero de pase: lo único que se paga es el sueldo. Por eso los que
+  // quedan libres son los que un club dejaría ir de verdad —grandes de edad y
+  // de los más flojos del plantel— y no figuras: un 80 gratis rompería el
+  // juego.
+  LIBRES_POR_VENTANA: 3,
+  LIBRES_MAXIMO: 8,
+  // Cuántas ventanas se queda un libre sin equipo antes de que se lo lleve
+  // otro o se retire.
+  VENTANAS_SIN_EQUIPO: 2,
+
+  libres(s) {
+    if (!s.libres) s.libres = [];
+    return s.libres;
+  },
+
+  // El jugador libre como se ve HOY: envejece igual que cualquier fichaje.
+  jugadorLibre(engine, j) {
+    const anio = engine.state.season ? engine.state.season.year : 1;
+    return { ...this.jugadorFichado(engine, j, anio), desdeClub: j.desdeClub, id: j.id };
+  },
+
+  // Se ejecuta al abrir cada ventana: primero se van los que llevaban mucho
+  // tiempo sin club y después algunos clubes sueltan gente.
+  liberarJugadores(engine) {
+    const s = engine.state;
+    const anio = s.season ? s.season.year : 1;
+    const lista = this.libres(s);
+
+    // Los que nadie fichó: se los llevó otro o colgaron los botines.
+    for (let i = lista.length - 1; i >= 0; i--) {
+      lista[i].ventanas = (lista[i].ventanas || 0) + 1;
+      if (lista[i].ventanas > this.VENTANAS_SIN_EQUIPO) lista.splice(i, 1);
+    }
+
+    // Los clubes se miran por reputación y no al azar: si se sortearan parejo,
+    // los libres salían casi siempre del ascenso y con 45 de valoración, o sea
+    // que no le servían a nadie. Un club grande suelta gente más seguido y la
+    // que suelta sirve.
+    const bolillero = [];
+    s.clubs.filter((c) => c.id !== s.clubId).forEach((c) => {
+      for (let i = 0; i < Math.max(1, c.reputation * c.reputation); i++) bolillero.push(c);
+    });
+    if (!bolillero.length) return lista;
+
+    const tocados = new Set();
+    let sueltos = 0;
+    for (let intento = 0; intento < 60 && sueltos < this.LIBRES_POR_VENTANA; intento++) {
+      if (lista.length >= this.LIBRES_MAXIMO) break;
+      const club = bolillero[Math.floor(Math.random() * bolillero.length)];
+      if (tocados.has(club.id)) continue;
+      const plantel = this.plantel(engine, club.id);
+      if (plantel.length <= MIN_PLANTEL_RIVAL) continue;
+      // El que un club deja ir es grande y está en la mitad floja del plantel:
+      // ni la figura ni el peor de todos. Primero los que se les termina el
+      // contrato, que es como pasa de verdad.
+      const flojos = plantel.slice().sort((a, b) => a.rating - b.rating)
+        .slice(0, Math.ceil(plantel.length / 2))
+        .filter((j) => !j.loanFrom && j.age >= 30);
+      const candidato = flojos.find((j) => (j.contractYears || 3) <= 1) || flojos.find((j) => j.age >= 33);
+      if (!candidato) continue;
+      tocados.add(club.id);
+      this.movimientosDe(s, club.id).fuera.push(candidato.id);
+      lista.push({
+        id: candidato.id,
+        name: candidato.name,
+        pos: candidato.pos,
+        posDetail: candidato.posDetail,
+        nation: candidato.nation,
+        role: candidato.role,
+        projection: candidato.projection,
+        ratingBase: candidato.rating,
+        edadBase: candidato.age,
+        contractYears: 1,
+        desdeAnio: anio,
+        desdeClub: club.id,
+        ventanas: 0,
+      });
+      sueltos++;
+    }
+    // Los planteles que soltaron gente cambiaron de fuerza.
+    if (sueltos) engine._fuerzas = {};
+    return lista;
+  },
+
   // ---------- Lo que se movió en el mundo ----------
   //
   // Los planteles rivales salen de un generador sembrado y no se guardan (ver

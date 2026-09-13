@@ -3967,7 +3967,7 @@ const Engine = {
     if (season.myDivision === 'D2' && season.roundIndex === TRANSFER_ROUND_D2 && !season.transferShown) {
       season.transferShown = true;
       season.transferReason = 'mid-edition';
-      s.market = this.generateMarket();
+      Mercado.liberarJugadores(this);
       s.screen = 'transfer';
       this.save();
       return;
@@ -5131,6 +5131,9 @@ const Engine = {
     // que vos negocies, así el mercado que ves ya tiene los cambios: el
     // jugador que te gustaba puede haberse ido a otro lado.
     Mercado.mercadoDeLosRivales(this);
+    // Y algunos clubes sueltan gente: son los jugadores libres que vas a poder
+    // fichar sin pagar pase.
+    Mercado.liberarJugadores(this);
     s.contractQueue = s.squad.filter((p) => p.contractYears <= 1).map((p) => p.id);
     // Y las ofertas que te llegan a vos van primero de todo: si vendés a
     // alguien, cambia a quién te conviene renovar y con cuánta plata salís al
@@ -5219,7 +5222,6 @@ const Engine = {
     // Lo que se negoció durante el año (panel Mercado) recién se firma acá:
     // fuera de la ventana no se mueve un peso.
     s.notasMercado = Mercado.resolverAcuerdos(this);
-    s.market = this.generateMarket();
     s.screen = 'transfer';
     this.save();
   },
@@ -5250,43 +5252,57 @@ const Engine = {
     return Math.round(base * ageFactor);
   },
 
-  generateMarket() {
-    const club = this.getClub(this.state.clubId);
-    return Array.from({ length: 5 }, (_, i) => {
-      const pos = SQUAD_POSITIONS[Math.floor(Math.random() * SQUAD_POSITIONS.length)];
-      const rating = Math.max(38, Math.min(92, Math.round(44 + club.reputation * 6 + (Math.random() * 20 - 6))));
-      const age = Math.round(18 + Math.random() * 15);
-      const price = Math.round(this.playerValue(rating, age) * (0.85 + Math.random() * 0.3));
-      const nation = this.rollNation();
-      return { id: `market-${i}-${Date.now()}`, name: this.randomPlayerName(nation), pos, rating, price, age, nation };
-    });
+  // Cuál es la próxima ventana de pases. El mercado abre DOS veces al año,
+  // como en la realidad: en la pretemporada (enero) y a mitad de año, al
+  // terminar el Apertura (junio). Fuera de esas dos se puede negociar, pero no
+  // se firma nada.
+  //
+  // OJO: los meses salen del almanaque del juego (el año arranca el 1º de
+  // febrero y termina en diciembre), no de las fechas exactas que publica AFA.
+  proximaVentanaDeMercado() {
+    const s = this.state;
+    if (!s.season) return null;
+    if (s.season.myDivision === 'D2') {
+      return s.season.transferShown
+        ? 'la pretemporada, en enero'
+        : 'la mitad de la temporada, en junio';
+    }
+    return s.season.edition === 'apertura'
+      ? 'junio, al terminar el Apertura'
+      : 'enero, en la pretemporada';
   },
 
-  // Un refuerzo SUMA al plantel. Antes reemplazaba al peor jugador de esa
-  // posición, así que comprar nunca agrandaba el plantel y encima te borraba
-  // a alguien sin avisar. Si el plantel está lleno hay que vender primero,
-  // como en la realidad.
-  buyPlayer(marketIndex) {
+  // Los jugadores que están sin club, tal como se ven hoy.
+  jugadoresLibres() {
+    return Mercado.libres(this.state).map((j) => Mercado.jugadorLibre(this, j));
+  },
+
+  // Fichar a un jugador libre. Un refuerzo SUMA al plantel: si está lleno hay
+  // que vender primero, como en la realidad. No cuesta pase —para eso está
+  // libre— pero sí entra en la masa salarial, que es lo que de verdad pesa.
+  ficharLibre(indice) {
     const s = this.state;
-    const offer = s.market[marketIndex];
-    if (!offer || s.budget < offer.price) return false;
+    const lista = Mercado.libres(s);
+    const guardado = lista[indice];
+    if (!guardado) return false;
     if (s.squad.length >= MAX_SQUAD) return false;
-    Economia.registrar(this, `Compra de ${offer.name}`, -offer.price);
+    const j = Mercado.jugadorLibre(this, guardado);
     s.squad.push({
-      id: offer.id,
-      name: offer.name,
-      pos: offer.pos,
-      rating: offer.rating,
-      // El jugador que llega del mercado se formó en otro lado, pero de acá
-      // en más crece en tu club: se usa tu cantera como aproximación.
-      potential: this.computePotential(offer.rating, offer.age, this.getClub(s.clubId)),
-      age: offer.age,
-      nation: offer.nation,
-      contractYears: 3,
+      id: j.id,
+      name: j.name,
+      pos: j.pos,
+      posDetail: j.posDetail,
+      rating: j.rating,
+      // Llega hecho de otro lado, pero de acá en más crece —o se apaga— en tu
+      // club: se usa tu cantera como aproximación.
+      potential: j.projection || this.computePotential(j.rating, j.age, this.getClub(s.clubId)),
+      age: j.age,
+      nation: j.nation,
+      contractYears: 2,
       energia: ENERGIA_MAXIMA,
     });
-    s.market.splice(marketIndex, 1);
-    Noticias.trasUnaOperacion(this, 'compra', offer, offer.price);
+    lista.splice(indice, 1);
+    Noticias.trasUnaOperacion(this, 'compra', j, 0);
     this.repairStartingSlots();
     this.save();
     return true;
