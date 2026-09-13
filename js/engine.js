@@ -108,11 +108,11 @@ const FECHAS_DE_COPAS = {
   },
 };
 
-// Las instancias de las llaves, en orden. El playoff de octavos es solo de la
+// Las instancias de las llaves, en orden. El repechaje de octavos es solo de la
 // Sudamericana: ahí el segundo de cada grupo se cruza con un tercero de la
 // Libertadores. En qué fecha cae cada una sale de FECHAS_DE_COPAS.
 const COPA_INTER_LLAVES = [
-  { etapa: 'playoff', nombre: 'Playoff de Octavos', alcanzado: 'el playoff de octavos', soloSudamericana: true },
+  { etapa: 'playoff', nombre: 'Playoffs (Repechaje)', alcanzado: 'el repechaje de octavos', soloSudamericana: true },
   { etapa: 'octavos', nombre: 'Octavos de Final', alcanzado: 'los octavos de final' },
   { etapa: 'cuartos', nombre: 'Cuartos de Final', alcanzado: 'los cuartos de final' },
   { etapa: 'semis', nombre: 'Semifinal', alcanzado: 'las semifinales' },
@@ -1522,7 +1522,7 @@ const Engine = {
   //
   // La Libertadores va primero porque le da de comer a la Sudamericana, como
   // en la realidad: los que pierden su última fase previa caen a los grupos de
-  // la Sudamericana, y los 8 terceros de grupo van a su playoff de octavos.
+  // la Sudamericana, y los 8 terceros de grupo van a su repechaje de octavos.
   // Por eso un club puede aparecer en las dos copas el mismo año, y cobrar
   // premio en las dos.
   simulateCopasDelAnio(qualification) {
@@ -1996,7 +1996,7 @@ const Engine = {
     if (alPlayoff.length) {
       const deLaSuda = porCampania(segundos).map((r) => r.id);
       const deLaLibertadores = alPlayoff.map((e) => e.id);
-      mark(deLaSuda.concat(deLaLibertadores), 'el playoff de octavos');
+      mark(deLaSuda.concat(deLaLibertadores), 'el repechaje de octavos');
       const ganadores = [];
       const cruces = Math.max(deLaSuda.length, deLaLibertadores.length);
       for (let i = 0; i < cruces; i++) {
@@ -3470,18 +3470,27 @@ const Engine = {
   // JSON-serializable (nada de objetos Date ni funciones) para que
   // sobreviva bien al save/load: la fecha se calcula con un contador de
   // días (dayCount) sobre un almanaque fijo, ver formatCalendarDate.
-  // En qué día del almanaque se juega una fecha del torneo. Una fecha es una
-  // semana (ver advanceCalendarDay), más una semana extra por cada parate FIFA
-  // que haya quedado atrás. El día 0 es el 1° de febrero, así que la fecha 0
-  // se juega el día 7.
+  // En qué día del almanaque se juega una fecha del torneo que se está
+  // jugando. Una fecha es una semana (ver advanceCalendarDay), más una semana
+  // extra por cada parate FIFA que haya en el medio.
   //
-  // OJO: solo vale para el PRIMER torneo del año. En el Clausura el roundIndex
-  // vuelve a empezar de cero pero el almanaque sigue corriendo, así que la
-  // cuenta daría cualquier cosa. Hoy lo usa únicamente la Recopa, que se juega
-  // en las dos primeras fechas de febrero.
-  diaDeLaFechaDeLiga(roundIndex) {
-    const parates = FIFA_ROUNDS.filter((r) => r <= roundIndex).length;
-    return 7 * (roundIndex + 1 + parates);
+  // La cuenta se ancla en HOY y no en el 1° de febrero a propósito: en Primera
+  // el año son DOS torneos y el roundIndex del Clausura vuelve a cero, así que
+  // contar desde el arranque del año daría cualquier cosa justo en las llaves
+  // de las copas, que son las que caen ahí.
+  //
+  // Devuelve null para una fecha que ya pasó: no tiene sentido anunciar el día
+  // de un partido que ya se jugó.
+  diaDeLaFecha(roundIndex) {
+    const s = this.state;
+    if (roundIndex == null || !s.season || !s.calendar) return null;
+    const actual = s.season.roundIndex;
+    if (roundIndex < actual) return null;
+    // La fecha que viene se juega al cierre de esta semana: el día 7 es el que
+    // destapa el partido (ver advanceCalendarDay).
+    const finDeSemana = (s.calendar.dayCount || 0) + Math.max(0, 7 - (s.calendar.dayInWeek || 0));
+    const parates = FIFA_ROUNDS.filter((r) => r > actual && r <= roundIndex).length;
+    return finDeSemana + 7 * (roundIndex - actual + parates);
   },
 
   // Los días en que se juegan la ida y la vuelta de la Recopa, para poder
@@ -3490,7 +3499,20 @@ const Engine = {
   diasDeLaRecopa() {
     const rondas = (this.calendarioDeCopas() || {}).recopa;
     if (!rondas || !rondas.length) return null;
-    return rondas.map((ronda) => this.diaDeLaFechaDeLiga(ronda));
+    return rondas.map((ronda) => this.diaDeLaFecha(ronda));
+  },
+
+  // Lo mismo para una instancia de las llaves de las copas internacionales
+  // (repechaje, octavos, cuartos, semis, final). Devuelve null cuando todavía
+  // no se puede saber: en Primera las llaves se juegan en el CLAUSURA, así que
+  // mientras corre el Apertura no hay día que anunciar y la pantalla prefiere
+  // no decir nada antes que decir "todavía no se jugó".
+  diasDeLaEtapaDeLlave(etapa) {
+    const llaves = (this.calendarioDeCopas() || {}).llaves;
+    const rondas = llaves && llaves[etapa];
+    if (!rondas || !rondas.length) return null;
+    const dias = rondas.map((ronda) => this.diaDeLaFecha(ronda));
+    return dias.some((d) => d != null) ? dias : null;
   },
 
   startCalendarWeek(nextAction) {

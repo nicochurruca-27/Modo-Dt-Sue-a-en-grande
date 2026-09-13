@@ -551,10 +551,10 @@ const Economia = {
   // paga aparte) y por qué fases previas pasó.
   premioInternacional(engine, copa, fase, extras) {
     const tabla = copa === 'Libertadores' ? ECONOMIA_DATOS.premios.libertadores : ECONOMIA_DATOS.premios.sudamericana;
-    // El playoff de octavos de la Sudamericana no paga premio propio, pero
+    // El repechaje de octavos de la Sudamericana no paga premio propio, pero
     // tiene que estar en la escalera igual: si no, un club eliminado ahí no
     // cobraría ni lo que le corresponde por la fase de grupos.
-    const escalera = ['la fase previa', 'la fase de grupos', 'el playoff de octavos', 'los octavos de final', 'los cuartos de final', 'las semifinales', 'la final', 'el título'];
+    const escalera = ['la fase previa', 'la fase de grupos', 'el repechaje de octavos', 'los octavos de final', 'los cuartos de final', 'las semifinales', 'la final', 'el título'];
     const claves = ['fasePrevia', 'grupos', 'playoffOctavos', 'octavos', 'cuartos', 'semifinal', 'subcampeon', 'campeon'];
     const hasta = escalera.indexOf(fase);
     if (hasta < 0) return 0;

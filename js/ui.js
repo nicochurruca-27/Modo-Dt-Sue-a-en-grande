@@ -243,9 +243,9 @@ function enLaCopa(c) {
 
 // Los colores de una tabla de grupo, que son los que el reglamento de cada
 // copa le da a cada puesto. En la Libertadores pasan los dos primeros, el
-// tercero no queda eliminado (se va al playoff de octavos de la Sudamericana)
+// tercero no queda eliminado (se va al repechaje de octavos de la Sudamericana)
 // y el cuarto sí. En la Sudamericana pasa derecho el primero, el segundo
-// tiene que ganar ese mismo playoff contra un tercero de la Libertadores, y
+// tiene que ganar ese mismo repechaje contra un tercero de la Libertadores, y
 // los otros dos se van.
 function zonaDeGrupo(copa, index) {
   if (copa === 'Libertadores') return index < 2 ? 'champ' : index === 2 ? 'suda' : 'desc';
@@ -256,7 +256,7 @@ function leyendaDeGrupo(copa) {
   if (copa === 'Libertadores') {
     return tableLegend([
       { zone: 'champ', text: 'Pasan a los octavos de final' },
-      { zone: 'suda', text: 'Se va a la Copa Sudamericana (playoff de octavos)' },
+      { zone: 'suda', text: 'Se va al repechaje de la Copa Sudamericana' },
       { zone: 'desc', text: 'Queda eliminado' },
     ]);
   }
@@ -321,6 +321,24 @@ function ladoDeCruceHtml(club, lado) {
   return `<span class="cruce-lado ${lado}">${clubCrest({ id: club.id, name: club.nombre }, 18)}<span>${club.nombre}</span></span>`;
 }
 
+// Cómo salió cada pierna de un cruce, siempre en el orden de arriba (el de la
+// izquierda primero), aunque en la cancha haya sido al revés. El número del
+// medio es el GLOBAL, así que sin esto no había forma de saber cómo había
+// salido la ida.
+//
+// Solo tiene sentido con la vuelta ya jugada: mientras haya un solo partido,
+// el global ES el resultado de la ida y repetirlo abajo no suma nada.
+function piernasDeUnCruceHtml(cruce) {
+  if (cruce.partidos.length < 2) return '';
+  const nombres = ['Ida', 'vuelta'];
+  return cruce.partidos.map((p, i) => {
+    const aDeLocal = p.local === cruce.a;
+    const gA = aDeLocal ? p.golesLocal : p.golesVisitante;
+    const gB = aDeLocal ? p.golesVisitante : p.golesLocal;
+    return `${nombres[i] || `Partido ${i + 1}`} ${gA} - ${gB}`;
+  }).join(', ');
+}
+
 // Un cruce: los dos escudos con el global en el medio, y abajo cómo viene o
 // cómo terminó.
 function cruceHtml(copa, cruce, esFinal, cuando) {
@@ -332,20 +350,43 @@ function cruceHtml(copa, cruce, esFinal, cuando) {
   // `cuando` son los días del almanaque de la ida y la vuelta, si se saben:
   // saber que falta y saber para cuándo no es lo mismo.
   const dia = (i) => (cuando && cuando[i] != null ? formatCalendarDate(cuando[i], null, false) : null);
-  let detalle;
-  if (cruce.ganador) detalle = `${esFinal ? 'Campeón' : 'Pasó'} ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`;
-  else if (jugados) detalle = dia(1) ? `Falta la vuelta, el ${dia(1)}` : 'Falta la vuelta';
-  else if (dia(0) && dia(1)) detalle = `Ida el ${dia(0)}, vuelta el ${dia(1)}`;
-  else if (dia(0)) detalle = `Se juega el ${dia(0)}`;
-  else detalle = 'Todavía no se jugó';
+  const partes = [];
+  const piernas = piernasDeUnCruceHtml(cruce);
+  if (piernas) partes.push(piernas);
+  if (cruce.ganador) partes.push(`${esFinal ? 'Campeón' : 'Pasó'} ${nombre(cruce.ganador)}${cruce.penales ? ', por penales' : ''}`);
+  // Sin fecha no se dice nada: un global sin ganador ya se lee como que el
+  // cruce está abierto, y arriba de la lista ya dice cuándo es la vuelta.
+  else if (jugados && dia(1)) partes.push(`Falta la vuelta, el ${dia(1)}`);
+  else if (dia(0) && dia(1)) partes.push(`Ida el ${dia(0)}, vuelta el ${dia(1)}`);
+  else if (dia(0)) partes.push(`Se juega el ${dia(0)}`);
+  // Si no se sabe el día no se dice nada: "todavía no se jugó" ya se entiende
+  // con el "vs" del medio y solo ensucia la lista.
+  const detalle = partes.join('. ');
   return `<li class="cruce${mio ? ' me-line' : ''}">
     <span class="cruce-equipos">
       ${ladoDeCruceHtml(copa.clubes[cruce.a], 'izquierda')}
       <strong>${marcador}</strong>
       ${ladoDeCruceHtml(copa.clubes[cruce.b], 'derecha')}
     </span>
-    <span class="muted cruce-detalle">${detalle}</span>
+    ${detalle ? `<span class="muted cruce-detalle">${detalle}</span>` : ''}
   </li>`;
+}
+
+// Cuándo se juega la instancia que se está mirando. Devuelve '' cuando ya
+// terminó o cuando todavía no se sabe el día: antes que poner "todavía no se
+// jugó", mejor no poner nada.
+function fechaDeLaEtapaHtml(inst, dias) {
+  const cruces = inst.cruces || [];
+  if (!dias || !cruces.length || cruces.every((c) => c.ganador)) return '';
+  const dia = (i) => (dias[i] != null ? formatCalendarDate(dias[i], null, false) : null);
+  // Todos los cruces de una instancia se juegan la misma fecha, así que
+  // alcanza con mirar cuántos partidos lleva cualquiera de ellos.
+  const jugados = Math.max(...cruces.map((c) => c.partidos.length));
+  let texto = '';
+  if (jugados >= 1) texto = dia(1) ? `La vuelta se juega el ${dia(1)}` : '';
+  else if (dia(0) && dia(1)) texto = `Ida el ${dia(0)}, vuelta el ${dia(1)}`;
+  else if (dia(0)) texto = `Se juega el ${dia(0)}`;
+  return texto ? `<p class="muted fecha-etapa">${texto}</p>` : '';
 }
 
 function llaveHtml(copa) {
@@ -360,6 +401,23 @@ function llaveHtml(copa) {
   const campeon = ll.campeon
     ? `<p class="${ll.campeon === Engine.state.clubId ? 'me-line' : ''}">Campeón: <strong>${copa.clubes[ll.campeon].nombre}</strong>${ll.subcampeon ? ` <span class="muted">— finalista: ${copa.clubes[ll.subcampeon].nombre}</span>` : ''}</p>`
     : '';
+  // Los días de la instancia que se está mirando, si se saben. En Primera las
+  // llaves se juegan en el Clausura, así que mientras corre el Apertura esto
+  // da null y no hay fecha para anunciar.
+  //
+  // La fecha va UNA sola vez arriba y no cruce por cruce: los ocho se juegan
+  // el mismo día, así que repetirla ocho veces es el mismo ruido que el
+  // "todavía no se jugó" que había antes. Por eso a cruceHtml no se le pasa
+  // `cuando`: abajo de cada cruce queda solo cómo viene o cómo terminó.
+  const cuando = fechaDeLaEtapaHtml(inst, Engine.diasDeLaEtapaDeLlave(inst.etapa));
+  // El repechaje es el único cruce del juego donde los dos lados vienen de
+  // torneos distintos, y mirando la lista no hay forma de darse cuenta. Los
+  // cruces están armados siempre igual —el segundo de la Sudamericana a la
+  // izquierda y el tercero de la Libertadores a la derecha, ver
+  // cerrarGruposDeUnaCopa— así que alcanza con decirlo una vez arriba.
+  const aclaracion = inst.etapa === 'playoff'
+    ? `<p class="muted nota-repechaje">A la izquierda, los <strong>2º de grupo de la Sudamericana</strong>; a la derecha, los <strong>3º de grupo de la Libertadores</strong>, que se cayeron de esa copa. Los 8 ganadores se meten en octavos, donde ya esperan los 8 primeros de grupo.</p>`
+    : '';
   return `
     ${campeon}
     ${cuadro}
@@ -368,6 +426,8 @@ function llaveHtml(copa) {
       <strong>${def.nombre}</strong>
       <button class="option-btn small" id="etapa-next-btn">▶</button>
     </div>
+    ${cuando}
+    ${aclaracion}
     <ul class="llave-lista">${inst.cruces.map((c) => cruceHtml(copa, c, inst.etapa === 'final')).join('')}</ul>
   `;
 }
@@ -468,7 +528,13 @@ function anchoParaDibujar() {
 //
 // Los topes son para los dos extremos: abajo, que un cuadro de 6 columnas en
 // un panel angosto no baje de escudos ilegibles (ahí sí se desliza); arriba,
-// que uno de 4 columnas en una pantalla ancha no termine con escudos gigantes.
+// que una llave de pocas columnas no termine con escudos gigantes.
+//
+// El tope de arriba tiene que dejar llenar el panel ANCHO: el de la Copa
+// Argentina son 6 columnas y nunca llega, pero el de una copa internacional
+// son 4 y con un tope chico se quedaba dibujando 350 px en un panel de 460 y
+// dejaba media carpeta vacía al costado. Recién se aplica en una llave de 2
+// columnas, donde sí haría falta frenarlo.
 //
 // La altura de la fila sale del escudo y no del ancho de columna: son 64
 // equipos en vertical, así que cada píxel de más se multiplica por 32.
@@ -486,7 +552,7 @@ function cuadroMedidas(columnas, ancho) {
   const porAlto = altoDeDibujoForzado
     ? (altoDeDibujoForzado * 1.6 / (2 ** columnas / 2) - 6) / 0.66
     : Infinity;
-  const tope = anchoDeDibujoForzado ? 97 : 38;
+  const tope = anchoDeDibujoForzado ? 97 : 72;
   const col = Math.max(25, Math.min(tope, Math.floor(Math.min(porAncho, porAlto))));
   const escudo = Math.round(col * 0.66);
   return { fila: escudo + 6, col, escudo };

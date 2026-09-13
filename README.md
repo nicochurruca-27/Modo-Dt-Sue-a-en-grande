@@ -119,6 +119,13 @@ abrir seguís donde quedaste.
   no clasifican siempre los mismos: los grandes van casi todos los años y los
   chicos se cuelan de vez en cuando. El campeón de cada copa y hasta dónde llegó tu club
   quedan en la pestaña "Copas" del panel.
+- **El repechaje de la Sudamericana**: entre los grupos y los octavos, los 8
+  segundos de grupo de la Sudamericana se cruzan con los 8 terceros de la
+  Libertadores, que se caen de esa copa. Los cruces no se sortean: van por
+  campaña (el 9º con el 24º, el 10º con el 23º, y así), y los 8 primeros de
+  grupo esperan en octavos. En el panel los dos lados siempre van en la misma
+  columna —los de la Sudamericana a la izquierda, los de la Libertadores a la
+  derecha— y arriba de la lista dice cuál es cuál.
 - **La primera temporada arranca con las copas en curso**: como los cupos de
   un año salen de la temporada anterior, el año 1 de una carrera no tendría
   copas. Así que arranca con el sorteo real, cargado a mano en

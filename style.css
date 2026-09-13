@@ -575,6 +575,18 @@ h1, h2, h3 {
 .cruce-marcador { color: var(--muted); margin: 0 3px; }
 .cruce-detalle { font-size: 0.74rem; }
 
+/* La aclaración de quién es quién en el repechaje de la Sudamericana: los dos
+   lados vienen de torneos distintos y sin esto no hay forma de saberlo. */
+.nota-repechaje {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  margin: 2px 0 6px;
+}
+.nota-repechaje strong { color: var(--text); font-weight: 600; }
+
+/* Cuándo se juega la instancia de copa que se está mirando. */
+.fecha-etapa { font-size: 0.76rem; margin: 2px 0 6px; }
+
 /* Los cuadros dibujados (Copa Argentina, las copas, la fase final). Son
    anchos, así que si no entran se deslizan, igual que la cancha. */
 .cuadro-scroll {
