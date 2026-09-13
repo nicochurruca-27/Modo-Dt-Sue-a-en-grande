@@ -1346,7 +1346,7 @@ function pitchMarkingsSvg(w, h) {
 // nombre debajo — el mismo estilo que las planillas de formación típicas.
 // El aro de color (verde/amarillo/rojo) indica qué tan bien juega ahí (ver
 // Engine.positionFit); el aro celeste es la selección para el cambio.
-function playerMarkerSvg(p, club, x, y, selected) {
+function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   const kit = clubKit(club);
   const label = p.number != null ? p.number : p.rating;
   const bandPath = kit.band
@@ -1370,6 +1370,9 @@ function playerMarkerSvg(p, club, x, y, selected) {
     <g class="player-marker" data-player="${p.id}" transform="translate(${x}, ${y})">
       ${title}
       ${selected ? `<rect x="-8" y="-8" width="${w + 16}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 20}" rx="10" fill="rgba(56,189,248,0.28)" />` : ''}
+      <!-- Zona de toque: sin esto el hueco entre la camiseta y la placa del
+           nombre no responde y el toque se lo come el fondo de la cancha. -->
+      <rect x="-4" y="-2" width="${w + 8}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 4}" rx="8" fill="transparent" />
       ${fitStroke ? `<rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="none" stroke="${fitStroke}" stroke-width="2.5" />` : ''}
       <g transform="scale(${scale})">
         <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
@@ -1381,6 +1384,7 @@ function playerMarkerSvg(p, club, x, y, selected) {
       <rect x="-3" y="${label2Y}" width="${w + 6}" height="${PITCH_LABEL2_H}" rx="3" fill="rgba(0,0,0,0.4)" />
       <text x="${w / 2}" y="${label2Y + PITCH_LABEL2_H - 3.5}" text-anchor="middle" font-size="9" font-weight="600" fill="#cbd5e1">${infoLine}</text>
       ${barraDeEnergiaSvg(p, -3, label2Y + PITCH_LABEL2_H + 2, w + 6)}
+      ${amonestado ? `<rect x="${w - 7}" y="-5" width="9" height="12" rx="2" fill="#eab308" stroke="#78350f" stroke-width="1" />` : ''}
     </g>
   `;
 }
@@ -1466,7 +1470,12 @@ function benchJerseySvg(p, club) {
   `;
 }
 
-function buildPitchSvg(xi, club) {
+function buildPitchSvg(xi, club, opciones) {
+  // Por defecto la cancha resalta al jugador que tocaste en el panel de
+  // plantel; el entretiempo le pasa su propia selección y la lista de
+  // amonestados del primer tiempo (ver panelDeCambiosHtml).
+  const resaltado = opciones && 'resaltado' in opciones ? opciones.resaltado : selectedPlayerId;
+  const amonestados = (opciones && opciones.amonestados) || null;
   const f = xi.formation;
   const rows = [
     { type: 'del', players: xi.del },
@@ -1512,7 +1521,7 @@ function buildPitchSvg(xi, club) {
     row.players.forEach((p, j) => {
       const virtualIndex = count === 1 ? (maxCols - 1) / 2 : spanOffset + (j * span) / (count - 1);
       const x = gridStartX + virtualIndex * gridStep;
-      playersMarkup += playerMarkerSvg(p, club, x, y, p.id === selectedPlayerId);
+      playersMarkup += playerMarkerSvg(p, club, x, y, p.id === resaltado, amonestados ? amonestados.has(p.id) : false);
     });
   });
 
@@ -2771,13 +2780,12 @@ function amonestadosDelPartido(p) {
     .map((e) => e.id));
 }
 
-function fichaDeCambioHtml(jug, grupo, amonestados, bloqueado) {
+function fichaDeCambioHtml(jug, grupo, amonestados) {
   const baja = Engine.outLabel(jug);
   const elegido = cambioSeleccion && cambioSeleccion.id === jug.id;
-  const inhabilitado = bloqueado || !!baja;
   return `
-    <button class="cambio-ficha${elegido ? ' elegido' : ''}${inhabilitado ? ' inhabilitado' : ''}"
-      data-cambio="${jug.id}" data-grupo="${grupo}" ${inhabilitado ? 'disabled' : ''}>
+    <button class="cambio-ficha${elegido ? ' elegido' : ''}${baja ? ' inhabilitado' : ''}"
+      data-cambio="${jug.id}" data-grupo="${grupo}" ${baja ? 'disabled' : ''}>
       <span class="pos ${jug.pos}">${jug.pos}</span>
       <span class="nombre">${jug.name}${amonestados.has(jug.id) ? ' <span class="amonestado">🟨</span>' : ''}</span>
       <span class="valor">${baja || jug.rating}</span>
@@ -2785,40 +2793,44 @@ function fichaDeCambioHtml(jug, grupo, amonestados, bloqueado) {
   `;
 }
 
+// El once va dibujado en la cancha, igual que en el panel de plantel (así lo
+// mirás como lo mirás siempre, con las camisetas y los puestos), y el banco
+// va en lista, que son doce nombres y en camisetas no se leen bien.
 function panelDeCambiosHtml(p) {
   const s = Engine.state;
+  const club = Engine.getClub(s.clubId);
   const quedan = Engine.cambiosQueQuedan();
   const amonestados = amonestadosDelPartido(p);
-  const enCancha = Engine.getStartingXI().starters;
   const salieron = new Set((p.cambios || []).map((c) => c.sale));
   const banco = Engine.getBanco().filter((j) => !salieron.has(j.id));
   const hechos = (p.cambios || []);
-  const sinCambios = quedan <= 0;
+  const enCancha = cambioSeleccion && cambioSeleccion.grupo === 'cancha' ? cambioSeleccion.id : null;
 
   return `
     <details class="collapsible cambios-panel" id="panel-cambios" ${panelDeCambiosAbierto ? 'open' : ''}>
-      <summary>Hacer un cambio <span class="muted">${sinCambios ? '· no te quedan' : `· te quedan ${quedan}`}</span></summary>
+      <summary>Hacer un cambio <span class="muted">${quedan ? `· te quedan ${quedan}` : '· no te quedan'}</span></summary>
       <div class="collapsible-body">
         ${hechos.length ? `<ul class="cambios-hechos">${hechos.map((c) => `
           <li><span class="sale">↓ ${c.saleNombre}</span><span class="entra">↑ ${c.entraNombre}</span></li>
         `).join('')}</ul>` : ''}
-        ${sinCambios ? '<p class="muted">Ya usaste los tres cambios del partido.</p>' : `
-          <p class="muted">${cambioSeleccion
+        <p class="muted">${!quedan
+          ? 'Ya usaste los tres cambios del partido. Así está parado el equipo para el segundo tiempo.'
+          : cambioSeleccion
             ? (cambioSeleccion.grupo === 'cancha'
               ? 'Ahora elegí al que entra desde el banco.'
-              : 'Ahora elegí al que sale de la cancha.')
-            : 'Tocá al que sale y después al que entra (o al revés).'}</p>
-          <h4>En la cancha</h4>
-          <div class="cambio-lista">
-            ${enCancha.map((j) => fichaDeCambioHtml(j, 'cancha', amonestados, false)).join('')}
-          </div>
+              : 'Ahora tocá al que sale de la cancha.')
+            : 'Tocá al que sale de la cancha y después al que entra del banco (o al revés).'}</p>
+        <div class="pitch-scroll cambio-cancha${quedan ? '' : ' sin-cambios'}">
+          ${buildPitchSvg(Engine.getStartingXI(), club, { resaltado: enCancha, amonestados })}
+        </div>
+        ${quedan ? `
           <h4>En el banco</h4>
           <div class="cambio-lista">
             ${banco.length
-              ? banco.map((j) => fichaDeCambioHtml(j, 'banco', amonestados, false)).join('')
+              ? banco.map((j) => fichaDeCambioHtml(j, 'banco', amonestados)).join('')
               : '<p class="muted">No te queda nadie en el banco.</p>'}
           </div>
-        `}
+        ` : ''}
       </div>
     </details>
   `;
@@ -2878,6 +2890,11 @@ function renderEntretiempo() {
   app.querySelectorAll('.cambio-ficha').forEach((btn) => {
     btn.addEventListener('click', () => tocarFichaDeCambio(btn.dataset.cambio, btn.dataset.grupo));
   });
+  if (Engine.cambiosQueQuedan() > 0) {
+    app.querySelectorAll('.cambio-cancha .player-marker').forEach((el) => {
+      el.addEventListener('click', () => tocarFichaDeCambio(el.getAttribute('data-player'), 'cancha'));
+    });
+  }
   app.querySelectorAll('#entretiempo-opciones .option-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       cambioSeleccion = null;

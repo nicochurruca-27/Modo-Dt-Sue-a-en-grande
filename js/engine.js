@@ -4424,7 +4424,7 @@ const Engine = {
       mios: 0,
       suyos: 0,
       eventos: [],
-      cambio: null,
+      cambios: [],
     };
     this.jugarUnTiempo(1, option.tacticMod);
     s.screen = 'entretiempo';

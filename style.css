@@ -1804,6 +1804,12 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   color: var(--muted);
 }
 
+/* La cancha del entretiempo: la misma que el panel de plantel, pero acá cada
+   camiseta es el jugador que sale. */
+.cambio-cancha { margin-bottom: 10px; }
+.cambio-cancha .player-marker { cursor: pointer; }
+.cambio-cancha.sin-cambios .player-marker { cursor: default; }
+
 .cambio-lista {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
