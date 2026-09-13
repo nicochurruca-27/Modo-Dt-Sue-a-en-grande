@@ -782,7 +782,7 @@ const Mercado = {
   cerrarAcuerdo(engine, j, costo, mensaje) {
     const s = engine.state;
     const m = this.init(s);
-    m.acuerdos.push({
+    const acuerdo = {
       clubId: j.clubId,
       jugadorId: j.id,
       tipo: j.estado,
@@ -794,8 +794,62 @@ const Mercado = {
         id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
         rating: j.rating, age: j.age, nation: j.nation, role: j.role,
       },
+    };
+
+    // Si el mercado está ABIERTO, el pase se hace ahora mismo y el jugador se
+    // suma al plantel (entra por la reserva, como cualquier refuerzo). Decirte
+    // "se concreta cuando abra el mercado" estando adentro de la ventana no
+    // tenía ningún sentido: el mercado es hoy.
+    //
+    // La excepción es el de fin de contrato: ese no se compra, firma libre
+    // cuando se le termina el contrato con su club, así que espera igual.
+    if (acuerdo.tipo !== 'fin-contrato' && engine.mercadoAbierto()) {
+      const hecho = this.concretarAcuerdo(engine, acuerdo);
+      return this.responder(engine, j.id, hecho.ok
+        ? `${mensaje} Ya está en tu plantel, en la reserva.`
+        // Si no se pudo (plantel lleno, no te alcanzaba la plata), la excusa
+        // es más útil que el "acepta".
+        : hecho.nota, hecho.ok);
+    }
+
+    m.acuerdos.push(acuerdo);
+    return this.responder(engine, j.id, acuerdo.tipo === 'fin-contrato'
+      ? `${mensaje} Se suma cuando se le termine el contrato.`
+      : `${mensaje} Se concreta cuando abra el mercado de pases.`, true);
+  },
+
+  // Concreta UN acuerdo: paga y suma el jugador al plantel. Devuelve
+  // { ok, nota }: la nota es la línea que lo cuenta, o la excusa si no se pudo.
+  concretarAcuerdo(engine, a) {
+    const s = engine.state;
+    const m = this.init(s);
+    const j = a.jugador;
+    if (s.squad.length >= MAX_SQUAD) {
+      return { ok: false, nota: `${j.name} no pudo sumarse: el plantel está lleno (${MAX_SQUAD}). El acuerdo se cayó.` };
+    }
+    if (s.budget < a.precio) {
+      return { ok: false, nota: `${j.name} no pudo sumarse: hacían falta ${this.plata(a.precio)} y no los tenías. El acuerdo se cayó.` };
+    }
+    // Pasa por Economia.registrar y no por s.budget directo, para que la
+    // compra quede anotada en el detalle de "de dónde sale la plata".
+    Economia.registrar(engine, `Fichaje de ${j.name}`, -a.precio);
+    s.squad.push({
+      id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
+      rating: j.rating, age: j.age, nation: j.nation, role: j.role,
+      contractYears: 3,
+      potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
+      // Llega entero: no viene de jugar.
+      energia: ENERGIA_MAXIMA,
     });
-    return this.responder(engine, j.id, `${mensaje} Se concreta cuando abra el mercado de pases.`, true);
+    // Deja de estar en el plantel de su club (ver plantel(), que filtra los
+    // fichados).
+    m.fichados.push(j.id);
+    engine._fuerzas = {};
+    engine.repairStartingSlots();
+    if (typeof Noticias !== 'undefined') Noticias.trasUnaOperacion(engine, 'compra', j, a.precio);
+    return { ok: true, nota: a.tipo === 'fin-contrato'
+      ? `${j.name} llegó libre desde ${engine.getClub(a.clubId).name}: pagaste ${this.plata(a.precio)} de prima.`
+      : `${j.name} llegó desde ${engine.getClub(a.clubId).name} por ${this.plata(a.precio)}.` };
   },
 
   responder(engine, jugadorId, texto, ok) {
@@ -826,33 +880,7 @@ const Mercado = {
     m.acuerdos = [];
 
     pendientes.forEach((a) => {
-      const j = a.jugador;
-      if (s.squad.length >= MAX_SQUAD) {
-        notas.push(`${j.name} no pudo sumarse: el plantel está lleno (${MAX_SQUAD}). El acuerdo se cayó.`);
-        return;
-      }
-      if (s.budget < a.precio) {
-        notas.push(`${j.name} no pudo sumarse: hacían falta ${this.plata(a.precio)} y no los tenías. El acuerdo se cayó.`);
-        return;
-      }
-      // Pasa por Economia.registrar y no por s.budget directo, para que la
-      // compra quede anotada en el detalle de "de dónde sale la plata".
-      Economia.registrar(engine, `Fichaje de ${j.name}`, -a.precio);
-      s.squad.push({
-        id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
-        rating: j.rating, age: j.age, nation: j.nation, role: j.role,
-        contractYears: 3,
-        potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
-        // Llega de pretemporada: entero.
-        energia: ENERGIA_MAXIMA,
-      });
-      m.fichados.push(j.id);
-      notas.push(a.tipo === 'fin-contrato'
-        ? `${j.name} llegó libre desde ${engine.getClub(a.clubId).name}: pagaste ${this.plata(a.precio)} de prima.`
-        : `${j.name} llegó desde ${engine.getClub(a.clubId).name} por ${this.plata(a.precio)}.`);
-      if (typeof Noticias !== 'undefined') {
-        Noticias.trasUnaOperacion(engine, 'compra', j, a.precio);
-      }
+      notas.push(this.concretarAcuerdo(engine, a).nota);
     });
 
     // Cada mercado nuevo borra los portazos del anterior: se puede volver a

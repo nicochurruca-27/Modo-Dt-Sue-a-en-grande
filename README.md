@@ -73,6 +73,13 @@ abrir seguís donde quedaste.
   mismo botón, que mientras corre dice "Detener". Antes "Avanzar" saltaba de
   una hasta el próximo día con algo: los días pasaban por adentro pero no se
   veían.
+- **Con el mercado abierto, el fichaje es en el acto**: si cerrás un acuerdo
+  por un jugador con contrato mientras la ventana está abierta (todo enero, o
+  en la ventana del medio del año), el pase se hace ahí mismo y el jugador ya
+  aparece en tu plantel, en la reserva, listo para que lo acomodes. Fuera de la
+  ventana el acuerdo queda anotado y se firma cuando abra. El de **fin de
+  contrato** es la excepción: ese no se compra, firma libre cuando se le
+  termina el contrato con su club, así que espera igual.
 - **Jugadores libres**: en cada ventana de pases algunos clubes del país dejan
   ir gente —grandes de edad, de la mitad floja del plantel y con el contrato
   terminándose, que es a quien un club deja ir de verdad— y esos jugadores

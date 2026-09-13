@@ -3039,6 +3039,18 @@ function masaSalarialHtml() {
   `;
 }
 
+// Después de negociar. Con el mercado abierto el fichaje se concreta en el
+// acto, así que no alcanza con repintar el panel del mercado: el jugador ya
+// está en tu plantel (en la reserva) y el panel de plantel tiene que mostrarlo
+// sin que haya que ir y volver de pantalla.
+function trasNegociar() {
+  renderMarketPanel();
+  renderSquadPanel();
+  // Y si estás adentro de la pantalla del mercado, ahí también se ve el
+  // plantel y la plata que te queda.
+  if (Engine.state.screen === 'transfer') renderTransfer();
+}
+
 function renderMarketPanel() {
   const panel = document.getElementById('market-panel');
   if (!panel) return;
@@ -3115,10 +3127,10 @@ function renderMarketPanel() {
     btn.addEventListener('click', () => { Mercado.consultar(Engine, elegido, btn.dataset.mercadoConsultar); renderMarketPanel(); });
   });
   panel.querySelectorAll('[data-mercado-negociar]').forEach((btn) => {
-    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoNegociar); renderMarketPanel(); });
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoNegociar); trasNegociar(); });
   });
   panel.querySelectorAll('[data-mercado-clausula]').forEach((btn) => {
-    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoClausula, true); renderMarketPanel(); });
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoClausula, true); trasNegociar(); });
   });
   panel.querySelectorAll('[data-mercado-cancelar]').forEach((btn) => {
     btn.addEventListener('click', () => { Mercado.cancelarAcuerdo(Engine, btn.dataset.mercadoCancelar); renderMarketPanel(); });
