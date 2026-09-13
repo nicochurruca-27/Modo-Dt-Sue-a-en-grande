@@ -283,7 +283,7 @@ const Noticias = {
 
   // Resultado de los torneos que se resuelven al cerrar el año: la
   // Libertadores y la Sudamericana, y también los títulos nacionales (el
-  // Campeón de Liga, el Trofeo de Campeones y las dos Supercopas).
+  // Campeón Anual, el Trofeo de Campeones y las dos Supercopas).
   // Cómo te fue en la previa de la Libertadores. Es la única instancia del
   // año que define en qué copa jugás (o si te quedás sin ninguna), así que
   // merece su noticia: antes se resolvía en silencio y te enterabas al ver los
@@ -325,7 +325,7 @@ const Noticias = {
       const nombre = c.sinArticulo ? c.copa : `${art} ${c.copa}`;
       const del = c.sinArticulo ? c.copa : `${art === 'la' ? 'de la' : 'del'} ${c.copa}`;
       const donde = c.nombrePropio ? 'Vuelta olímpica en casa.' : 'Vuelta olímpica en el continente.';
-      // El Campeón de Liga no se gana en un partido sino sumando todo el año,
+      // El Campeón Anual no se gana en un partido sino sumando todo el año,
       // así que se cuenta distinto: no hay final ni rival al que vencer.
       if (c.sinArticulo) {
         const suyo = c.userWon;

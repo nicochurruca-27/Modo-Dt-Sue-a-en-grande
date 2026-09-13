@@ -61,6 +61,11 @@ abrir seguís donde quedaste.
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
   genérico con sus iniciales.
+- **La pantalla de fin de temporada cierra con la Tabla Anual entera** (los 30
+  de Primera, las dos zonas y los dos torneos sumados), que es la tabla que
+  reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
+  recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
+  torneo anual único con dos zonas, sigue siendo la de tu zona.
 - **El año arranca el 1° de enero, con la pretemporada**: enero entero —cuatro
   semanas de almanaque— es pretemporada, con el **mercado de verano abierto**:
   desde el calendario entrás y salís del mercado las veces que quieras y el

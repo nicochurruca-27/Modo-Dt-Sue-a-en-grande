@@ -1884,13 +1884,13 @@ const Engine = {
   // Además del Apertura y el Clausura hay cuatro títulos más en juego, y no
   // son amistosos: son oficiales y cuentan como vuelta olímpica.
   //
-  //   Campeón de Liga        — el primero de la Tabla Anual. No se juega un
+  //   Campeón Anual          — el primero de la Tabla Anual. No se juega un
   //                            partido: se gana sumando todo el año.
   //   Trofeo de Campeones    — campeón del Apertura contra campeón del
   //                            Clausura, partido único en cancha neutral.
   //   Supercopa Argentina    — campeón del Trofeo contra campeón de la Copa
   //                            Argentina, los dos del año pasado.
-  //   Supercopa Internacional— campeón del Trofeo contra el Campeón de Liga,
+  //   Supercopa Internacional— campeón del Trofeo contra el Campeón Anual,
   //                            también del año pasado.
   //
   // Las dos Supercopas se juegan al año siguiente, así que usan lo que quedó
@@ -1907,7 +1907,11 @@ const Engine = {
     const campeonDeLiga = anual[0] ? anual[0].id : null;
     if (campeonDeLiga) {
       resultados.push({
-        copa: 'Campeón de Liga',
+        // El nombre que se muestra. La clave interna sigue siendo
+        // `campeonDeLiga` (ver s.ultimosTitulos más abajo) a propósito: es lo
+        // que quedó guardado en las partidas viejas y de ahí sale el rival de
+        // la Supercopa Internacional del año que viene.
+        copa: 'Campeón Anual',
         nombrePropio: true,
         sinArticulo: true,
         championId: campeonDeLiga,
@@ -5660,7 +5664,7 @@ const Engine = {
         if (cobrado) notasEconomia.push(`Recopa Sudamericana: ${Economia.monto(cobrado)} por salir ${c.userWon ? 'campeón' : 'subcampeón'}.`);
         return;
       }
-      // Los títulos nacionales (Campeón de Liga, Trofeo de Campeones, las dos
+      // Los títulos nacionales (Campeón Anual, Trofeo de Campeones, las dos
       // Supercopas) no tienen premio publicado, así que no pagan plata: valen
       // por el título.
       if (c.nombrePropio) return;

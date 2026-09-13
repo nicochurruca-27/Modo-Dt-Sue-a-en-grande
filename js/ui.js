@@ -232,8 +232,8 @@ function articuloDe(c) {
 }
 
 // Cómo se nombra el título en una frase: "Campeón de la Copa Libertadores",
-// "Campeón del Trofeo de Campeones", y el Campeón de Liga, que ya se llama
-// así y no lleva nada adelante.
+// "Campeón del Trofeo de Campeones", y el Campeón Anual, que ya se llama así
+// y no lleva nada adelante.
 function tituloDeCampeon(c) {
   if (c.sinArticulo) return c.copa;
   return `Campeón ${articuloDe(c) === 'la' ? 'de la' : 'del'} ${nombreDeCopa(c)}`;
@@ -2787,7 +2787,14 @@ function caminoHastaElFinal(sum) {
 function renderSeasonEnd() {
   const s = Engine.state;
   const sum = s.lastSeasonSummary;
-  const pos = sum.myZoneTable.findIndex((r) => r.id === s.clubId) + 1;
+  // La tabla que importa al cerrar el año. En Primera es la Tabla Anual
+  // ENTERA, que es la que reparte los cupos a las copas y marca los descensos.
+  // Antes se mostraba la Anual recortada a tu zona, y esa tabla no existe: la
+  // Anual no se parte por zonas. En la Nacional, que juega un torneo anual
+  // único con dos zonas, la de tu zona sí es la que corresponde.
+  const tablaFinal = sum.isD1 ? sum.tablaAnualD1 : sum.myZoneTable;
+  const tituloDeLaTabla = sum.isD1 ? 'Tabla Anual' : 'Tabla de tu zona';
+  const pos = tablaFinal.findIndex((r) => r.id === s.clubId) + 1;
 
   let torneosText;
   if (sum.userWasAperturaChampion && sum.userWasClausuraChampion) torneosText = '¡Ganaste el Apertura Y el Clausura!';
@@ -2847,7 +2854,7 @@ function renderSeasonEnd() {
       ` : ''}
 
       <div class="season-summary">
-        <p>Terminaste <strong>${pos}°</strong> en tu zona con ${sum.myZoneTable[pos - 1].pts} puntos.</p>
+        <p>Terminaste <strong>${pos}°</strong> en ${sum.isD1 ? 'la Tabla Anual' : 'tu zona'} con ${tablaFinal[pos - 1].pts} puntos.</p>
         ${trofeos.length
           ? `<ul class="trophy-list">${trofeos.map((t) => `<li>${t}</li>`).join('')}</ul>`
           : '<p class="muted">Este año se terminó sin títulos.</p>'}
@@ -2856,12 +2863,12 @@ function renderSeasonEnd() {
         <p class="muted">${sum.economyNote}</p>
       </div>
 
-      ${bloque('Tabla de tu zona', `
+      ${bloque(tituloDeLaTabla, `
         <div class="table-wrap">
           <table class="table">
             <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Pts</th></tr></thead>
             <tbody>
-              ${sum.myZoneTable.map((r, i) => `
+              ${tablaFinal.map((r, i) => `
                 <tr class="${r.id === s.clubId ? 'me' : ''}">
                   <td>${i + 1}</td><td>${r.name}</td><td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td><td>${r.gf}</td><td>${r.ga}</td><td>${r.pts}</td>
                 </tr>
