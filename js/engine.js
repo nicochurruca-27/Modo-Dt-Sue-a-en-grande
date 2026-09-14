@@ -3387,6 +3387,8 @@ const Engine = {
       historialDT: historial || [],
       // Lo que otros clubes te ofrecen por tus jugadores en cada ventana.
       ofertasRecibidas: [],
+      // Los que están cedidos a préstamo en otro club (ver cederJugador).
+      cedidos: [],
       mercado: null,
       notasMercado: [],
       historialPuntos: {},
@@ -5433,7 +5435,12 @@ const Engine = {
     // Y las ofertas que te llegan a vos van primero de todo: si vendés a
     // alguien, cambia a quién te conviene renovar y con cuánta plata salís al
     // mercado.
-    s.ofertasRecibidas = Mercado.ofertasPorTusJugadores(this);
+    // Y antes que nada vuelven los que estaban cedidos: el plantel con el que
+    // salís al mercado ya es el de verdad.
+    const vueltas = this.revisarPrestamos();
+    s.notasDePrestamos = vueltas;
+    s.ofertasRecibidas = Mercado.ofertasPorTusJugadores(this)
+      .concat(Mercado.ofertasDePrestamo(this));
     this.mostrarSiguienteOferta();
   },
 
@@ -5447,11 +5454,40 @@ const Engine = {
     this.save();
   },
 
-  // Aceptás o rechazás la oferta que está arriba de la pila.
+  // Aceptás o rechazás la oferta que está arriba de la pila. Hay tres clases:
+  // una compra común, una cesión a préstamo, y el pago de la cláusula, que no
+  // se puede rechazar (por eso existe la cláusula).
   resolverOferta(aceptar) {
     const s = this.state;
     const oferta = s.ofertasRecibidas.shift();
     const jugador = oferta && s.squad.find((p) => p.id === oferta.playerId);
+
+    if (jugador && oferta.tipo === 'prestamo') {
+      if (aceptar) {
+        this.cederJugador(oferta);
+        s.lastDecisionNote = `${jugador.name} se va a préstamo a ${oferta.club.nombre} ${oferta.modalidadLabel}.`;
+      } else {
+        s.lastDecisionNote = `${jugador.name} se queda: no aceptaste la cesión.`;
+      }
+      this.mostrarSiguienteOferta();
+      return;
+    }
+
+    // La cláusula pagada no se discute: el jugador se va igual.
+    if (jugador && oferta.obligatoria) {
+      Economia.registrar(this, `Cláusula de ${jugador.name} pagada por ${oferta.club.nombre}`, oferta.monto);
+      s.squad = s.squad.filter((p) => p.id !== jugador.id);
+      if (!oferta.club.extranjero) {
+        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year);
+        this._fuerzas = {};
+      }
+      this.repairStartingSlots();
+      Noticias.trasUnaVentaGrande(this, jugador, oferta);
+      s.lastDecisionNote = `${oferta.club.nombre} pagó la cláusula de ${jugador.name}: ${Economia.monto(oferta.monto)}. No había nada que decidir.`;
+      this.mostrarSiguienteOferta();
+      return;
+    }
+
     // Si el plantel quedó en el mínimo mientras mirabas las ofertas, no se
     // puede vender a nadie más.
     if (jugador && aceptar && s.squad.length > MIN_SQUAD) {
@@ -5521,15 +5557,6 @@ const Engine = {
     this.save();
   },
 
-  // Cuánto vale un jugador. El precio DUPLICA cada 6 puntos de valoración:
-  // un 70 (titular de Primera) vale ~1,5 millones, un 82 (un crack como
-  // Almada) ronda los 6, y un 88 se va arriba de los 12. Antes era casi
-  // lineal (valoración × 15.000) y un crack costaba apenas un tercio más que
-  // uno del montón, así que con el presupuesto de River se compraban trece
-  // jugadores de 80 y el mercado no tenía ninguna tensión.
-  //
-  // La edad ajusta el valor: un pibe con proyección cuesta más caro que un
-  // veterano de la misma valoración, al que ya casi no le queda recorrido.
   // Valor de un jugador concreto. Si tiene valor de mercado investigado se
   // usa ese; si no, se estima con la fórmula. Así los clubes ya cargados
   // manejan precios reales y el resto sigue funcionando igual que antes.
@@ -5538,13 +5565,43 @@ const Engine = {
     return this.playerValue(player.rating, player.age);
   },
 
+  // Cómo se calibró: la investigación de Boca trae el valor de mercado real de
+  // 31 jugadores (de Javier García a Milton Delgado). Ajustando la curva a
+  // esos 31 puntos sale que el precio DUPLICA cada 5,5 puntos de valoración y
+  // que la edad pesa muchísimo más de lo que pesaba acá: Milton Delgado (75,
+  // 21 años) vale 10 millones y Merentiel (79, 30 años) vale 6.
+  //
+  // La fórmula vieja arrancaba en 1,5 millones para un 70 y ajustaba la edad
+  // con tres escalones. Contra los datos reales quedaba corta por un factor
+  // de 2 a 5 (Di Lollo: 1,7 estimado contra 7 reales), y por eso Almada —un
+  // 82 de 25 años— se compraba por cinco millones cuando en la vida real
+  // costó arriba de veinte. Con la curva nueva el error típico contra esos
+  // 31 valores es de un 22%.
+  VALOR_BASE: 5400000,       // un 70 de 19 años
+  VALOR_DUPLICA_CADA: 5.5,   // puntos de valoración
+  VALOR_POR_EDAD: [[19, 1], [23, 1.07], [27, 0.55], [31, 0.34], [35, 0.15], [39, 0.1]],
+
+  // Cuánto de su valor conserva un jugador a esa edad. Entre dos edades de la
+  // tabla se interpola derecho, así no hay saltos de un cumpleaños al otro
+  // (antes un jugador perdía el 20% del valor el día que cumplía 30).
+  factorDeEdad(age) {
+    const tabla = this.VALOR_POR_EDAD;
+    if (age <= tabla[0][0]) return tabla[0][1];
+    if (age >= tabla[tabla.length - 1][0]) return tabla[tabla.length - 1][1];
+    for (let i = 0; i < tabla.length - 1; i++) {
+      const [edadA, factorA] = tabla[i];
+      const [edadB, factorB] = tabla[i + 1];
+      if (age >= edadA && age <= edadB) {
+        const t = (age - edadA) / (edadB - edadA);
+        return factorA + (factorB - factorA) * t;
+      }
+    }
+    return 1;
+  },
+
   playerValue(rating, age) {
-    const base = 1500000 * Math.pow(2, (rating - 70) / 6);
-    let ageFactor = 1;
-    if (age <= 22) ageFactor = 1.3;
-    else if (age >= 33) ageFactor = 0.55;
-    else if (age >= 30) ageFactor = 0.8;
-    return Math.round(base * ageFactor);
+    const base = this.VALOR_BASE * Math.pow(2, (rating - 70) / this.VALOR_DUPLICA_CADA);
+    return Math.round(base * this.factorDeEdad(age));
   },
 
   // Cuál es la próxima ventana de pases. El mercado abre DOS veces al año,
@@ -5609,17 +5666,129 @@ const Engine = {
     return Math.round(this.valueOf(player) * 0.75);
   },
 
-  sellPlayer(squadIndex) {
+  // ---------- Qué hacés con cada jugador tuyo ----------
+  //
+  // Acá había un sellPlayer: apretabas un botón y el jugador se vendía al
+  // instante, sin que nadie lo viniera a buscar. Eso no existe en el fútbol y
+  // era lo que más desarmaba el mercado. Ahora vos marcás la postura del club
+  // (no se vende / transferible / a préstamo) y las ofertas llegan solas en
+  // cada ventana; lo único que podés resolver por tu cuenta es rescindirle el
+  // contrato, que no te da plata: te cuesta.
+
+  marcarEnElMercado(playerId, estado) {
     const s = this.state;
-    if (s.squad.length <= MIN_SQUAD) return false;
-    const player = s.squad[squadIndex];
-    const monto = this.sellValue(player);
-    Economia.registrar(this, `Venta de ${player.name}`, monto);
-    s.squad.splice(squadIndex, 1);
-    Noticias.trasUnaOperacion(this, 'venta', player, monto);
-    this.repairStartingSlots();
+    const player = (s.squad || []).find((p) => p.id === playerId);
+    if (!player || !Mercado.ESTADOS_PROPIOS[estado]) return false;
+    player.mercado = estado;
     this.save();
     return true;
+  },
+
+  // Lo que cuesta cortarle el contrato a alguien: lo que le queda por cobrar.
+  // Se paga el 80%, que es más o menos donde termina un arreglo de estos.
+  costoDeRescision(player) {
+    if (!player) return 0;
+    const sueldo = Economia.sueldoDe(this, player);
+    const anios = Math.max(1, player.contractYears || 1);
+    return Math.round(sueldo * anios * 0.8);
+  },
+
+  // Dejarlo ir libre pagando lo que resta del contrato. Sale del plantel y
+  // pasa a la lista de jugadores sin club, así lo puede agarrar cualquiera
+  // —incluso vos, si te arrepentís, pero ya sin contrato con vos.
+  rescindirContrato(playerId) {
+    const s = this.state;
+    const player = (s.squad || []).find((p) => p.id === playerId);
+    if (!player) return { ok: false, nota: 'Ese jugador no está en el plantel.' };
+    if (s.squad.length <= MIN_SQUAD) return { ok: false, nota: `No podés bajar de ${MIN_SQUAD} jugadores.` };
+    if (s.squad.filter((p) => p.pos === player.pos).length <= 1) {
+      return { ok: false, nota: `Es el único ${player.pos} que te queda.` };
+    }
+    const costo = this.costoDeRescision(player);
+    if (costo > s.budget) return { ok: false, nota: `Te faltan ${Economia.monto(costo - s.budget)} para pagarle lo que le queda de contrato.` };
+
+    Economia.registrar(this, `Rescisión de ${player.name}`, -costo);
+    s.squad = s.squad.filter((p) => p.id !== playerId);
+    // Pasa a la lista de los que están sin club, con la misma forma que usa
+    // Mercado.liberarJugadores: guarda la base (valoración y edad del año en
+    // que quedó libre) y el resto se recalcula solo con los años.
+    Mercado.libres(s).push({
+      id: player.id,
+      name: player.name,
+      pos: player.pos,
+      posDetail: player.posDetail,
+      nation: player.nation,
+      role: player.role,
+      projection: player.potential,
+      ratingBase: player.rating,
+      edadBase: player.age,
+      contractYears: 1,
+      desdeAnio: s.season ? s.season.year : 1,
+      desdeClub: s.clubId,
+      ventanas: 0,
+    });
+    this.repairStartingSlots();
+    this.save();
+    return { ok: true, nota: `${player.name} queda libre. Pagaste ${Economia.monto(costo)} de contrato.` };
+  },
+
+  // ---------- Préstamos ----------
+  //
+  // El jugador sale del plantel mientras dure la cesión: allá juega, allá le
+  // pagan el sueldo, y vuelve cuando termina. El plazo se cuenta en ventanas
+  // de pases, que es como se mueve el calendario del juego: seis meses es una
+  // ventana, un año son dos.
+  cederJugador(oferta) {
+    const s = this.state;
+    const player = (s.squad || []).find((p) => p.id === oferta.playerId);
+    if (!player) return false;
+    if (!s.cedidos) s.cedidos = [];
+    s.squad = s.squad.filter((p) => p.id !== player.id);
+    s.cedidos.push({
+      jugador: player,
+      clubId: oferta.club.id,
+      clubNombre: oferta.club.nombre,
+      modalidad: oferta.modalidad,
+      modalidadLabel: oferta.modalidadLabel,
+      ventanas: oferta.ventanas,
+      compra: oferta.compra || 0,
+      anio: s.season ? s.season.year : 1,
+    });
+    if (oferta.monto) Economia.registrar(this, `Préstamo de ${player.name} a ${oferta.clubNombre || oferta.club.nombre}`, oferta.monto);
+    this.repairStartingSlots();
+    return true;
+  },
+
+  // Se llama al abrir cada ventana. Descuenta una ventana a cada préstamo y
+  // resuelve los que se terminaron: el que tenía compra obligatoria se queda
+  // en el otro club y entra la plata; el resto vuelve a tu plantel.
+  revisarPrestamos() {
+    const s = this.state;
+    if (!s.cedidos || !s.cedidos.length) return [];
+    const notas = [];
+    const siguen = [];
+    s.cedidos.forEach((c) => {
+      c.ventanas -= 1;
+      if (c.ventanas > 0) { siguen.push(c); return; }
+      const j = c.jugador;
+      // Mientras estuvo afuera siguió cumpliendo años y jugando.
+      const anios = s.season ? Math.max(0, s.season.year - c.anio) : 0;
+      if (anios > 0) j.age += anios;
+      if (c.modalidad === 'compra-obligatoria') {
+        Economia.registrar(this, `Venta de ${j.name} a ${c.clubNombre}`, c.compra);
+        Mercado.transferir(s, j, s.clubId, c.clubId, s.season ? s.season.year : 1);
+        this._fuerzas = {};
+        notas.push(`${c.clubNombre} ejecutó la compra obligatoria de ${j.name}: entraron ${Economia.monto(c.compra)}.`);
+      } else {
+        j.mercado = 'retenido';
+        j.energia = ENERGIA_MAXIMA;
+        s.squad.push(j);
+        notas.push(`${j.name} volvió del préstamo en ${c.clubNombre}.`);
+      }
+    });
+    s.cedidos = siguen;
+    this.repairStartingSlots();
+    return notas;
   },
 
   continueFromTransfer() {

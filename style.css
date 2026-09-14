@@ -1883,3 +1883,83 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 
 .cambios-hechos .sale { color: #f87171; }
 .cambios-hechos .entra { color: var(--accent); }
+
+/* ---------- Arrastrar y soltar jugadores ---------- */
+
+/* Los jugadores que se pueden levantar: sin selección de texto ni menú del
+   navegador, que son lo que aparece al mantener apretado en el celular. */
+.player-marker, .banco-card, .cambio-ficha {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* El cartelito que va debajo del dedo con el nombre del que estás llevando. */
+.arrastre-fantasma {
+  position: fixed;
+  z-index: 999;
+  transform: translate(-50%, -140%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #38bdf8;
+  background: #0b1220;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+/* El que levantaste queda apagado en su lugar. */
+.arrastre-origen { opacity: 0.35; }
+
+/* Y el que está debajo, marcado: en la cancha se le pinta el borde de la
+   camiseta, y en el banco el borde de la tarjeta. */
+.player-marker.arrastre-destino path { stroke: #38bdf8; stroke-width: 3; }
+.banco-card.arrastre-destino { outline: 2px solid #38bdf8; outline-offset: 2px; border-radius: 8px; }
+.cambio-ficha.arrastre-destino { border-color: #38bdf8; background: rgba(56, 189, 248, 0.14); }
+
+/* ---------- Tu plantel en el mercado ---------- */
+.propios-lista { list-style: none; margin: 0; padding: 0; }
+
+.propio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #1f2937;
+}
+
+.propio-ficha { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.propio-ficha .muted { font-size: 0.76rem; }
+
+.propio-estados { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.estado-chip {
+  padding: 4px 8px;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  background: #0f172a;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.estado-chip:hover { border-color: #64748b; color: #e2e8f0; }
+
+/* El estado elegido: cada uno con su color, como en la lista de los rivales. */
+.estado-chip.activo { color: #0b1220; font-weight: 700; }
+.estado-chip.estado-retenido.activo { background: #64748b; border-color: #64748b; color: #f8fafc; }
+.estado-chip.estado-transferible.activo { background: #4ade80; border-color: #4ade80; }
+.estado-chip.estado-prestamo.activo { background: #38bdf8; border-color: #38bdf8; }
+
+.estado-chip.rescindir { border-color: #7f1d1d; color: #fca5a5; }
+.estado-chip.rescindir:hover { background: #450a0a; border-color: #b91c1c; color: #fecaca; }
+
+.propios-cedidos { list-style: none; margin: 6px 0 0; padding: 0; font-size: 0.86rem; }
+.propios-cedidos li { padding: 4px 0; border-bottom: 1px solid #1f2937; }

@@ -1540,7 +1540,188 @@ function buildPitchSvg(xi, club, opciones) {
   `;
 }
 
+// ---------- Arrastrar y soltar jugadores ----------
+//
+// Tocar uno y después el otro sigue funcionando igual. Esto es el otro camino,
+// el que pidió el usuario: mantenés apretado y lo llevás encima del que querés
+// cambiar, y al soltarlo se intercambian.
+//
+// Va con eventos de puntero (no con el drag-and-drop de HTML, que no anda ni
+// en SVG ni en el celular), así que el mismo código sirve para el mouse y para
+// el dedo. La diferencia es el arranque: con el mouse alcanza con mover el
+// puntero, y con el dedo hay que mantener apretado un ratito, porque si no
+// cualquier intento de deslizar la pantalla para leer el plantel levantaría
+// un jugador.
+const ARRASTRE_MINIMO = 8;    // píxeles de movimiento para que cuente como arrastre
+const ARRASTRE_ESPERA = 220;  // ms apretado con el dedo antes de levantar al jugador
+
+let arrastre = null;
+let arrastroRecien = false;
+
+// Dónde se puede arrastrar: el panel de plantel y el panel de cambios del
+// entretiempo. En cualquier otro lado un [data-player] es solo información.
+function zonaDeArrastre(el) {
+  if (el.closest('#squad-panel')) return 'plantel';
+  if (el.closest('#panel-cambios')) return 'entretiempo';
+  return null;
+}
+
+// Qué pasa cuando soltás uno arriba del otro. En el plantel es el mismo
+// intercambio de siempre; en el entretiempo tiene que pasar por las reglas del
+// partido (tres cambios, el que salió no vuelve), así que va por hacerUnCambio.
+function soltarJugador(origenId, destinoId, zona) {
+  if (!origenId || !destinoId || origenId === destinoId) return false;
+  if (zona === 'entretiempo') {
+    const enCancha = (id) => (Engine.state.startingSlots || []).some((e) => e.playerId === id);
+    const sale = enCancha(origenId) ? origenId : enCancha(destinoId) ? destinoId : null;
+    if (!sale) return false;
+    const entra = sale === origenId ? destinoId : origenId;
+    if (!Engine.hacerUnCambio(sale, entra)) return false;
+    cambioSeleccion = null;
+    render();
+    return true;
+  }
+  if (!Engine.swapPlayers(origenId, destinoId)) return false;
+  selectedPlayerId = null;
+  render();
+  return true;
+}
+
+function nombreDeJugador(id) {
+  const p = (Engine.state.squad || []).find((x) => x.id === id);
+  return p ? p.name : '';
+}
+
+function marcarOrigenDelArrastre(id, prendido) {
+  document.querySelectorAll(`[data-player="${id}"]`).forEach((el) => el.classList.toggle('arrastre-origen', prendido));
+}
+
+function marcarDestinoDelArrastre(el) {
+  if (arrastre.destino === el) return;
+  if (arrastre.destino) arrastre.destino.classList.remove('arrastre-destino');
+  arrastre.destino = el;
+  if (el) el.classList.add('arrastre-destino');
+}
+
+function empezarElArrastre() {
+  arrastre.activo = true;
+  marcarOrigenDelArrastre(arrastre.id, true);
+  const fantasma = document.createElement('div');
+  fantasma.className = 'arrastre-fantasma';
+  fantasma.textContent = nombreDeJugador(arrastre.id);
+  document.body.appendChild(fantasma);
+  arrastre.fantasma = fantasma;
+  moverElFantasma(arrastre.x, arrastre.y);
+}
+
+function moverElFantasma(x, y) {
+  if (!arrastre.fantasma) return;
+  arrastre.fantasma.style.left = `${x}px`;
+  arrastre.fantasma.style.top = `${y}px`;
+}
+
+// Sobre quién estás. El fantasma no molesta porque no recibe eventos, pero hay
+// que esquivar al jugador que estás llevando.
+function jugadorDebajoDelDedo(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const destino = el && el.closest ? el.closest('[data-player]') : null;
+  if (!destino) return null;
+  if (destino.getAttribute('data-player') === arrastre.id) return null;
+  if (zonaDeArrastre(destino) !== arrastre.zona) return null;
+  return destino;
+}
+
+function terminarElArrastre(soltado) {
+  if (!arrastre) return;
+  clearTimeout(arrastre.timer);
+  if (arrastre.fantasma) arrastre.fantasma.remove();
+  if (arrastre.destino) arrastre.destino.classList.remove('arrastre-destino');
+  marcarOrigenDelArrastre(arrastre.id, false);
+  const datos = arrastre;
+  arrastre = null;
+  if (datos.activo) {
+    // El click que viene atrás del arrastre no tiene que contar como toque.
+    arrastroRecien = true;
+    setTimeout(() => { arrastroRecien = false; }, 0);
+    if (soltado && datos.destino) {
+      soltarJugador(datos.id, datos.destino.getAttribute('data-player'), datos.zona);
+    }
+  }
+}
+
+document.addEventListener('pointerdown', (e) => {
+  if (e.button > 0) return;
+  const el = e.target.closest ? e.target.closest('[data-player]') : null;
+  if (!el) return;
+  const zona = zonaDeArrastre(el);
+  if (!zona) return;
+  if (arrastre) terminarElArrastre(false);
+  arrastre = {
+    id: el.getAttribute('data-player'),
+    zona,
+    x: e.clientX,
+    y: e.clientY,
+    activo: false,
+    // Con el dedo el final lo manda touchend: Chrome dispara un pointerup
+    // falso a los 200 y pico de milisegundos (es cuando decide que estás
+    // haciendo una pulsación larga) y eso soltaba al jugador justo en el
+    // momento en que lo acababas de levantar.
+    touch: e.pointerType === 'touch',
+    listo: e.pointerType === 'mouse',
+    fantasma: null,
+    destino: null,
+    timer: null,
+  };
+  // Con el dedo, el jugador se levanta recién después de mantener apretado.
+  if (!arrastre.listo) {
+    arrastre.timer = setTimeout(() => {
+      if (arrastre) { arrastre.listo = true; empezarElArrastre(); }
+    }, ARRASTRE_ESPERA);
+  }
+});
+
+// El movimiento, venga del mouse o del dedo. Devuelve true si el arrastre
+// sigue en pie.
+function moverElArrastre(x, y) {
+  const lejos = Math.abs(x - arrastre.x) + Math.abs(y - arrastre.y) > ARRASTRE_MINIMO;
+  if (!arrastre.activo) {
+    // Si te moviste antes de que se levantara, es que estabas deslizando la
+    // pantalla: se cancela y el toque queda como un toque.
+    if (lejos && !arrastre.listo) { terminarElArrastre(false); return false; }
+    if (!lejos || !arrastre.listo) return true;
+    empezarElArrastre();
+  }
+  moverElFantasma(x, y);
+  marcarDestinoDelArrastre(jugadorDebajoDelDedo(x, y));
+  return true;
+}
+
+document.addEventListener('pointermove', (e) => {
+  if (!arrastre || e.pointerType === 'touch') return;
+  moverElArrastre(e.clientX, e.clientY);
+});
+
+// El dedo va por su propio camino y no por pointermove: cuando el arrastre
+// está en marcha hay que frenar el desplazamiento de la pantalla con
+// preventDefault, y Chrome deja de mandar pointermove apenas hacés eso.
+document.addEventListener('touchmove', (e) => {
+  if (!arrastre || !e.touches.length) return;
+  if (arrastre.activo && e.cancelable) e.preventDefault();
+  const t = e.touches[0];
+  moverElArrastre(t.clientX, t.clientY);
+}, { passive: false });
+
+document.addEventListener('pointerup', () => { if (!arrastre || !arrastre.touch) terminarElArrastre(true); });
+document.addEventListener('pointercancel', () => { if (!arrastre || !arrastre.touch) terminarElArrastre(false); });
+document.addEventListener('touchend', () => terminarElArrastre(true));
+document.addEventListener('touchcancel', () => terminarElArrastre(false));
+
+// La pulsación larga no tiene que abrir el menú del navegador arriba del
+// jugador que estás llevando.
+document.addEventListener('contextmenu', (e) => { if (arrastre && arrastre.activo) e.preventDefault(); });
+
 function handlePlayerTap(id) {
+  if (arrastroRecien) return;
   const s = Engine.state;
   if (selectedPlayerId === null || selectedPlayerId === id) {
     selectedPlayerId = selectedPlayerId === id ? null : id;
@@ -1598,7 +1779,7 @@ function avisoDePlantel() {
   const libres = MAX_SQUAD - s.squad.length;
   if (libres > AVISO_PLANTEL) return '';
   if (libres <= 0) {
-    return `<p class="aviso-plantel lleno">Plantel lleno: ${s.squad.length} de ${MAX_SQUAD}. Para traer a alguien tenés que vender primero.</p>`;
+    return `<p class="aviso-plantel lleno">Plantel lleno: ${s.squad.length} de ${MAX_SQUAD}. Para traer a alguien tiene que salir otro primero.</p>`;
   }
   return `<p class="aviso-plantel">Te ${libres === 1 ? 'queda 1 lugar' : `quedan ${libres} lugares`} en el plantel (${s.squad.length} de ${MAX_SQUAD}).</p>`;
 }
@@ -2459,22 +2640,82 @@ function renderOfertaRecibida() {
   const o = s.ofertasRecibidas[0];
   const p = s.squad.find((x) => x.id === o.playerId);
   if (!p) { Engine.resolverOferta(false); render(); return; }
-  const club = Engine.getClub(s.clubId);
   const valor = Engine.valueOf(p);
-  const sobre = Math.round((o.monto / valor - 1) * 100);
   const st = Engine.estadisticasDe(p);
   const sueldo = Economia.sueldoDe(Engine, p);
+  const ficha = `${p.age} años · ${p.pos} · valoración ${p.rating}${p.potential > p.rating ? ` (puede llegar a ${p.potential})` : ''}`;
+  const rendimiento = st.pj
+    ? `Lleva ${st.pj} ${st.pj === 1 ? 'partido' : 'partidos'} y ${st.goles} ${st.goles === 1 ? 'gol' : 'goles'} esta temporada`
+    : 'Todavía no jugó esta temporada';
 
+  // Un préstamo no es una venta: no entra plata (más que un cargo chico), pero
+  // te ahorrás el sueldo y el jugador vuelve.
+  if (o.tipo === 'prestamo') {
+    const conCompra = o.modalidad === 'compra-obligatoria';
+    app.innerHTML = `
+      ${header()}
+      <div class="card">
+        <h2>Piden a ${p.name} a préstamo</h2>
+        <p><strong>${o.club.nombre}</strong> lo quiere <strong>${o.modalidadLabel}</strong>.</p>
+        <ul>
+          <li>${ficha}</li>
+          <li>${rendimiento}</li>
+          <li>Te pagan ${money(o.monto)} de cargo y le cubren el sueldo: te ahorrás ${money(sueldo)} al año</li>
+          ${conCompra
+            ? `<li><strong>Al terminar el préstamo te lo compran sí o sí por ${money(o.compra)}.</strong> No vuelve.</li>`
+            : '<li>Vuelve a tu plantel cuando se termina la cesión</li>'}
+        </ul>
+        <p class="muted">Lo marcaste para salir a préstamo. Mientras esté cedido no lo podés usar.</p>
+        <div class="options">
+          <button class="option-btn" id="aceptar-oferta">Aceptar la cesión</button>
+          <button class="option-btn" id="rechazar-oferta">Que se quede</button>
+        </div>
+      </div>
+      ${noticiasHtml()}
+    `;
+    document.getElementById('aceptar-oferta').addEventListener('click', () => { Engine.resolverOferta(true); render(); });
+    document.getElementById('rechazar-oferta').addEventListener('click', () => { Engine.resolverOferta(false); render(); });
+    wireNoticias();
+    return;
+  }
+
+  // La cláusula pagada no se negocia: la pantalla lo cuenta y seguís.
+  if (o.obligatoria) {
+    app.innerHTML = `
+      ${header()}
+      <div class="card">
+        <h2>Pagaron la cláusula de ${p.name}</h2>
+        <p><strong>${o.club.nombre}</strong>${o.club.extranjero ? ` (${o.club.pais})` : ''} depositó los <strong>${money(o.monto)}</strong> de la cláusula de rescisión.</p>
+        <ul>
+          <li>${ficha}</li>
+          <li>Vale ${money(valor)}</li>
+          <li>Te ahorrás ${money(sueldo)} al año de sueldo</li>
+        </ul>
+        <p class="muted">Con la cláusula paga el club no tiene nada que decidir: el jugador se va. La única forma de evitarlo es renovarle el contrato —con una cláusula más alta— antes de que alguien la pague.</p>
+        <div class="options">
+          <button class="option-btn" id="aceptar-oferta">Entendido</button>
+        </div>
+      </div>
+      ${noticiasHtml()}
+    `;
+    document.getElementById('aceptar-oferta').addEventListener('click', () => { Engine.resolverOferta(true); render(); });
+    wireNoticias();
+    return;
+  }
+
+  const sobre = Math.round((o.monto / valor - 1) * 100);
+  const estado = Mercado.ESTADOS_PROPIOS[Mercado.estadoPropio(p)];
   app.innerHTML = `
     ${header()}
     <div class="card">
       <h2>Oferta por ${p.name}</h2>
       <p><strong>${o.club.nombre}</strong>${o.club.extranjero ? ` (${o.club.pais})` : ''} ofrece <strong>${money(o.monto)}</strong> por ${p.name}.</p>
       <ul>
-        <li>${p.age} años · ${p.pos} · valoración ${p.rating}${p.potential > p.rating ? ` (puede llegar a ${p.potential})` : ''}</li>
+        <li>${ficha}</li>
         <li>Vale ${money(valor)}: te ofrecen un ${sobre >= 0 ? `${sobre}% más` : `${-sobre}% menos`}</li>
-        <li>${st.pj ? `Lleva ${st.pj} ${st.pj === 1 ? 'partido' : 'partidos'} y ${st.goles} ${st.goles === 1 ? 'gol' : 'goles'} esta temporada` : 'Todavía no jugó esta temporada'}</li>
+        <li>${rendimiento}</li>
         <li>Te ahorrás ${money(sueldo)} al año de sueldo</li>
+        <li>Lo tenías marcado como <strong>${estado.label}</strong></li>
       </ul>
       <p class="muted">${o.club.extranjero
         ? 'Si aceptás se va del país y no lo volvés a ver.'
@@ -2785,7 +3026,7 @@ function fichaDeCambioHtml(jug, grupo, amonestados) {
   const elegido = cambioSeleccion && cambioSeleccion.id === jug.id;
   return `
     <button class="cambio-ficha${elegido ? ' elegido' : ''}${baja ? ' inhabilitado' : ''}"
-      data-cambio="${jug.id}" data-grupo="${grupo}" ${baja ? 'disabled' : ''}>
+      data-cambio="${jug.id}" data-player="${jug.id}" data-grupo="${grupo}" ${baja ? 'disabled' : ''}>
       <span class="pos ${jug.pos}">${jug.pos}</span>
       <span class="nombre">${jug.name}${amonestados.has(jug.id) ? ' <span class="amonestado">🟨</span>' : ''}</span>
       <span class="valor">${baja || jug.rating}</span>
@@ -2839,6 +3080,7 @@ function panelDeCambiosHtml(p) {
 // Un toque en una ficha: si no había nadie marcado, la marca; si el marcado
 // era del otro grupo, ese es el cambio; si era del mismo, cambia la marca.
 function tocarFichaDeCambio(id, grupo) {
+  if (arrastroRecien) return;
   if (cambioSeleccion && cambioSeleccion.id === id) { cambioSeleccion = null; render(); return; }
   if (cambioSeleccion && cambioSeleccion.grupo !== grupo) {
     const sale = grupo === 'cancha' ? id : cambioSeleccion.id;
@@ -3083,8 +3325,14 @@ function renderTransfer() {
     ${header()}
     <div class="card">
       <h2>${windowLabel}</h2>
-      <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tenés que vender.</p>
+      <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tiene que salir alguien: que te lo compren, cederlo a préstamo o rescindirle el contrato.</p>
       ${avisoDePlantel()}
+      ${(s.notasDePrestamos || []).length ? `
+        <div class="mercado-acuerdos">
+          <strong>Préstamos que se terminaron</strong>
+          <ul>${s.notasDePrestamos.map((n) => `<li>${n}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
       ${(s.notasMercado || []).length ? `
         <div class="mercado-acuerdos">
           <strong>Se concretaron los acuerdos que veníamos negociando</strong>
@@ -3105,29 +3353,14 @@ function renderTransfer() {
         `;
         }).join('') || '<p class="muted">Por ahora no hay ningún jugador sin club.</p>'}
       </div>
-      <details class="collapsible">
-        <summary>Vender jugadores de tu plantel (${s.squad.length})</summary>
-        <div class="collapsible-body">
-          ${s.squad.length <= MIN_SQUAD ? `<p class="muted">No podés vender más: el plantel está en el mínimo de ${MIN_SQUAD} jugadores.</p>` : ''}
-          <div class="options" id="squad-list">
-            ${[...s.squad].map((p, i) => ({ p, i })).sort((a, b) => b.p.rating - a.p.rating).map(({ p, i }) => `
-              <div class="pick-row">
-                <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años) — contrato hasta fin de ${p.contractYears > 1 ? `${p.contractYears} temporadas` : '1 temporada'}</span>
-                <button class="option-btn small danger" data-i="${i}" ${s.squad.length <= MIN_SQUAD ? 'disabled' : ''}>Vender por ${money(Engine.sellValue(p))}</button>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </details>
+      ${tuPlantelEnElMercadoHtml()}
       <button class="option-btn" id="continue-btn">${enPretemporada ? 'Volver al calendario' : 'Continuar temporada'}</button>
     </div>
   `;
   app.querySelectorAll('#libres-list button').forEach((btn) => {
     btn.addEventListener('click', () => { Engine.ficharLibre(Number(btn.dataset.i)); render(); });
   });
-  app.querySelectorAll('#squad-list button').forEach((btn) => {
-    btn.addEventListener('click', () => { Engine.sellPlayer(Number(btn.dataset.i)); render(); });
-  });
+  wireTuPlantelEnElMercado(app);
   document.getElementById('continue-btn').addEventListener('click', () => { Engine.continueFromTransfer(); render(); });
 }
 
@@ -3326,6 +3559,7 @@ function renderSeasonEnd() {
 // Acá solo se dibuja y se enganchan los botones.
 
 let mercadoClubId = null;   // club que se está mirando
+let plantelMercadoAbierto = false;
 let mercadoBusqueda = '';   // texto del buscador
 
 function mercadoEstadoPill(estado) {
@@ -3466,6 +3700,82 @@ function trasNegociar() {
   if (Engine.state.screen === 'transfer') renderTransfer();
 }
 
+// ---------- Tu plantel en el mercado ----------
+//
+// La lista completa de tus jugadores con la postura del club para cada uno.
+// Acá antes había un botón de "vender" al lado de cada nombre y el jugador se
+// iba en el acto; eso no pasa en el fútbol. Lo que hacés ahora es marcarlo, y
+// las ofertas llegan solas en cada ventana.
+//
+// La rescisión es la única salida que depende solo de vos, y es la que cuesta:
+// le pagás lo que le queda de contrato y queda libre.
+function tuPlantelEnElMercadoHtml() {
+  const s = Engine.state;
+  if (!s || !s.squad) return '';
+  const estados = Object.keys(Mercado.ESTADOS_PROPIOS);
+  const lista = [...s.squad].sort((a, b) => b.rating - a.rating);
+  const cedidos = s.cedidos || [];
+
+  return `
+    <details class="collapsible plantel-mercado" ${plantelMercadoAbierto ? 'open' : ''}>
+      <summary>Tu plantel en el mercado (${s.squad.length})</summary>
+      <div class="collapsible-body">
+        <p class="muted">Marcá qué hacés con cada uno. No podés venderlo vos: las ofertas llegan de los otros clubes en cada ventana de pases, y ahí decidís.</p>
+        <ul class="propios-lista">
+          ${lista.map((p) => {
+            const estado = Mercado.estadoPropio(p);
+            const costo = Engine.costoDeRescision(p);
+            return `
+            <li class="propio">
+              <div class="propio-ficha">
+                <strong>${p.name}</strong>
+                <span class="muted">${p.pos} · ${p.rating} · ${p.age} años · contrato ${p.contractYears} ${p.contractYears === 1 ? 'año' : 'años'}${p.clause ? ` · cláusula ${money(p.clause)}` : ''}</span>
+              </div>
+              <div class="propio-estados">
+                ${estados.map((e) => `
+                  <button class="estado-chip ${e === estado ? 'activo' : ''} estado-${e}" data-estado-jugador="${p.id}" data-estado="${e}" title="${Mercado.ESTADOS_PROPIOS[e].ayuda}">${Mercado.ESTADOS_PROPIOS[e].corto}</button>
+                `).join('')}
+                <button class="estado-chip rescindir" data-rescindir="${p.id}" title="Le pagás lo que le queda de contrato y queda libre.">Rescindir ${money(costo)}</button>
+              </div>
+            </li>
+          `;
+          }).join('')}
+        </ul>
+        ${cedidos.length ? `
+          <h4>Cedidos a préstamo</h4>
+          <ul class="propios-cedidos">
+            ${cedidos.map((c) => `<li>${c.jugador.name} <span class="muted">— ${c.clubNombre}, ${c.modalidadLabel}${c.modalidad === 'compra-obligatoria' ? ` · lo compran por ${money(c.compra)}` : ''}</span></li>`).join('')}
+          </ul>
+        ` : ''}
+      </div>
+    </details>
+  `;
+}
+
+function wireTuPlantelEnElMercado(scope) {
+  // Se dibuja en dos lados (la pantalla de la ventana y el panel del
+  // mercado), así que se busca por clase y no por id.
+  const panel = scope.querySelector('.plantel-mercado');
+  if (panel) panel.addEventListener('toggle', () => { plantelMercadoAbierto = panel.open; });
+  scope.querySelectorAll('[data-estado-jugador]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Engine.marcarEnElMercado(btn.dataset.estadoJugador, btn.dataset.estado);
+      render();
+    });
+  });
+  scope.querySelectorAll('[data-rescindir]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = Engine.state.squad.find((x) => x.id === btn.dataset.rescindir);
+      if (!p) return;
+      const costo = Engine.costoDeRescision(p);
+      if (!confirm(`¿Rescindirle el contrato a ${p.name}? Le tenés que pagar ${money(costo)} y queda libre.`)) return;
+      const r = Engine.rescindirContrato(p.id);
+      if (!r.ok) alert(r.nota);
+      render();
+    });
+  });
+}
+
 function renderMarketPanel() {
   const panel = document.getElementById('market-panel');
   if (!panel) return;
@@ -3500,6 +3810,7 @@ function renderMarketPanel() {
         : `<p class="muted mercado-aviso"><strong>El mercado está cerrado.</strong> Abre dos veces al año, como en la realidad: en la pretemporada (enero) y a mitad de año, al terminar el Apertura (junio). La próxima es en ${Engine.proximaVentanaDeMercado() || 'la próxima ventana'}. Mientras tanto podés negociar todo lo que quieras: el acuerdo que cierres se firma solo cuando abra.</p>`}
       ${avisoDePlantel()}
       ${finanzasHtml()}
+      ${tuPlantelEnElMercadoHtml()}
 
       ${acuerdos.length ? `
         <div class="mercado-acuerdos">
@@ -3532,6 +3843,7 @@ function renderMarketPanel() {
       if (nuevo) { nuevo.focus(); nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); }
     });
   }
+  wireTuPlantelEnElMercado(panel);
   panel.querySelectorAll('[data-mercado-club]').forEach((btn) => {
     btn.addEventListener('click', () => {
       mercadoClubId = btn.dataset.mercadoClub === mercadoClubId ? null : btn.dataset.mercadoClub;

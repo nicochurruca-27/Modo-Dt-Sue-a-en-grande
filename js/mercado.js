@@ -157,36 +157,103 @@ const Mercado = {
   // bastante más y se lo lleva del país.
   MAX_OFERTAS_POR_VENTANA: 3,
 
+  // ---------- Lo que vos decidís con cada jugador tuyo ----------
+  //
+  // Antes había un botón de "vender" al lado de cada jugador y salía al toque,
+  // como si un club pudiera poner a cualquiera en la vidriera y cobrarlo el
+  // mismo día. No funciona así: vos marcás la postura del club y las ofertas
+  // llegan (o no). Lo único que sí podés hacer solo es rescindirle el
+  // contrato, y eso cuesta plata en vez de darte.
+  ESTADOS_PROPIOS: {
+    retenido: {
+      label: 'No se vende',
+      corto: 'No se vende',
+      ayuda: 'El club no lo pone en el mercado. Igual pueden venir a buscarlo, pero tienen que pagar mucho más.',
+    },
+    transferible: {
+      label: 'Transferible',
+      corto: 'Transferible',
+      ayuda: 'Avisás que lo escuchás. Llegan más ofertas y por un precio cercano a lo que vale.',
+    },
+    prestamo: {
+      label: 'A préstamo',
+      corto: 'Préstamo',
+      ayuda: 'Lo ofrecés cedido para que sume minutos en otro lado. Las ofertas son de préstamo, no de compra.',
+    },
+  },
+
+  estadoPropio(p) {
+    return (p && p.mercado) || 'retenido';
+  },
+
+  // Qué tan mirado está cada jugador tuyo. Un pibe de 70 con techo 85 interesa
+  // más que un 74 de 31 años.
+  atractivoDe(p) {
+    const techo = p.potential || p.rating;
+    return p.rating + Math.max(0, techo - p.rating) * (p.age <= 23 ? 1.2 : 0.3) - Math.max(0, p.age - 29) * 2;
+  },
+
   ofertasPorTusJugadores(engine) {
     const s = engine.state;
     if (!s.squad || s.squad.length <= 15) return [];
     const club = engine.getClub(s.clubId);
 
-    // A quién miran: a los mejores, y a los pibes con techo alto. Un jugador
-    // que no juega ni rinde no lo viene a buscar nadie.
-    const deseables = s.squad
-      .map((p) => {
-        const techo = p.potential || p.rating;
-        // Un pibe de 70 con techo 85 interesa más que un 74 de 31 años.
-        const atractivo = p.rating + Math.max(0, techo - p.rating) * (p.age <= 23 ? 1.2 : 0.3) - Math.max(0, p.age - 29) * 2;
-        return { p, atractivo };
-      })
+    // Los que ofreciste a préstamo van por otro camino: por ellos no llegan
+    // ofertas de compra.
+    const enVenta = s.squad.filter((p) => this.estadoPropio(p) !== 'prestamo');
+    const conAtractivo = (lista) => lista.map((p) => ({ p, atractivo: this.atractivoDe(p) }));
+
+    // Los que vos ofreciste se miran aunque no sean figuras: es justamente lo
+    // que hace que suene el teléfono. Y van primero, para que marcarlos sirva
+    // de algo: antes la lista salía de los ocho más codiciados del plantel y
+    // por ahí no entraba ninguno (con un plantel lleno de pibes con techo
+    // alto, un 81 de 32 años no aparecía nunca, lo pusieras como lo pusieras).
+    const ofrecidos = engine.shuffled(conAtractivo(enVenta.filter((p) => this.estadoPropio(p) === 'transferible'))
+      .filter((x) => x.atractivo >= 52)).slice(0, 2);
+    const resto = engine.shuffled(conAtractivo(enVenta.filter((p) => this.estadoPropio(p) !== 'transferible'))
       .filter((x) => x.atractivo >= 63)
       .sort((a, b) => b.atractivo - a.atractivo)
-      .slice(0, 6);
+      .slice(0, 8)).slice(0, this.MAX_OFERTAS_POR_VENTANA);
+    const deseables = ofrecidos.concat(resto).slice(0, this.MAX_OFERTAS_POR_VENTANA);
     if (!deseables.length) return [];
 
     const ofertas = [];
-    engine.shuffled(deseables).slice(0, this.MAX_OFERTAS_POR_VENTANA).forEach(({ p, atractivo }) => {
-      // Cuanto más te lo quieren, más chances de que la oferta exista.
-      const chance = Math.min(0.8, (atractivo - 62) / 28);
+    deseables.forEach(({ p, atractivo }) => {
+      const estado = this.estadoPropio(p);
+      // Cuanto más te lo quieren, más chances de que la oferta exista. Que lo
+      // pongas en la lista de transferibles es justamente lo que hace que
+      // suene el teléfono; que digas que no se vende no lo protege del todo,
+      // pero espanta a la mayoría.
+      let chance = Math.min(0.8, (atractivo - 54) / 28);
+      if (estado === 'transferible') chance = Math.min(0.95, chance * 2 + 0.2);
+      else chance *= 0.5;
       if (Math.random() > chance) return;
       const comprador = this.compradorPara(engine, p, club);
       if (!comprador) return;
       const valor = engine.valueOf(p);
-      // De afuera pagan más: se lo llevan del país y compiten con otros.
-      const factor = comprador.extranjero ? 1.3 + Math.random() * 0.6 : 0.95 + Math.random() * 0.45;
+
+      // La cláusula de rescisión: si la pagan, no hay nada que discutir. Es
+      // poco frecuente y solo la pagan por alguien que vale la pena.
+      const clausula = p.clause || 0;
+      if (clausula && clausula >= valor && Math.random() < (comprador.extranjero ? 0.18 : 0.07)) {
+        ofertas.push({
+          tipo: 'clausula',
+          playerId: p.id, nombre: p.name, rating: p.rating, edad: p.age,
+          club: comprador,
+          monto: clausula,
+          obligatoria: true,
+        });
+        return;
+      }
+
+      // Lo que pagan. De afuera pagan más (se lo llevan del país y compiten
+      // con otros), y por alguien que NO está en venta hay que poner mucho
+      // más arriba de lo que vale para que el club se siente a escuchar.
+      let factor = comprador.extranjero ? 1.3 + Math.random() * 0.6 : 0.95 + Math.random() * 0.45;
+      if (estado === 'retenido') factor *= 1.35;
+      else if (estado === 'transferible') factor *= 0.92;
       ofertas.push({
+        tipo: 'compra',
         playerId: p.id,
         nombre: p.name,
         rating: p.rating,
@@ -196,6 +263,66 @@ const Mercado = {
       });
     });
     return ofertas;
+  },
+
+  // ---------- Las ofertas de préstamo ----------
+  //
+  // Por los que marcaste "a préstamo". Vienen en las tres formas que se usan
+  // de verdad: seis meses, un año, o un año con obligación de compra (que es
+  // una venta en cuotas: se va ahora y la plata entra cuando termina).
+  MODALIDADES_DE_PRESTAMO: [
+    { id: 'seis-meses', label: 'por seis meses', ventanas: 1 },
+    { id: 'un-anio', label: 'por un año', ventanas: 2 },
+    { id: 'compra-obligatoria', label: 'por un año con obligación de compra', ventanas: 2 },
+  ],
+
+  ofertasDePrestamo(engine) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    const ofrecidos = (s.squad || []).filter((p) => this.estadoPropio(p) === 'prestamo');
+    if (!ofrecidos.length) return [];
+
+    const ofertas = [];
+    engine.shuffled(ofrecidos).slice(0, 3).forEach((p) => {
+      // A un préstamo se prende casi cualquiera, salvo que el jugador no le
+      // sirva a nadie.
+      if (Math.random() > Math.min(0.9, 0.35 + (p.rating - 58) / 40)) return;
+      const club2 = this.clubParaPrestamo(engine, p, club);
+      if (!club2) return;
+      const modalidad = this.MODALIDADES_DE_PRESTAMO[Math.floor(Math.random() * this.MODALIDADES_DE_PRESTAMO.length)];
+      const valor = engine.valueOf(p);
+      // El cargo por el préstamo es chico: lo que importa es que el otro club
+      // le paga el sueldo mientras esté allá.
+      const cargo = Math.round(valor * (0.02 + Math.random() * 0.06));
+      ofertas.push({
+        tipo: 'prestamo',
+        playerId: p.id,
+        nombre: p.name,
+        rating: p.rating,
+        edad: p.age,
+        club: club2,
+        modalidad: modalidad.id,
+        modalidadLabel: modalidad.label,
+        ventanas: modalidad.ventanas,
+        monto: cargo,
+        compra: modalidad.id === 'compra-obligatoria' ? Math.round(valor * (0.85 + Math.random() * 0.35)) : 0,
+      });
+    });
+    return ofertas;
+  },
+
+  // A quién se lo prestás: un club más chico que el tuyo, que es donde un
+  // jugador va a buscar los minutos que no tiene en tu equipo.
+  clubParaPrestamo(engine, jugador, club) {
+    const s = engine.state;
+    const clasicos = typeof CLASICOS !== 'undefined' ? CLASICOS : [];
+    const esClasico = (id) => clasicos.some((par) => par.includes(id) && par.includes(s.clubId));
+    const candidatos = s.clubs.filter((c) => c.id !== s.clubId
+      && !esClasico(c.id)
+      && c.reputation <= club.reputation);
+    if (!candidatos.length) return null;
+    const c = engine.shuffled(candidatos)[0];
+    return { id: c.id, nombre: c.name, pais: 'Argentina', extranjero: false };
   },
 
   // Quién viene a buscarlo. Un jugador bueno interesa a un club más grande que
