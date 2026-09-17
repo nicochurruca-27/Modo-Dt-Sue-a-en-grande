@@ -156,6 +156,9 @@ const Mercado = {
   // jugador pasa a jugar ahí, y te lo vas a cruzar— o de afuera, que paga
   // bastante más y se lo lleva del país.
   MAX_OFERTAS_POR_VENTANA: 3,
+  // Cuántos de los que VOS ofreciste pueden recibir oferta en la misma
+  // ventana. Va aparte del tope de arriba, que es para el resto del plantel.
+  MAX_OFERTAS_DE_LOS_MARCADOS: 5,
 
   // ---------- Lo que vos decidís con cada jugador tuyo ----------
   //
@@ -208,13 +211,18 @@ const Mercado = {
     // de algo: antes la lista salía de los ocho más codiciados del plantel y
     // por ahí no entraba ninguno (con un plantel lleno de pibes con techo
     // alto, un 81 de 32 años no aparecía nunca, lo pusieras como lo pusieras).
+    //
+    // Cada transferible tira su propia moneda y NO comparte cupo con el resto
+    // del plantel: si ponés seis en la lista, el teléfono suena seis veces más
+    // (hasta el tope de abajo). Antes todos entraban en el mismo cupo de tres
+    // y marcar a más gente no cambiaba casi nada.
     const ofrecidos = engine.shuffled(conAtractivo(enVenta.filter((p) => this.estadoPropio(p) === 'transferible'))
-      .filter((x) => x.atractivo >= 52)).slice(0, 2);
+      .filter((x) => x.atractivo >= 52)).slice(0, this.MAX_OFERTAS_DE_LOS_MARCADOS);
     const resto = engine.shuffled(conAtractivo(enVenta.filter((p) => this.estadoPropio(p) !== 'transferible'))
       .filter((x) => x.atractivo >= 63)
       .sort((a, b) => b.atractivo - a.atractivo)
       .slice(0, 8)).slice(0, this.MAX_OFERTAS_POR_VENTANA);
-    const deseables = ofrecidos.concat(resto).slice(0, this.MAX_OFERTAS_POR_VENTANA);
+    const deseables = ofrecidos.concat(resto);
     if (!deseables.length) return [];
 
     const ofertas = [];
@@ -225,7 +233,7 @@ const Mercado = {
       // suene el teléfono; que digas que no se vende no lo protege del todo,
       // pero espanta a la mayoría.
       let chance = Math.min(0.8, (atractivo - 54) / 28);
-      if (estado === 'transferible') chance = Math.min(0.95, chance * 2 + 0.2);
+      if (estado === 'transferible') chance = Math.min(0.95, chance * 2 + 0.35);
       else chance *= 0.5;
       if (Math.random() > chance) return;
       const comprador = this.compradorPara(engine, p, club);
@@ -283,10 +291,10 @@ const Mercado = {
     if (!ofrecidos.length) return [];
 
     const ofertas = [];
-    engine.shuffled(ofrecidos).slice(0, 3).forEach((p) => {
+    engine.shuffled(ofrecidos).slice(0, this.MAX_OFERTAS_DE_LOS_MARCADOS).forEach((p) => {
       // A un préstamo se prende casi cualquiera, salvo que el jugador no le
       // sirva a nadie.
-      if (Math.random() > Math.min(0.9, 0.35 + (p.rating - 58) / 40)) return;
+      if (Math.random() > Math.min(0.92, 0.5 + (p.rating - 58) / 40)) return;
       const club2 = this.clubParaPrestamo(engine, p, club);
       if (!club2) return;
       const modalidad = this.MODALIDADES_DE_PRESTAMO[Math.floor(Math.random() * this.MODALIDADES_DE_PRESTAMO.length)];
@@ -309,6 +317,96 @@ const Mercado = {
       });
     });
     return ofertas;
+  },
+
+  // ---------- La contraoferta ----------
+  //
+  // Aceptar o rechazar dejaba afuera lo que más se hace en un pase: sentarse a
+  // discutir una condición. Es una sola: la que más pesa en esa oferta. Si te
+  // dicen que no, la oferta original sigue arriba de la mesa —no perdés nada
+  // por preguntar, más allá de que se te caiga la ilusión.
+  contraofertaPara(oferta) {
+    if (!oferta || oferta.obligatoria || oferta.negociada) return null;
+    if (oferta.tipo === 'prestamo') {
+      if (oferta.modalidad === 'compra-obligatoria') {
+        return {
+          id: 'sin-obligacion',
+          label: 'Pedir que sea sin obligación de compra',
+          nota: 'Mismo préstamo por un año, pero al final vuelve a tu club.',
+        };
+      }
+      if (oferta.modalidad === 'un-anio') {
+        return {
+          id: 'mas-corto',
+          label: 'Pedir que sea por seis meses',
+          nota: 'Lo tenés de vuelta en la próxima ventana.',
+        };
+      }
+      return {
+        id: 'mas-cargo',
+        label: 'Pedir más plata por la cesión',
+        nota: 'El préstamo es el mismo, pero te pagan más por prestarlo.',
+      };
+    }
+    return {
+      id: 'mas-plata',
+      label: 'Pedir más plata',
+      nota: 'Le decís que así no, a ver si estiran la oferta.',
+    };
+  },
+
+  // La respuesta del otro club. Devuelve { ok, texto } y, si aceptaron, la
+  // oferta que se está mirando queda modificada en el lugar.
+  responderContraoferta(engine, oferta) {
+    const pedido = this.contraofertaPara(oferta);
+    if (!pedido) return null;
+    oferta.negociada = true;
+    const club = oferta.club.nombre;
+
+    if (pedido.id === 'sin-obligacion') {
+      // La obligación de compra es justamente lo que fueron a buscar, así que
+      // acá te dicen que no bastante seguido.
+      if (Math.random() < 0.45) {
+        oferta.modalidad = 'un-anio';
+        oferta.modalidadLabel = 'por un año';
+        oferta.compra = 0;
+        oferta.monto = Math.round(oferta.monto * 0.8);
+        return { ok: true, texto: `${club} acepta: préstamo por un año, sin obligación de compra. Bajan un poco el cargo.` };
+      }
+      return { ok: false, texto: `${club} no afloja: lo quieren con la compra obligatoria o no hay préstamo.` };
+    }
+
+    if (pedido.id === 'mas-corto') {
+      if (Math.random() < 0.55) {
+        oferta.modalidad = 'seis-meses';
+        oferta.modalidadLabel = 'por seis meses';
+        oferta.ventanas = 1;
+        oferta.monto = Math.round(oferta.monto * 0.65);
+        return { ok: true, texto: `${club} acepta: se lo llevan por seis meses.` };
+      }
+      return { ok: false, texto: `${club} lo quiere todo el año: dicen que por seis meses no les sirve.` };
+    }
+
+    if (pedido.id === 'mas-cargo') {
+      if (Math.random() < 0.5) {
+        oferta.monto = Math.round(oferta.monto * 1.6);
+        return { ok: true, texto: `${club} acepta pagar más por la cesión.` };
+      }
+      return { ok: false, texto: `${club} dice que no le da el presupuesto para pagar más.` };
+    }
+
+    // Plata por una compra. Cuanto más arriba del valor está ya la oferta,
+    // menos margen les queda: por alguien que ya pagaron caro no estiran más.
+    const jugador = (engine.state.squad || []).find((p) => p.id === oferta.playerId);
+    const valor = jugador ? engine.valueOf(jugador) : oferta.monto;
+    const sobre = oferta.monto / Math.max(1, valor) - 1;
+    const chance = Math.max(0.12, Math.min(0.8, 0.65 - sobre * 0.5));
+    if (Math.random() < chance) {
+      const subida = 1.15 + Math.random() * 0.2;
+      oferta.monto = Math.round(oferta.monto * subida);
+      return { ok: true, texto: `${club} mejora la oferta: ahora ponen ${this.plata(oferta.monto)}.` };
+    }
+    return { ok: false, texto: `${club} dice que es lo máximo que pueden pagar. La oferta sigue en pie.` };
   },
 
   // A quién se lo prestás: un club más chico que el tuyo, que es donde un

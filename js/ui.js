@@ -2635,6 +2635,24 @@ function dirigenciaHtml() {
 // elige el próximo club entre los que te vinieron a buscar.
 // Vinieron a buscarte un jugador. Es la decisión que más duele del juego:
 // la plata contra el equipo.
+// Lo que contestó el club cuando te sentaste a negociar, y el botón para
+// hacerlo. Se puede pedir una sola cosa por oferta (ver Mercado.contraofertaPara).
+function contraofertaHtml(o) {
+  const pedido = Mercado.contraofertaPara(o);
+  const respuesta = o.respuesta
+    ? `<p class="contraoferta-respuesta ${o.respuesta.ok ? 'si' : 'no'}">${o.respuesta.texto}</p>`
+    : '';
+  const boton = pedido
+    ? `<button class="option-btn" id="negociar-oferta"><strong>${pedido.label}</strong><span>${pedido.nota}</span></button>`
+    : '';
+  return { respuesta, boton: boton ? boton.replace('class="option-btn"', 'class="option-btn apilado"') : '' };
+}
+
+function wireContraoferta() {
+  const btn = document.getElementById('negociar-oferta');
+  if (btn) btn.addEventListener('click', () => { Engine.contraofertar(); render(); });
+}
+
 function renderOfertaRecibida() {
   const s = Engine.state;
   const o = s.ofertasRecibidas[0];
@@ -2652,6 +2670,7 @@ function renderOfertaRecibida() {
   // te ahorrás el sueldo y el jugador vuelve.
   if (o.tipo === 'prestamo') {
     const conCompra = o.modalidad === 'compra-obligatoria';
+    const negociar = contraofertaHtml(o);
     app.innerHTML = `
       ${header()}
       <div class="card">
@@ -2665,8 +2684,10 @@ function renderOfertaRecibida() {
             ? `<li><strong>Al terminar el préstamo te lo compran sí o sí por ${money(o.compra)}.</strong> No vuelve.</li>`
             : '<li>Vuelve a tu plantel cuando se termina la cesión</li>'}
         </ul>
+        ${negociar.respuesta}
         <p class="muted">Lo marcaste para salir a préstamo. Mientras esté cedido no lo podés usar.</p>
         <div class="options">
+          ${negociar.boton}
           <button class="option-btn" id="aceptar-oferta">Aceptar la cesión</button>
           <button class="option-btn" id="rechazar-oferta">Que se quede</button>
         </div>
@@ -2675,6 +2696,7 @@ function renderOfertaRecibida() {
     `;
     document.getElementById('aceptar-oferta').addEventListener('click', () => { Engine.resolverOferta(true); render(); });
     document.getElementById('rechazar-oferta').addEventListener('click', () => { Engine.resolverOferta(false); render(); });
+    wireContraoferta();
     wireNoticias();
     return;
   }
@@ -2705,6 +2727,7 @@ function renderOfertaRecibida() {
 
   const sobre = Math.round((o.monto / valor - 1) * 100);
   const estado = Mercado.ESTADOS_PROPIOS[Mercado.estadoPropio(p)];
+  const negociar = contraofertaHtml(o);
   app.innerHTML = `
     ${header()}
     <div class="card">
@@ -2717,10 +2740,12 @@ function renderOfertaRecibida() {
         <li>Te ahorrás ${money(sueldo)} al año de sueldo</li>
         <li>Lo tenías marcado como <strong>${estado.label}</strong></li>
       </ul>
+      ${negociar.respuesta}
       <p class="muted">${o.club.extranjero
         ? 'Si aceptás se va del país y no lo volvés a ver.'
         : `Si aceptás va a jugar en ${o.club.nombre}, y lo vas a tener enfrente.`}</p>
       <div class="options">
+        ${negociar.boton}
         <button class="option-btn" id="aceptar-oferta">Aceptar y cobrar ${money(o.monto)}</button>
         <button class="option-btn" id="rechazar-oferta">Rechazar: no se vende</button>
       </div>
@@ -2730,6 +2755,7 @@ function renderOfertaRecibida() {
   `;
   document.getElementById('aceptar-oferta').addEventListener('click', () => { Engine.resolverOferta(true); render(); });
   document.getElementById('rechazar-oferta').addEventListener('click', () => { Engine.resolverOferta(false); render(); });
+  wireContraoferta();
   wireNoticias();
 }
 
@@ -3560,6 +3586,9 @@ function renderSeasonEnd() {
 
 let mercadoClubId = null;   // club que se está mirando
 let plantelMercadoAbierto = false;
+// Hasta dónde bajaste la lista del plantel. Sin esto, marcar a un jugador del
+// puesto 25 te devolvía al principio de la lista en cada toque.
+let plantelMercadoScroll = 0;
 let mercadoBusqueda = '';   // texto del buscador
 
 function mercadoEstadoPill(estado) {
@@ -3721,7 +3750,8 @@ function tuPlantelEnElMercadoHtml() {
       <summary>Tu plantel en el mercado (${s.squad.length})</summary>
       <div class="collapsible-body">
         <p class="muted">Marcá qué hacés con cada uno. No podés venderlo vos: las ofertas llegan de los otros clubes en cada ventana de pases, y ahí decidís.</p>
-        <ul class="propios-lista">
+        <div class="propios-caja">
+        <ul class="propios-lista propios-scroll">
           ${lista.map((p) => {
             const estado = Mercado.estadoPropio(p);
             const costo = Engine.costoDeRescision(p);
@@ -3741,6 +3771,8 @@ function tuPlantelEnElMercadoHtml() {
           `;
           }).join('')}
         </ul>
+        <div class="propios-barra"><div class="propios-pulgar"></div></div>
+        </div>
         ${cedidos.length ? `
           <h4>Cedidos a préstamo</h4>
           <ul class="propios-cedidos">
@@ -3752,11 +3784,71 @@ function tuPlantelEnElMercadoHtml() {
   `;
 }
 
+// La barra de la lista, dibujada a mano. La del navegador no sirve acá: en
+// Chrome es flotante (aparece y desaparece) y en el celular directamente no se
+// ve, así que no había forma de saber que la lista seguía para abajo ni de
+// arrastrarla. Esta se ve siempre y se puede llevar con el dedo.
+function armarLaBarraDeLaLista(caja) {
+  const lista = caja.querySelector('.propios-scroll');
+  const barra = caja.querySelector('.propios-barra');
+  const pulgar = caja.querySelector('.propios-pulgar');
+  if (!lista || !barra || !pulgar) return;
+
+  // El alto de la barra se toma SIEMPRE del de la lista, nunca de la barra
+  // misma: en el celular el panel del mercado arranca escondido, ahí todo mide
+  // cero, la barra se escondía sola y —al estar escondida— ya nunca volvía a
+  // medir más que cero, así que no aparecía nunca más.
+  const pintar = () => {
+    const alto = lista.clientHeight;
+    if (!alto || lista.scrollHeight <= alto + 2) { barra.style.display = 'none'; return; }
+    barra.style.display = '';
+    barra.style.height = `${alto}px`;
+    const altoPulgar = Math.max(28, Math.round((alto * alto) / lista.scrollHeight));
+    const libre = alto - altoPulgar;
+    const avance = lista.scrollTop / (lista.scrollHeight - alto);
+    pulgar.style.height = `${altoPulgar}px`;
+    pulgar.style.top = `${Math.round(libre * avance)}px`;
+  };
+
+  lista.scrollTop = plantelMercadoScroll;
+  pintar();
+  lista.addEventListener('scroll', () => { plantelMercadoScroll = lista.scrollTop; pintar(); });
+  // Y se vuelve a dibujar cuando la lista cambia de tamaño: es lo que pasa al
+  // entrar a la pestaña Mercado en el celular, o al girar el teléfono.
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(pintar).observe(lista);
+
+  // Llevar el pulgar con el mouse o con el dedo.
+  let llevando = null;
+  const alPunto = (y) => {
+    const caja2 = barra.getBoundingClientRect();
+    const alto = pulgar.offsetHeight;
+    const libre = barra.clientHeight - alto;
+    const pos = Math.max(0, Math.min(libre, y - caja2.top - llevando.agarre));
+    lista.scrollTop = (pos / libre) * (lista.scrollHeight - lista.clientHeight);
+  };
+  pulgar.addEventListener('pointerdown', (e) => {
+    llevando = { agarre: e.clientY - pulgar.getBoundingClientRect().top };
+    pulgar.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  pulgar.addEventListener('pointermove', (e) => { if (llevando) { alPunto(e.clientY); e.preventDefault(); } });
+  pulgar.addEventListener('pointerup', () => { llevando = null; });
+  pulgar.addEventListener('pointercancel', () => { llevando = null; });
+  // Un toque en la barra, fuera del pulgar, salta hasta ahí.
+  barra.addEventListener('pointerdown', (e) => {
+    if (e.target === pulgar) return;
+    llevando = { agarre: pulgar.offsetHeight / 2 };
+    alPunto(e.clientY);
+    llevando = null;
+  });
+}
+
 function wireTuPlantelEnElMercado(scope) {
   // Se dibuja en dos lados (la pantalla de la ventana y el panel del
   // mercado), así que se busca por clase y no por id.
   const panel = scope.querySelector('.plantel-mercado');
   if (panel) panel.addEventListener('toggle', () => { plantelMercadoAbierto = panel.open; });
+  scope.querySelectorAll('.propios-caja').forEach(armarLaBarraDeLaLista);
   scope.querySelectorAll('[data-estado-jugador]').forEach((btn) => {
     btn.addEventListener('click', () => {
       Engine.marcarEnElMercado(btn.dataset.estadoJugador, btn.dataset.estado);

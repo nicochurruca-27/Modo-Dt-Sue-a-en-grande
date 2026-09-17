@@ -5454,6 +5454,19 @@ const Engine = {
     this.save();
   },
 
+  // Sentarte a negociar la oferta que está arriba de la pila: se pide UNA
+  // cosa (la que más pesa en esa oferta) y el otro club contesta. La oferta
+  // no se cae si te dicen que no, pero se pregunta una sola vez.
+  contraofertar() {
+    const s = this.state;
+    const oferta = s.ofertasRecibidas && s.ofertasRecibidas[0];
+    if (!oferta) return null;
+    const respuesta = Mercado.responderContraoferta(this, oferta);
+    if (respuesta) oferta.respuesta = respuesta;
+    this.save();
+    return respuesta;
+  },
+
   // Aceptás o rechazás la oferta que está arriba de la pila. Hay tres clases:
   // una compra común, una cesión a préstamo, y el pago de la cláusula, que no
   // se puede rechazar (por eso existe la cláusula).
