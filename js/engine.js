@@ -163,16 +163,30 @@ const MIN_SQUAD = 14;
 // semana y liga el fin de semana, una semana doble te deja el once fundido.
 //
 // Los números están puestos para que un titular que juega SOLO la liga se
-// mantenga arriba (gasta 29 y recupera 35 en la semana), y para que el que
-// juega absolutamente todo no exista: con 45 partidos en el año no hay
-// descanso que alcance. Hay que rotar, que es de lo que se trata.
+// mantenga arriba (gasta 29 y recupera 42 en la semana), y para que el que
+// juega absolutamente todo se note cansado. Hay que rotar, que es de lo que
+// se trata.
+//
+// OJO con estos números, que estaban rotos y hundían la carrera sin que se
+// entendiera por qué. La fuerza de un club rival sale de las valoraciones de
+// su plantel, sin cansancio y sin nadie fuera de puesto: es su techo. La
+// tuya sale de tus once REALES, con el desgaste puesto. Con el mínimo en 72%,
+// en una semana de tres partidos tu once de 75 jugaba a 60 contra rivales a
+// pleno; medido, Boca terminaba 13° de 15 con cualquier planteo. Ahora el
+// piso es el 88% y se recupera más rápido: rotar sigue importando (un 12% es
+// un montón), pero ya no define el campeonato solo.
 const ENERGIA_MAXIMA = 100;
 const ENERGIA_POR_PARTIDO = 30;
-const ENERGIA_POR_DIA = 5;
+const ENERGIA_POR_DIA = 6;
 // Abajo de esto el jugador empieza a rendir menos. Arriba, juega entero.
 const ENERGIA_SIN_MERMA = 80;
-// Lo peor que puede rendir un jugador reventado: el 72% de su valoración.
-const RENDIMIENTO_MINIMO = 0.72;
+// Lo peor que puede rendir un jugador reventado: el 88% de su valoración.
+const RENDIMIENTO_MINIMO = 0.88;
+// El desgaste promedio de un plantel rival a lo largo del año. Los rivales no
+// tienen energía simulada jugador por jugador (sus planteles se generan), así
+// que se les aplica esto para que su fuerza esté en la misma escala que la
+// tuya, que sí la tiene.
+const DESGASTE_RIVAL = 0.96;
 const PLAYOFF_STAGES = ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'];
 const REDUCIDO_STAGES = ['Primera Rueda del Reducido', 'Cuartos del Reducido', 'Semifinal del Reducido', 'Final del Reducido'];
 // Cómo se llama cada instancia de una copa internacional según cuántos
@@ -517,6 +531,13 @@ const Engine = {
       const once = arquero ? [arquero, ...campo] : campo;
       fuerza = once.reduce((suma, p) => suma + p.rating, 0) / once.length;
     }
+    // Este número es el TECHO del club: su mejor once, cada uno en su puesto y
+    // entero. Tu equipo nunca juega en su techo (tiene desgaste y algún
+    // jugador fuera de posición), así que compararlos derecho te dejaba
+    // siempre en desventaja contra todos. Se le aplica el mismo desgaste
+    // promedio que sufre un plantel que rota: así los dos números están en la
+    // misma escala y tu plantel vale lo que dice valer.
+    fuerza *= DESGASTE_RIVAL;
     this._fuerzas[clave] = fuerza;
     return fuerza;
   },
@@ -3591,6 +3612,25 @@ const Engine = {
     return c == null ? 60 : c;
   },
 
+  // ---------- El ánimo del plantel ----------
+  //
+  // El ánimo solo se movía con las decisiones de la semana, y NUNCA volvía al
+  // centro. O sea que era un contador que se hundía para siempre: tres o
+  // cuatro respuestas que costaban ánimo y el plantel quedaba en -15 (cinco
+  // puntos menos de fuerza en cada partido) sin forma de recuperarse ni
+  // manera de entender por qué el equipo se caía a pedazos. Medido: el ánimo
+  // terminaba clavado en el piso en TODAS las carreras de prueba.
+  //
+  // Ahora los resultados son lo que más lo mueve —ganar levanta, perder
+  // hunde— y después de cada partido tira un poco hacia el cero: una mala
+  // racha se paga, pero se sale.
+  animoPorResultado(resultado) {
+    const s = this.state;
+    const delta = resultado === 'G' ? 1.5 : resultado === 'P' ? -1.5 : 0;
+    const haciaElCentro = -(s.morale || 0) * 0.08;
+    s.morale = Math.max(-15, Math.min(15, (s.morale || 0) + delta + haciaElCentro));
+  },
+
   // Cómo te ve la dirigencia, en palabras.
   estadoDeLaDirigencia() {
     const c = this.confianza();
@@ -4104,6 +4144,8 @@ const Engine = {
     // de calendario entra el goteo fijo (TV, sponsors, cuota social).
     if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
     Noticias.tick(this);
+    // Con el mercado abierto puede llegar una oferta cualquier día.
+    if (this.ofertaDelDia()) return 'frena';
 
     if (cal.messageDay && cal.dayInWeek === cal.messageDay) {
       cal.message = INBOX_MESSAGES[Math.floor(Math.random() * INBOX_MESSAGES.length)];
@@ -4378,7 +4420,13 @@ const Engine = {
     const p = s.partido;
     const formacion = this.currentFormation();
     const estilo = this.bonusDeEstiloDeDT();
-    const mia = this.squadStrength() + s.morale / 3;
+    // El ánimo pesa /6 y no /3. Con /3 movía 5 puntos de fuerza —más que
+    // cualquier formación, más que cualquier charla— y como no volvía nunca al
+    // centro, dos respuestas desafortunadas por mes te dejaban un equipo 5
+    // puntos peor durante toda la temporada. Medido: la MISMA carrera con las
+    // mismas decisiones tácticas terminaba 2ª o 13ª según cómo hubieras
+    // contestado en las ruedas de prensa.
+    const mia = this.squadStrength() + s.morale / 6;
     const suya = this.clubStrength(ctx.opponentId);
     const ventaja = ctx.isNeutral ? 0 : 4;
     const local = ctx.isHome ? mia : suya;
@@ -5119,7 +5167,9 @@ const Engine = {
       const mios = m.isHome ? m.homeGoals : m.awayGoals;
       const suyos = m.isHome ? m.awayGoals : m.homeGoals;
       if (!Array.isArray(s.season.myResults)) s.season.myResults = [];
-      s.season.myResults.push(mios > suyos ? 'G' : mios === suyos ? 'E' : 'P');
+      const resultado = mios > suyos ? 'G' : mios === suyos ? 'E' : 'P';
+      s.season.myResults.push(resultado);
+      this.animoPorResultado(resultado);
       if (m.isHome) Economia.cobrarPartidoDeLocal(this, !!(s.matchContext && s.matchContext.clasico));
       this.simulateWholeRound(s.season.roundIndex, m);
       this.recordRoundResult(m.home, m.away, m.homeGoals, m.awayGoals);
@@ -5603,6 +5653,8 @@ const Engine = {
   startTransferWindow(reason = 'between-editions') {
     const s = this.state;
     s.season.transferReason = reason;
+    s.season.ofertasDeLaVentana = 0;
+    s.season.jugadoresConOferta = [];
     // Los otros clubes también se mueven en cada ventana. Se hace ANTES de
     // que vos negocies, así el mercado que ves ya tiene los cambios: el
     // jugador que te gustaba puede haberse ido a otro lado.
@@ -5623,9 +5675,55 @@ const Engine = {
     this.mostrarSiguienteOferta();
   },
 
+  // ---------- Las ofertas que caen día por día ----------
+  //
+  // Las ofertas por tus jugadores se armaban SOLO en startTransferWindow, que
+  // es la ventana de mitad de año. La de enero no pasa por ahí: se entra con
+  // el botón "Ir al mercado de pases" (ver abrirElMercado), así que podías
+  // marcar medio plantel como transferible, pasar todo enero apretando
+  // Avanzar y no recibir un solo llamado. Ahora, con el mercado abierto,
+  // cualquier día puede sonar el teléfono: es más realista y además se siente
+  // mientras pasás los días.
+  OFERTAS_POR_VENTANA_LARGA: 5,
+  CHANCE_DE_OFERTA_POR_DIA: 0.3,
+
+  ofertaDelDia() {
+    const s = this.state;
+    if (!s.season || s.screen !== 'calendar') return false;
+    if (!this.mercadoAbierto()) return false;
+    if (s.ofertasRecibidas && s.ofertasRecibidas.length) return false;
+    const hechas = s.season.ofertasDeLaVentana || 0;
+    if (hechas >= this.OFERTAS_POR_VENTANA_LARGA) return false;
+    if (Math.random() > this.CHANCE_DE_OFERTA_POR_DIA) return false;
+
+    const ofertas = Mercado.ofertasPorTusJugadores(this).concat(Mercado.ofertasDePrestamo(this));
+    if (!ofertas.length) return false;
+    // Se prefiere a alguien por el que todavía no vino nadie en esta ventana:
+    // sin esto salían tres ofertas seguidas por el mismo jugador y parecía que
+    // el resto del plantel no existía.
+    const yaSonaron = s.season.jugadoresConOferta || [];
+    const candidatas = this.shuffled(ofertas);
+    const elegida = candidatas.find((o) => !yaSonaron.includes(o.playerId)) || candidatas[0];
+    s.ofertasRecibidas = [elegida];
+    s.season.jugadoresConOferta = yaSonaron.concat([elegida.playerId]);
+    s.season.ofertasDeLaVentana = hechas + 1;
+    // Esta oferta no es parte del circuito de la ventana (ofertas → renovaciones
+    // → pantalla de mercado): cuando la resolvés, se vuelve al almanaque.
+    s.volverAlCalendario = true;
+    s.screen = 'oferta-recibida';
+    this.save();
+    return true;
+  },
+
   mostrarSiguienteOferta() {
     const s = this.state;
     if (!s.ofertasRecibidas || !s.ofertasRecibidas.length) {
+      if (s.volverAlCalendario) {
+        s.volverAlCalendario = false;
+        s.screen = 'calendar';
+        this.save();
+        return;
+      }
       this.showNextContractDecision();
       return;
     }
@@ -5697,10 +5795,28 @@ const Engine = {
     } else if (jugador && aceptar) {
       s.lastDecisionNote = 'No se puede vender: el plantel quedaría por debajo del mínimo.';
     } else if (jugador) {
-      // Rechazar a un club grande no sale gratis: el jugador quería irse.
-      const golpe = oferta.club.extranjero ? 4 : 2;
-      s.morale = Math.max(-15, s.morale - golpe);
-      s.lastDecisionNote = `${jugador.name} se queda. En el vestuario no cayó del todo bien.`;
+      // Decir que no tiene un costo, pero SOLO cuando el jugador tenía motivos
+      // para querer irse: si lo pusiste en la lista de transferibles y después
+      // le cerrás la puerta, se enoja; si el club nunca lo puso en venta, que
+      // lo bajen de un llamado es lo normal y el vestuario no se mueve.
+      //
+      // Esto era un -2/-4 fijo por cada rechazo. Con una oferta por ventana no
+      // se notaba; desde que pueden llegar cinco en un enero, rechazarlas
+      // todas hundía el ánimo del plantel al mínimo y el equipo se caía a
+      // pedazos sin que se entendiera por qué.
+      // El golpe también depende de la plata: lo que enoja no es que digas
+      // que no, es decir que no a una oferta que era un montón. Y es chico a
+      // propósito: ahora pueden llegar cinco ofertas en un enero, y a -4 cada
+      // una el plantel terminaba el mes por el piso.
+      const enVenta = Mercado.estadoPropio(jugador) === 'transferible';
+      const generosa = oferta.monto >= this.valueOf(jugador) * 1.2;
+      let golpe = 0;
+      if (enVenta) golpe = generosa ? 2 : 1;
+      else if (generosa && oferta.club.extranjero) golpe = 1;
+      if (golpe) s.morale = Math.max(-15, s.morale - golpe);
+      s.lastDecisionNote = golpe
+        ? `${jugador.name} se queda. En el vestuario no cayó del todo bien.`
+        : `${jugador.name} se queda: el club no lo pone en venta.`;
     }
     this.mostrarSiguienteOferta();
   },

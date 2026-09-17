@@ -57,6 +57,10 @@ const Noticias = {
     // pero ver dos tarjetas idénticas juntas parece uno, así que no se
     // agrega si la misma frase todavía está a la vista en el feed.
     if (lista.slice(0, 8).some((n) => n.titular === titular)) return;
+    // Tampoco se repite el PROTAGONISTA: "Todos hablan de Fulano", "Fulano, la
+    // joya de tal" y "En tal club apareció Fulano" son tres titulares
+    // distintos sobre el mismo pibe, y salían los tres seguidos.
+    if (op.sobre && lista.slice(0, 10).some((n) => n.titular.includes(op.sobre))) return;
     lista.unshift({
       id: `n${s.calendar ? s.calendar.dayCount : 0}-${lista.length}-${Math.floor(Math.random() * 100000)}`,
       cat,
@@ -383,6 +387,30 @@ const Noticias = {
   rumorDeMercado(engine) {
     const s = engine.state;
     const club = this.clubDeLaLigaAlAzar(engine, true);
+
+    // Si vos pusiste gente en la lista de transferibles o la ofreciste a
+    // préstamo, el rumor es sobre uno de ellos casi la mitad de las veces:
+    // así se siente que el mercado se movió porque VOS lo moviste, aunque la
+    // oferta formal llegue después (o no llegue).
+    const marcados = (s.squad || []).filter((p) => typeof Mercado !== 'undefined' && Mercado.estadoPropio(p) !== 'retenido');
+    if (marcados.length && club && club.id !== s.clubId && Math.random() < 0.45) {
+      const mio = this.alAzar(marcados);
+      const esPrestamo = Mercado.estadoPropio(mio) === 'prestamo';
+      const propias = esPrestamo
+        ? [
+          [`${club.name} pregunta por ${mio.name} a préstamo`, `Saben que en ${engine.getClub(s.clubId).name} lo dejarían salir para que sume minutos. Todavía no hay nada firmado.`],
+          [`${mio.name}, ofrecido a varios clubes`, 'El club busca que se vaya cedido por lo que resta del año. Hay más de un interesado.'],
+        ]
+        : [
+          [`Sondeo de ${club.name} por ${mio.name}`, `Está en la lista de transferibles y en ${club.name} lo miran. Por ahora es solo una consulta.`],
+          [`${mio.name} suena para ${club.name}`, 'El nombre gusta y saben que es negociable. La oferta formal todavía no llegó.'],
+          [`${club.name} pidió información por ${mio.name}`, 'Primer contacto entre dirigentes. Nada concreto todavía.'],
+        ];
+      const [tit, baj] = this.alAzar(propias);
+      this.push(s, 'mercado', tit, baj, { clubId: club.id, destacada: true, sobre: mio.name });
+      return;
+    }
+
     const objetivo = this.clubDeLaLigaAlAzar(engine, true);
     let jugador = null;
     if (objetivo && objetivo.id !== club.id && typeof Mercado !== 'undefined') {
@@ -399,7 +427,7 @@ const Noticias = {
       [`Se enfría la salida de ${jugador} a ${club.name}`, `Las partes no se pusieron de acuerdo en la forma de pago y todo quedó en suspenso.`],
     ];
     const [titular, bajada] = this.alAzar(plantillas);
-    this.push(s, 'mercado', titular, bajada, { clubId: club.id });
+    this.push(s, 'mercado', titular, bajada, { clubId: club.id, sobre: jugador });
   },
 
   parteMedicoRival(engine) {
@@ -420,8 +448,53 @@ const Noticias = {
       { clubId: club.id });
   },
 
+  // ¿Hay torneo rodando? En enero (pretemporada) el campeonato todavía no
+  // empezó: no hay "figura del mes", no hay goleador y la tabla está toda en
+  // cero. Publicar eso ahí es exactamente lo que hace que un juego se sienta
+  // de cartón.
+  enJuego(engine) {
+    const s = engine.state;
+    if (!s.season) return false;
+    if ((s.season.pretemporada || 0) > 0) return false;
+    return ((s.season.myResults || []).length > 0);
+  },
+
+  // Las noticias de enero: amistosos, doble turno y el mercado. Son las que
+  // van cuando no hay una fecha de la que hablar.
+  pretemporada(engine) {
+    const s = engine.state;
+    const club = engine.getClub(s.clubId);
+    const rival = this.clubDeLaLigaAlAzar(engine, true);
+    const plantel = (s.squad || []).filter((p) => engine.isAvailable(p));
+    const pibe = plantel.filter((p) => p.age <= 21).sort((a, b) => (b.potential || b.rating) - (a.potential || a.rating))[0];
+    const figura = plantel.slice().sort((a, b) => b.rating - a.rating)[0];
+    const gl = Math.floor(Math.random() * 4);
+    const gv = Math.floor(Math.random() * 3);
+
+    const plantillas = [
+      [`${club.name} ${gl}-${gv} ${rival.name} en un amistoso de pretemporada`,
+        `Partido de preparación, con los dos técnicos probando variantes. ${gl > gv ? 'Ganó el ensayo el local.' : gl === gv ? 'Terminó igualado.' : 'Se lo llevó la visita.'}`],
+      [`Doble turno en el predio de ${club.name}`,
+        'El cuerpo técnico apura la puesta a punto: trabajo físico a la mañana y fútbol por la tarde.'],
+      [`En ${club.name} esperan definiciones del mercado`,
+        'La dirigencia sabe que el plantel se termina de armar antes del debut y hay nombres en carpeta.'],
+    ];
+    if (pibe) {
+      plantillas.push([`${pibe.name} se entrena con la primera de ${club.name}`,
+        `A los ${pibe.age} años se ganó un lugar en la pretemporada y el cuerpo técnico lo mira de cerca.`]);
+    }
+    if (figura) {
+      plantillas.push([`${figura.name} se puso a punto y llega entero al debut`,
+        'Hizo la pretemporada completa, sin molestias, y es una de las certezas para la primera fecha.']);
+    }
+    const [titular, bajada] = this.alAzar(plantillas);
+    this.push(s, 'ultimahora', titular, bajada, { clubId: s.clubId });
+  },
+
   premio(engine) {
     const s = engine.state;
+    // Sin fechas jugadas no hay premios de los que hablar (ver enJuego).
+    if (!this.enJuego(engine)) return;
     // Si se puede, el premio se lo lleva un jugador de verdad del plantel
     // propio: el de mejor valoración disponible. Si no, uno de la liga.
     const propios = (s.squad || []).filter((p) => engine.isAvailable(p)).sort((a, b) => b.rating - a.rating);
@@ -522,11 +595,14 @@ const Noticias = {
         `A los ${j.age} años ya está en ${j.rating} de valoración y en el club creen que todavía le sobra recorrido.`],
     ];
     const [titular, bajada] = this.alAzar(plantillas);
-    this.push(s, 'premios', titular, bajada, { clubId: club.id, destacada: true });
+    this.push(s, 'premios', titular, bajada, { clubId: club.id, destacada: true, sobre: j.name });
   },
 
   climaDeVestuario(engine) {
     const s = engine.state;
+    // Con la tabla en cero no hay nada que contar: en enero todos marchan
+    // séptimos con cero puntos.
+    if (!this.enJuego(engine)) return;
     const club = engine.getClub(s.clubId);
     // Entre temporadas el season se rearma con zones vacío: ahí no hay tabla
     // de la que hablar, así que esta noticia simplemente no sale.
@@ -568,17 +644,29 @@ const Noticias = {
     // El relleno bajó de 45% a 28% de los días por la misma razón: ya no hace
     // falta inventar tanto para que el diario tenga algo.
     if (Math.random() > 0.28) return;
-    const generadores = [
-      () => this.rumorDeMercado(engine),
-      () => this.parteMedicoRival(engine),
-      () => this.premio(engine),
-      () => this.desdeAfuera(engine),
-      () => this.climaDeVestuario(engine),
-      // Va dos veces porque muchas tiradas no encuentran ninguna joya en el
-      // club que le tocó y no publican nada.
-      () => this.joyaJuvenil(engine),
-      () => this.joyaJuvenil(engine),
-    ];
+    // En pretemporada se habla de otra cosa: no hay fechas, ni tabla, ni
+    // figura del mes. Antes salía todo mezclado y en pleno enero te podía
+    // aparecer "figura del mes por su nivel en las últimas fechas".
+    const generadores = this.enJuego(engine)
+      ? [
+        () => this.rumorDeMercado(engine),
+        () => this.parteMedicoRival(engine),
+        () => this.premio(engine),
+        () => this.desdeAfuera(engine),
+        () => this.climaDeVestuario(engine),
+        // Va dos veces porque muchas tiradas no encuentran ninguna joya en el
+        // club que le tocó y no publican nada.
+        () => this.joyaJuvenil(engine),
+        () => this.joyaJuvenil(engine),
+      ]
+      : [
+        () => this.pretemporada(engine),
+        () => this.pretemporada(engine),
+        () => this.rumorDeMercado(engine),
+        () => this.rumorDeMercado(engine),
+        () => this.desdeAfuera(engine),
+        () => this.joyaJuvenil(engine),
+      ];
     this.alAzar(generadores)();
   },
 };
