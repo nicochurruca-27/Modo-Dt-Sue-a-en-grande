@@ -3,19 +3,14 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
-**Hay una auditoría completa en `auditoria.html`** (13/9/2026): estado real de
-cada sistema, bugs, exploits, roadmap por fases y prioridades puntuadas. Este
-archivo es la lista de tareas; ese otro es el diagnóstico y el orden.
-
-El hallazgo principal de esa auditoría ya está resuelto: `clubStrength()`
-ahora sale del plantel real de cada club. Lo que sigue abierto de ese frente
-está más abajo, en "Planteles rivales que se muevan de verdad".
+Última revisión: 17/9/2026.
 
 ---
 
 ## 1. Datos que faltan cargar
 
-Nada de esto se puede inventar: son datos reales que hay que pasar a mano.
+Nada de esto se puede inventar: son datos reales que hay que pasar a mano. Es
+lo único que no depende de programar.
 
 ### Jugadores de todos los clubes
 
@@ -28,108 +23,90 @@ detallada, edad, nacionalidad, dorsal, valoración y **proyección** (el techo a
 que puede llegar). Si además vienen años de contrato, valor, sueldo y cláusula,
 mejor; si no, se estiman con la escala que ya usa el resto.
 
+### Escudos de la Nacional, de la tercera y del continente
+
+Hoy solo están los 30 de Primera (`js/escudos.js`). El resto —los 36 de la
+Nacional y los 103 clubes del continente en `js/internacional.js`— se dibuja
+con un escudo genérico de iniciales. Se nota sobre todo en el cuadro de la
+Libertadores, donde la mitad de los escudos son reales y la otra mitad no.
+
+Se generan con `tools/generar-escudos.py` a partir de una carpeta con los PNG.
+
 ### Clubes de la tercera división
 
 Para que la Copa Argentina deje de ser "todos los de Primera + casi toda la
 Nacional". Son **34 lugares** para repartir entre Primera B Metropolitana,
 Primera C y Torneo Federal A.
 
-Por club: nombre, división y un nivel del 1 al 5 (1 = Federal A flojo, 5 =
-candidato de Primera Nacional). Sin el nivel, un club del Federal A le gana a
-Boca demasiado seguido.
-
-Van a ser un pozo **solo para la Copa Argentina**, como el pozo de los 103
-clubes del continente: no son divisiones jugables, no hay ascenso ni descenso
-hacia ellas.
-
-### Escudos de la Nacional y de la tercera
-
-Hoy solo están los 30 de Primera (`js/escudos.js`). El resto se dibuja con un
-escudo genérico de iniciales, que se nota sobre todo en el cuadro de la Copa
-Argentina. Se regeneran con `tools/generar-escudos.py` a partir de una carpeta
-con los PNG.
-
-### Escudos de los clubes del continente
-
-Los 103 clubes de `js/internacional.js` —Flamengo, Peñarol, Nacional, Colo
-Colo, todos— hoy se dibujan con el escudo genérico de iniciales. Se nota en la
-fase de grupos y sobre todo en el cuadro de la Libertadores, donde la mitad de
-los escudos son reales (los argentinos) y la otra mitad no.
-
-Se cargan igual que los de Primera: una carpeta con los PNG y
-`tools/generar-escudos.py`. Son 103, así que conviene hacerlos por país.
+Por club: nombre, división y un nivel del 1 al 5. Van a ser un pozo **solo para
+la Copa Argentina**: no son divisiones jugables.
 
 ### La edición actual de la Copa Argentina
 
 Los 32 cruces de los treintaidosavos, en el orden de arriba hacia abajo del
-cuadro, para que la primera temporada arranque con la copa real en curso. Con
-los resultados al lado de los que ya se jugaron, si los hay.
+cuadro, para que la primera temporada arranque con la copa real en curso.
 
 ---
 
-## 2. La IA de los clubes, lo que falta
+## 2. La IA de los clubes rivales
 
 Los clubes rivales ya tienen plantel, envejecen, se retiran, reponen con
-juveniles y **se compran y se venden entre ellos** en cada ventana de pases, y
-todo eso se guarda. Falta subirle el nivel a esa IA, que hoy es a propósito
-simple (busca a alguien que lo mejore y listo):
+juveniles y se compran y se venden entre ellos en cada ventana, y todo eso se
+guarda. Falta subirle el nivel a esa IA, que hoy es a propósito simple:
 
-- **Presupuesto**: hoy un club ficha sin que le cueste nada. Debería poder
-  gastar solo lo que tiene, y vender para comprar.
+- **Presupuesto**: hoy un club ficha sin que le cueste nada. Debería gastar
+  solo lo que tiene, y vender para comprar.
 - **Necesidades por puesto**: un club con tres arqueros y sin centrales sigue
   comprando delanteros.
-- **Negociar la oferta**: hoy es aceptar o rechazar. Debería poder pedirse más
-  plata, o un porcentaje de una futura venta.
 - **Que el jugador opine**: si se quiere ir y lo retenés, que baje su ánimo y
   pida salir en la ventana siguiente.
 - **Política de juveniles**: que un club de cantera grande suba pibes propios
   en vez de comprar.
 - **Que los rivales se lesionen y acumulen amarillas**, como tu plantel.
 
+Es lo que más emparejaría el juego: hoy vos podés comprar y ellos casi no.
+
 ---
 
-## 3. Estadísticas que todavía faltan
+## 3. Estadísticas
 
 Los jugadores del usuario ya llevan partidos, goles y asistencias. Falta:
 
-- **Tabla de goleadores del torneo.** Hoy solo se sabe lo de tu plantel: los
-  jugadores de los clubes rivales no juegan los partidos simulados, así que no
-  hay a quién anotarle un gol. Sale gratis el día que la simulación de un
-  partido entre dos rivales mire los planteles (punto 2).
-- **Historial por temporada.** Hoy se guarda el año en curso y el acumulado de
-  carrera, pero no queda "en 2027 hizo 22 goles".
-- **Goles separados por competencia** (liga / Copa Argentina / internacionales).
+- **Tabla de goleadores del torneo.** Hoy los partidos entre dos rivales no
+  miran los planteles, así que no hay a quién anotarle un gol. Sale casi gratis
+  el día que esa simulación mire los planteles (punto 2).
+- **Historial por temporada**: hoy queda el año en curso y el acumulado de
+  carrera, pero no "en 2027 hizo 22 goles".
+- **Goles separados por competencia** (liga / Copa Argentina / copas).
 
 ---
 
-## 4. Sistema de partido en vivo
+## 4. El partido minuto a minuto
 
-El cambio más grande que queda. Hoy el partido se resuelve de una: elegís la
-charla táctica y aparece el resultado final.
+Está hecho el segundo escalón: el partido se juega en **tramos** (dos tiempos,
+y el tiempo se parte en dos si hay una lesión), genera eventos con minuto y
+autor, frena en el entretiempo y en la lesión, y recalcula con lo que decidís.
+Falta el minuto a minuto de verdad:
 
-La idea es que se simule **minuto a minuto**, rápido pero visible, y que se
-frene en los eventos:
-
-- Gol, amarilla, roja, lesión — cada uno con su animación.
-- Poder hacer **cambios en vivo**, con el banco de 12 que ya está armado.
-- Poder cambiar el planteo en el entretiempo o en el momento: pasar a algo más
-  ofensivo si vas perdiendo, meterte atrás si estás ganando.
-
-La energía ya está, así que los cambios en vivo tienen sentido: un jugador
-cansado rinde menos y te obliga a sacarlo. Lo que falta para esto es que el
-partido produzca **hechos** y no solo un marcador: minuto, autor del gol,
-amarillas, lesiones. Con esos hechos, dibujarlos en vivo es casi gratis.
+- **Los eventos tienen que salir en el momento**, no sortearse por tramo y
+  después repartirse los minutos. Hay que recorrer los 90 minutos.
+- **Poder intervenir en cualquier momento**: un cambio en el minuto 70, cambiar
+  el esquema cuando te empatan.
+- **Más tipos de evento**: expulsiones en vivo, penales dentro del juego (hoy
+  el penal es una pantalla aparte), palos, ocasiones.
+- **Los goles del rival con su autor** ya funcionan para los clubes argentinos.
+  Los del continente no tienen plantel cargado y el gol queda a nombre del club.
 
 ---
 
-## 5. La carrera del DT, lo que falta
+## 5. La carrera del DT
 
 Ya existen la confianza de la dirigencia, el despido, las ofertas de otros
-clubes y el historial de dónde dirigiste. Falta:
+clubes, el historial y la promesa de la presentación (que corre la vara con la
+que te miden). Falta:
 
 - **Reputación propia del DT**, que hoy se estima contando títulos. Debería
-  crecer también por sostenerse en un club, por buenas campañas sin título y
-  por dirigir en Primera.
+  crecer también por sostenerse en un club y por buenas campañas sin título.
 - **Renunciar**, para irse a un club que te tienta antes de que te echen.
 - **Ofertas estando en funciones**: hoy solo te llaman cuando quedaste libre.
 - **Que la dirigencia hable de otras cosas**: pedir un refuerzo, bancarte
@@ -137,95 +114,63 @@ clubes y el historial de dónde dirigiste. Falta:
 
 ---
 
-## 5. Camisetas con los colores de cada club
+## 6. Camisetas con los colores de cada club
 
-En la plantilla cada jugador se muestra con una camisetita dibujada, pero hoy
-es siempre la misma: toma los colores del club del usuario. La idea es que cada
-club tenga la suya —la franja de River, el amarillo y azul de Boca, la de
-Racing— y que se vea en todos lados donde aparece un jugador: el once, el
-banco, la reserva y el mercado de pases.
+En la plantilla cada jugador se muestra con una camisetita, pero siempre con
+los colores del club del usuario. La idea es que cada club tenga la suya —la
+franja de River, el amarillo y azul de Boca— y que se vea en el once, el banco,
+la reserva y el mercado.
 
-Los colores de cada club ya están en `js/colores.js` (sacados del escudo por
-`tools/generar-colores.py`) y los de los clubes del continente en
-`internacional.js`, así que es trabajo de dibujo, no de datos: hay que darle a
-`benchJerseySvg` y al dibujo del once una forma de camiseta por club (lisa,
-a rayas verticales, con banda cruzada, con franja horizontal).
+Los colores ya están en `js/colores.js` (sacados del escudo con
+`tools/generar-colores.py`) y los del continente en `internacional.js`, así que
+es trabajo de dibujo y no de datos: hay que darle a `benchJerseySvg` y al once
+una forma de camiseta por club (lisa, a rayas, con banda cruzada, con franja).
 
 ---
 
-## 6. Detalles pendientes
+## 7. Economía, lo que quedó afinar
 
-- **El usuario todavía gana de más.** Con la fuerza de los rivales saliendo de
-  su plantel, en 60 temporadas medidas los títulos de liga bajaron a la mitad
-  (20 → 10) y las copas internacionales de 7 a 1 de 120. Sigue habiendo una
-  ventaja estructural: vos podés comprar y los rivales no. Se termina de
-  emparejar con la IA de clubes (punto 2).
-- **Los 4 descensos de la Primera Nacional** solo se miran para tu club. Los
-  otros no se mueven, porque no hay una división más abajo de dónde traer
-  reemplazos. Si algún día entra la tercera como división jugable, esto se
-  completa.
+Cada club de Primera tiene su economía real en `js/finanzas.js` y de ahí salen
+el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
 
----
-
-## 7. Los presupuestos de los clubes
-
-Hecho. Cada club de Primera tiene ahora su propia economía en `js/finanzas.js`
-(valor de plantel, socios, aforo y estado de las cuentas, con datos reales de
-2026), y de ahí salen el presupuesto de arranque, el goteo semanal, la vara de
-sueldos y la recaudación de local.
-
-Lo que quedó pendiente de acá:
-
-- **La Primera Nacional sigue andando por categoría.** No hay datos publicados
-  comparables de esos 36 clubes, así que usan la tabla de siempre.
-- ~~Un club chico se queda sin un peso.~~ Arreglado. El problema no eran las
-  renovaciones (le costaban $100k al año contra $641k de ingreso): era que el
-  plantel se encarece solo con los años —envejece y entra en su mejor momento,
-  donde se cobra más— y el presupuesto de sueldos estaba congelado el día uno.
-  En ocho temporadas la planilla subía un 25% contra una vara quieta, así que
-  el club quedaba pasado para siempre y pagaba la diferencia todas las semanas.
-  Ahora el club renegocia ese presupuesto cada temporada (ver
-  `Economia.renegociarPresupuestoDeSueldos`).
+- **La Primera Nacional sigue andando por categoría**: no hay datos publicados
+  comparables de esos 36 clubes.
 - **La recaudación de local no usa el aforo**, que está cargado y sería el dato
-  natural: hoy se estira junto con el resto de la economía del club. Queda para
-  cuando se quiera afinar.
-- **Los socios tampoco se usan todavía.** Están cargados para cuando la cuota
-  social sea una fuente propia y no una proporción de la categoría.
-
-## 8. El arranque de la carrera
-
-Hecho: la pantalla de inicio (punto 1 de lo que charlamos).
-
-Hecho también: la presentación en sociedad, ahora la conferencia de prensa con
-los colores del club.
-
-Queda pendiente:
-
-- **La pantalla de elegir club**, que podría contar bastante más de cada club
-  antes de que te decidas (la reputación es hoy cinco estrellitas y nada más).
-
-El orden del arranque queda como está: primero tu nombre y tu estilo de DT,
-después el club.
+  natural.
+- **Los socios tampoco se usan todavía**: están cargados para cuando la cuota
+  social sea una fuente propia.
 
 ---
 
-## 9. El partido minuto a minuto
+## 8. Detalles sueltos
 
-Hecho el primer escalón: el partido se juega en dos tiempos con entretiempo, y
-ya sabe partirse, generar eventos con su minuto y su autor, y recalcular a
-mitad de camino con lo que decidiste. Eso es justo lo que hace falta para
-después partirlo en noventa.
+- **La pantalla de elegir club** podría contar bastante más de cada club antes
+  de que te decidas (hoy la reputación son cinco estrellitas y nada más).
+- **Los 4 descensos de la Primera Nacional** solo se miran para tu club: no hay
+  una división más abajo de donde traer reemplazos.
+- **El usuario todavía gana de más**, aunque mucho menos que antes. Se termina
+  de emparejar con la IA de clubes (punto 2).
 
-Lo que falta para el minuto a minuto de verdad:
+---
 
-- **Los eventos tienen que salir en el momento**, no todos juntos al terminar
-  el tiempo. Hoy se sortean los goles del tiempo entero y después se les pone
-  un minuto; para el minuto a minuto hay que recorrer los 90 minutos y sortear
-  qué pasa en cada uno.
-- **Poder intervenir en cualquier momento**, no solo en el entretiempo: un
-  cambio en el minuto 70, cambiar el esquema cuando te empatan.
-- **Más tipos de evento**: expulsiones, lesiones en el partido, penales dentro
-  del juego (hoy el penal es una pantalla aparte), palos, ocasiones.
-- **Los goles del rival con su autor** ya funcionan para los clubes argentinos
-  (sale del plantel sembrado). Los del continente no tienen plantel cargado, y
-  ahí el gol queda a nombre del club.
+## 9. Lo grande que viene: más de una liga
+
+La idea es que el juego deje de ser solo la liga argentina. Antes de escribir
+una línea conviene tener presente qué del motor es argentino y qué no:
+
+- **Es genérico y sirve tal cual**: el partido (fuerza, formaciones, planteos,
+  entretiempo, lesiones, energía), el mercado entero (estados, ofertas,
+  préstamos, cláusulas, libres), la economía, la carrera del DT, las noticias,
+  el desarrollo de jugadores y el motor de llaves (sirve para cualquier copa).
+- **Es argentino y hay que parametrizar**: dos zonas de 15 con interzonal,
+  Apertura y Clausura, la Tabla Anual, los playoffs, la Copa Argentina, el
+  calendario que arranca el 1° de enero, y los cupos a Libertadores y
+  Sudamericana. En el código son ~25 lugares que miran `D1`/`D2`, ~38 que miran
+  `apertura`/`clausura` y ~126 que nombran a las copas.
+
+El camino que menos duele es **un formato de liga como dato**, no como código:
+un archivo por país con sus divisiones, cuántos equipos, si hay zonas, si hay
+playoffs, cuántos descienden, qué copas juega y cómo reparte los cupos. El
+motor lee ese formato y arma la temporada. Los 103 clubes del continente ya
+están cargados con país, nivel, estadio y colores, así que Sudamérica es el
+primer paso natural.
