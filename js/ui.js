@@ -123,6 +123,7 @@ function render() {
   else if (s.screen === 'calendar') renderCalendar();
   else if (s.screen === 'pre-match') renderPreMatch();
   else if (s.screen === 'entretiempo') renderEntretiempo();
+  else if (s.screen === 'lesion') renderLesion();
   else if (s.screen === 'penalty') renderPenalty();
   else if (s.screen === 'match-result') renderMatchResult();
   else if (s.screen === 'contract-renewal') renderContractRenewal();
@@ -1348,6 +1349,10 @@ function pitchMarkingsSvg(w, h) {
 // Engine.positionFit); el aro celeste es la selección para el cambio.
 function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   const kit = clubKit(club);
+  // Lesionado o suspendido: un icono chico pegado a la camiseta (🏥 / 🟥). Va
+  // adentro del SVG y no como elemento aparte porque la tarjeta del banco es
+  // más ancha que la camiseta y el icono terminaba flotando al costado.
+  const baja = Engine.outIcono(p);
   const label = p.number != null ? p.number : p.rating;
   const bandPath = kit.band
     ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
@@ -1385,6 +1390,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
       <text x="${w / 2}" y="${label2Y + PITCH_LABEL2_H - 3.5}" text-anchor="middle" font-size="9" font-weight="600" fill="#cbd5e1">${infoLine}</text>
       ${barraDeEnergiaSvg(p, -3, label2Y + PITCH_LABEL2_H + 2, w + 6)}
       ${amonestado ? `<rect x="${w - 7}" y="-5" width="9" height="12" rx="2" fill="#eab308" stroke="#78350f" stroke-width="1" />` : ''}
+      ${baja ? `<text x="-5" y="9" font-size="12">${baja}</text>` : ''}
     </g>
   `;
 }
@@ -1465,7 +1471,6 @@ function benchJerseySvg(p, club) {
       <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="banco-svg">
         ${playerMarkerSvg(p, club, 6, 4, p.id === selectedPlayerId)}
       </svg>
-      ${baja ? `<span class="out-tag banco-out">${baja}</span>` : ''}
     </div>
   `;
 }
@@ -3087,12 +3092,12 @@ let penaltyShooterId = null;
 function eventosDelPartidoHtml(eventos, hasta) {
   const lista = (eventos || []).filter((e) => !hasta || e.minuto <= hasta);
   if (!lista.length) return '<p class="muted">Todavía no pasó nada para contar.</p>';
-  const icono = { gol: '⚽', amarilla: '🟨' };
+  const icono = { gol: '⚽', amarilla: '🟨', lesion: '🏥' };
   return `<ul class="partido-eventos">${lista.map((e) => `
     <li class="${e.mio ? 'mio' : ''}">
       <span class="minuto">${e.minuto}'</span>
       <span class="icono">${icono[e.tipo] || '·'}</span>
-      <span class="quien">${e.nombre || (e.mio ? 'Tu equipo' : 'El rival')}${e.tipo === 'amarilla' ? ' <span class="muted">(amonestado)</span>' : ''}</span>
+      <span class="quien">${e.nombre || (e.mio ? 'Tu equipo' : 'El rival')}${e.tipo === 'amarilla' ? ' <span class="muted">(amonestado)</span>' : ''}${e.tipo === 'lesion' ? ' <span class="muted">(se lesionó)</span>' : ''}</span>
     </li>
   `).join('')}</ul>`;
 }
@@ -3125,7 +3130,7 @@ function fichaDeCambioHtml(jug, grupo, amonestados) {
       data-cambio="${jug.id}" data-player="${jug.id}" data-grupo="${grupo}" ${baja ? 'disabled' : ''}>
       <span class="pos ${jug.pos}">${jug.pos}</span>
       <span class="nombre">${jug.name}${amonestados.has(jug.id) ? ' <span class="amonestado">🟨</span>' : ''}</span>
-      <span class="valor">${baja || jug.rating}</span>
+      <span class="valor" title="${baja || ''}">${baja ? Engine.outIcono(jug) : jug.rating}</span>
     </button>
   `;
 }
@@ -3188,6 +3193,69 @@ function tocarFichaDeCambio(id, grupo) {
   }
   cambioSeleccion = { id, grupo };
   render();
+}
+
+// ---------- La lesión que frena el partido ----------
+//
+// El partido se detiene en el minuto de la lesión: el jugador ya salió y el
+// casillero quedó vacío. Elegís a quién metés (gasta uno de los tres cambios)
+// o seguís con uno menos, que el equipo paga en la cancha.
+function renderLesion() {
+  const s = Engine.state;
+  const p = s.partido;
+  const ctx = s.matchContext;
+  const club = Engine.getClub(s.clubId);
+  const rival = Engine.getClub(ctx.opponentId);
+  const les = p.lesion;
+  const dif = p.mios - p.suyos;
+  const salieron = new Set((p.cambios || []).map((c) => c.sale));
+  const banco = Engine.getBanco().filter((j) => !salieron.has(j.id) && j.id !== les.id);
+  const amonestados = amonestadosDelPartido(p);
+  const quedan = Engine.cambiosQueQuedan();
+  const cubierta = les.cubierta;
+  const entro = cubierta ? (p.cambios || []).slice(-1)[0] : null;
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card entretiempo lesion-card">
+      <p class="muted entretiempo-donde">Minuto ${les.minuto} · ${dondeSeJuega(ctx)}</p>
+      <div class="entretiempo-marcador">
+        <span class="lado">${clubCrest(club, 44)}<strong>${club.name}</strong></span>
+        <span class="cifras ${dif > 0 ? 'gana' : dif < 0 ? 'pierde' : ''}">${p.mios} - ${p.suyos}</span>
+        <span class="lado">${clubCrest(rival, 44)}<strong>${rival.name}</strong></span>
+      </div>
+      <h2>🏥 Se lesionó ${les.nombre}</h2>
+      <p class="lesion-parte">${les.detail}. Se pierde ${les.matches} ${les.matches === 1 ? 'partido' : 'partidos'}.</p>
+      ${eventosDelPartidoHtml(p.eventos)}
+      ${cubierta
+        ? `<p class="contraoferta-respuesta si">Entra ${entro ? entro.entraNombre : ''} por ${les.nombre}.</p>`
+        : quedan > 0
+          ? `
+            <h3>¿A quién metés?</h3>
+            <p class="muted">Tocá al que entra. Te ${quedan === 1 ? 'queda 1 cambio' : `quedan ${quedan} cambios`}; si no metés a nadie, seguís con uno menos.</p>
+            <div class="cambio-lista">
+              ${banco.length
+                ? banco.map((j) => fichaDeCambioHtml(j, 'banco', amonestados)).join('')
+                : '<p class="muted">No te queda nadie en el banco.</p>'}
+            </div>
+          `
+          : '<p class="muted">Ya usaste los tres cambios: hay que seguir con uno menos.</p>'}
+      <div class="options">
+        <button class="option-btn" id="seguir-lesion">${cubierta ? 'Seguir el partido' : 'Seguir con uno menos'}</button>
+      </div>
+    </div>
+  `;
+  app.querySelectorAll('.cambio-ficha').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (arrastroRecien) return;
+      Engine.meterPorElLesionado(btn.dataset.cambio);
+      render();
+    });
+  });
+  document.getElementById('seguir-lesion').addEventListener('click', () => {
+    Engine.seguirDespuesDeLaLesion();
+    render();
+  });
 }
 
 function renderEntretiempo() {
