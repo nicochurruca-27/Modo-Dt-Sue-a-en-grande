@@ -3906,11 +3906,27 @@ const Engine = {
 
   // ¿Se puede firmar hoy? En la pretemporada sí, todo enero; y en la ventana
   // del medio del año, mientras dure su pantalla.
+  // El mercado de verano no es solo enero: son los dos meses, enero y febrero
+  // enteros, hasta el 28. El torneo arranca en febrero y el mercado sigue
+  // abierto, como en la realidad —se juegan fechas con el libro de pases
+  // todavía abierto—. Antes se cerraba justo cuando empezaba a rodar la
+  // pelota y no se entendía por qué.
+  ULTIMO_DIA_DEL_MERCADO_DE_VERANO: 58, // el 28 de febrero (el día 0 es el 1° de enero)
+
   mercadoAbierto() {
     const s = this.state;
     if (!s.season) return false;
     if (s.screen === 'transfer') return true;
-    return (s.season.pretemporada || 0) > 0;
+    if ((s.season.pretemporada || 0) > 0) return true;
+    const dia = s.calendar ? s.calendar.dayCount : 0;
+    return dia <= this.ULTIMO_DIA_DEL_MERCADO_DE_VERANO;
+  },
+
+  // Cuántos días quedan de mercado de verano (0 si ya cerró).
+  diasDeMercadoQueQuedan() {
+    const s = this.state;
+    if (!s.calendar) return 0;
+    return Math.max(0, this.ULTIMO_DIA_DEL_MERCADO_DE_VERANO - s.calendar.dayCount);
   },
 
   // Entrar al mercado desde un día de pretemporada. Se puede entrar y salir
@@ -3919,7 +3935,7 @@ const Engine = {
     const s = this.state;
     if (!this.mercadoAbierto()) return;
     s.notasMercado = Mercado.resolverAcuerdos(this);
-    s.season.transferReason = 'pretemporada';
+    s.season.transferReason = (s.season.pretemporada || 0) > 0 ? 'pretemporada' : 'verano';
     s.screen = 'transfer';
     this.save();
   },
@@ -4466,6 +4482,16 @@ const Engine = {
     const enCancha = this.getStartingXI().starters
       .map((e) => s.squad.find((x) => x.id === e.id))
       .filter(Boolean);
+    // El desgaste se paga a medida que se juega, no al final: por eso en el
+    // entretiempo ya ves las barritas más bajas. Cada uno gasta según los
+    // minutos que estuvo, así el que entra en el segundo tiempo paga la mitad
+    // y el que sale en el descanso no paga los 45 que no jugó.
+    if (!Array.isArray(p.jugaron)) p.jugaron = [];
+    enCancha.forEach((j) => {
+      j.energia = Math.max(0, this.energiaDe(j) - this.costoDeUnPartido(j) * (minutos / 90));
+      if (!p.jugaron.includes(j.id)) p.jugaron.push(j.id);
+    });
+
     const faltan = Math.max(0, 11 - enCancha.length);
     const conLosQueQuedan = Math.min(1, enCancha.length / 11);
     // Con uno menos creás bastante menos y además te atacan más: las dos
@@ -4601,7 +4627,7 @@ const Engine = {
     p.eventos.sort((a, b) => a.minuto - b.minuto);
     p.lesion = { ...lesion, cubierta: false };
     if (!p.notasFisicas) p.notasFisicas = [];
-    p.notasFisicas.push(`${jugador.name} se lesionó a los ${lesion.minuto}': ${lesion.detail.toLowerCase()}. Se pierde ${lesion.matches} ${lesion.matches === 1 ? 'partido' : 'partidos'}.`);
+    p.notasFisicas.push({ tono: 'malo', texto: `${jugador.name} se lesionó a los ${lesion.minuto}': ${lesion.detail.toLowerCase()}. Se pierde ${lesion.matches} ${lesion.matches === 1 ? 'partido' : 'partidos'}.` });
   },
 
   // Entra uno del banco por el lesionado, en su mismo casillero. Gasta uno de
@@ -4763,6 +4789,7 @@ const Engine = {
       shootout: null,
       eventos: p.eventos,
       enCancha,
+      jugaron: p.jugaron || enCancha,
       notasFisicas: p.notasFisicas || [],
     };
     s.partido = null;
@@ -4967,7 +4994,7 @@ const Engine = {
   // suspendido. El detalle sigue estando en el globito al pasar por arriba.
   outIcono(player) {
     if (this.isAvailable(player)) return null;
-    return player.out.reason === 'lesión' ? '🏥' : '🟥';
+    return player.out.reason === 'lesión' ? '🚑' : '🟥';
   },
 
   // Después de cada partido: se descuentan las bajas en curso y se sortea si
@@ -5001,14 +5028,6 @@ const Engine = {
     return ENERGIA_POR_DIA * factor;
   },
 
-  // Los once que jugaron llegan cansados al vestuario.
-  gastarEnergia(jugaron) {
-    this.state.squad.forEach((p) => {
-      if (!jugaron.has(p.id)) return;
-      p.energia = Math.max(0, this.energiaDe(p) - this.costoDeUnPartido(p));
-    });
-  },
-
   // Un día de calendario de descanso para todo el plantel. Se llama una vez
   // por día en advanceCalendarDay, así que una semana son siete pasadas.
   recuperarEnergia() {
@@ -5028,7 +5047,7 @@ const Engine = {
       if (p.out && p.out.matches > 0) {
         p.out.matches--;
         if (p.out.matches === 0) {
-          avisos.push(`${p.name} se recuperó y ya está disponible.`);
+          avisos.push({ tono: 'bueno', texto: `${p.name} se recuperó y ya está disponible.` });
           p.out = null;
         }
       }
@@ -5066,9 +5085,9 @@ const Engine = {
       if (p.amarillas >= 5) {
         p.amarillas = 0;
         p.out = { reason: 'suspensión', detail: 'Acumulación de amarillas', matches: 1 };
-        avisos.push(`${p.name} llegó a la quinta amarilla: no puede jugar el próximo partido.`);
+        avisos.push({ tono: 'malo', texto: `${p.name} llegó a la quinta amarilla: no puede jugar el próximo partido.` });
       } else if (p.amarillas === 4) {
-        avisos.push(`${p.name} llegó a la cuarta amarilla: con una más se pierde un partido.`);
+        avisos.push({ tono: 'aviso', texto: `${p.name} llegó a la cuarta amarilla: con una más se pierde un partido.` });
       }
     });
 
@@ -5082,7 +5101,7 @@ const Engine = {
         const dobleAmarilla = Math.random() < 0.5;
         const matches = dobleAmarilla ? 1 : 1 + Math.floor(Math.random() * 4);
         p.out = { reason: 'suspensión', detail: dobleAmarilla ? 'Doble amarilla' : 'Expulsado', matches };
-        avisos.push(`${p.name} ${dobleAmarilla ? 'se fue por doble amarilla' : 'se fue expulsado'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.`);
+        avisos.push({ tono: 'malo', texto: `${p.name} ${dobleAmarilla ? 'se fue por doble amarilla' : 'se fue expulsado'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.` });
       }
     }
 
@@ -5246,10 +5265,11 @@ const Engine = {
     const s = this.state;
     const club = this.getClub(s.clubId);
     const factorClub = this.factorDeDesarrollo(club);
-    const jugaron = new Set(this.getStartingXI().starters.map((e) => e.id));
-    // Los once llegan cansados. Se hace ANTES de mirar el desarrollo para que
-    // el orden sea el de la realidad: primero se jugó el partido.
-    this.gastarEnergia(jugaron);
+    // Los que pisaron la cancha en ese partido, con cambios incluidos. El
+    // cansancio ya se pagó minuto a minuto mientras se jugaba (ver
+    // jugarUnTramo), así que acá solo se mira quién sumó rodaje.
+    const jugaron = new Set((s.pendingMatch && s.pendingMatch.jugaron)
+      || this.getStartingXI().starters.map((e) => e.id));
     const notas = [];
 
     s.squad.forEach((p) => {
@@ -6254,7 +6274,7 @@ const Engine = {
     // enero sigue con el mercado abierto, así que no se pierde nada.
     else if (s.season.transferReason === 'pre-season') this.empezarLaPretemporada();
     // Y si entraste al mercado desde un día de enero, volvés a ese mismo día.
-    else if (s.season.transferReason === 'pretemporada') { s.screen = 'calendar'; }
+    else if (s.season.transferReason === 'pretemporada' || s.season.transferReason === 'verano') { s.screen = 'calendar'; }
     else this.enterEditionRound();
     this.save();
   },

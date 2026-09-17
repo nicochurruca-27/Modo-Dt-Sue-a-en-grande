@@ -1357,7 +1357,12 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   const bandPath = kit.band
     ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
     : '';
-  const fitStroke = p.fit === 'green' ? 'var(--accent)' : p.fit === 'yellow' ? '#eab308' : p.fit === 'red' ? 'var(--danger)' : null;
+  // El puesto se marcaba con un marco de color alrededor de la camiseta, y
+  // con once marcos encendidos la cancha era un arcoíris que tapaba a los
+  // jugadores. Ahora: si está en su posición no se marca nada (que es lo
+  // normal) y si no, un punto chico en la placa de abajo. Menos ruido y la
+  // información sigue estando.
+  const fitPunto = p.fit === 'yellow' ? '#eab308' : p.fit === 'red' ? 'var(--danger)' : null;
   const posAbbrev = posDetailAbbrev(p.posDetail);
   const roleNote = posAbbrev ? ` (${posAbbrev})` : p.role ? ` (rol: ${p.role})` : '';
   const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}${roleNote}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
@@ -1378,7 +1383,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
       <!-- Zona de toque: sin esto el hueco entre la camiseta y la placa del
            nombre no responde y el toque se lo come el fondo de la cancha. -->
       <rect x="-4" y="-2" width="${w + 8}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 4}" rx="8" fill="transparent" />
-      ${fitStroke ? `<rect x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="8" fill="none" stroke="${fitStroke}" stroke-width="2.5" />` : ''}
+
       <g transform="scale(${scale})">
         <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
         ${bandPath}
@@ -1387,6 +1392,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
       <rect x="-3" y="${h + 3}" width="${w + 6}" height="${PITCH_LABEL_H}" rx="3" fill="rgba(0,0,0,0.6)" />
       <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>
       <rect x="-3" y="${label2Y}" width="${w + 6}" height="${PITCH_LABEL2_H}" rx="3" fill="rgba(0,0,0,0.4)" />
+      ${fitPunto ? `<circle cx="1.5" cy="${label2Y + PITCH_LABEL2_H / 2}" r="2.6" fill="${fitPunto}" />` : ''}
       <text x="${w / 2}" y="${label2Y + PITCH_LABEL2_H - 3.5}" text-anchor="middle" font-size="9" font-weight="600" fill="#cbd5e1">${infoLine}</text>
       ${barraDeEnergiaSvg(p, -3, label2Y + PITCH_LABEL2_H + 2, w + 6)}
       ${amonestado ? `<rect x="${w - 7}" y="-5" width="9" height="12" rx="2" fill="#eab308" stroke="#78350f" stroke-width="1" />` : ''}
@@ -1638,6 +1644,7 @@ function jugadorDebajoDelDedo(x, y) {
 
 function terminarElArrastre(soltado) {
   if (!arrastre) return;
+  pararElDesplazamiento();
   clearTimeout(arrastre.timer);
   if (arrastre.fantasma) arrastre.fantasma.remove();
   if (arrastre.destino) arrastre.destino.classList.remove('arrastre-destino');
@@ -1685,6 +1692,59 @@ document.addEventListener('pointerdown', (e) => {
   }
 });
 
+// ---------- La pantalla acompaña al arrastre ----------
+//
+// Llevando un jugador de la cancha al banco (o al revés) muchas veces el
+// destino queda fuera de la pantalla y no hay forma de llegar: el dedo no da
+// más de largo. Mientras el arrastre está cerca de un borde, la pantalla se
+// desplaza sola en esa dirección, despacio.
+const BORDE_DE_ARRASTRE = 90;  // píxeles desde el borde donde empieza a moverse
+
+let desplazando = null;
+
+function pararElDesplazamiento() {
+  if (desplazando) cancelAnimationFrame(desplazando.raf);
+  desplazando = null;
+}
+
+// Mueve la página; si la página no se puede mover (ya está en el tope o el
+// que scrollea es un panel), mueve el contenedor con scroll que esté debajo
+// del dedo.
+function desplazarUnPoco(paso, x, y) {
+  const antes = window.scrollY;
+  window.scrollBy(0, paso);
+  if (window.scrollY !== antes) return;
+  let el = document.elementFromPoint(x, Math.max(1, Math.min(window.innerHeight - 2, y)));
+  while (el && el !== document.body) {
+    if (el.scrollHeight > el.clientHeight + 4) {
+      const y0 = el.scrollTop;
+      el.scrollTop += paso;
+      if (el.scrollTop !== y0) return;
+    }
+    el = el.parentElement;
+  }
+}
+
+function acompaniarElBorde(x, y) {
+  const alto = window.innerHeight;
+  let paso = 0;
+  if (y < BORDE_DE_ARRASTRE) paso = -Math.ceil((BORDE_DE_ARRASTRE - y) / 5);
+  else if (y > alto - BORDE_DE_ARRASTRE) paso = Math.ceil((y - (alto - BORDE_DE_ARRASTRE)) / 5);
+  if (!paso) { pararElDesplazamiento(); return; }
+  if (desplazando) { desplazando.paso = paso; desplazando.x = x; desplazando.y = y; return; }
+
+  desplazando = { paso, x, y, raf: 0 };
+  const tic = () => {
+    if (!arrastre || !arrastre.activo || !desplazando) { pararElDesplazamiento(); return; }
+    desplazarUnPoco(desplazando.paso, desplazando.x, desplazando.y);
+    // El dedo puede estar quieto mientras la pantalla se mueve, así que hay
+    // que volver a mirar qué quedó debajo.
+    marcarDestinoDelArrastre(jugadorDebajoDelDedo(desplazando.x, desplazando.y));
+    desplazando.raf = requestAnimationFrame(tic);
+  };
+  desplazando.raf = requestAnimationFrame(tic);
+}
+
 // El movimiento, venga del mouse o del dedo. Devuelve true si el arrastre
 // sigue en pie.
 function moverElArrastre(x, y) {
@@ -1698,6 +1758,7 @@ function moverElArrastre(x, y) {
   }
   moverElFantasma(x, y);
   marcarDestinoDelArrastre(jugadorDebajoDelDedo(x, y));
+  acompaniarElBorde(x, y);
   return true;
 }
 
@@ -1836,6 +1897,26 @@ function balanceDeLaFormacionHtml(empuje, riesgo) {
   `;
 }
 
+// La ficha del jugador que tocaste: lo que hace falta saber de él, y sobre
+// todo qué le pasa si no está disponible. La idea es que en la cancha no haya
+// más que un icono (🚑 / 🟥) y que el detalle aparezca acá, al tocarlo.
+function fichaDelSeleccionadoHtml() {
+  const s = Engine.state;
+  const p = (s.squad || []).find((x) => x.id === selectedPlayerId);
+  if (!p) return '';
+  const baja = Engine.outLabel(p);
+  const energia = Math.round(Engine.energiaDe(p));
+  const contrato = `${p.contractYears} ${p.contractYears === 1 ? 'año' : 'años'}`;
+  const amarillas = p.amarillas ? ` · ${p.amarillas} ${p.amarillas === 1 ? 'amarilla' : 'amarillas'}` : '';
+  return `
+    <div class="ficha-jugador${baja ? ' con-baja' : ''}">
+      <div class="ficha-nombre"><strong>${p.name}</strong> <span class="muted">${p.posDetail || p.pos} · ${p.rating}${p.potential > p.rating ? ` (techo ${p.potential})` : ''}</span></div>
+      <div class="muted">${p.age} años · ${nationFlag(p.nation)} ${Engine.nationName(p.nation)} · contrato ${contrato} · energía ${energia}%${amarillas}</div>
+      ${baja ? `<div class="ficha-baja">${Engine.outIcono(p)} ${baja}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderSquadPanel() {
   const s = Engine.state;
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
@@ -1864,8 +1945,9 @@ function renderSquadPanel() {
       <div class="pitch-scroll">
         ${buildPitchSvg(xi, club)}
       </div>
+      ${fichaDelSeleccionadoHtml()}
       <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
-      <p class="muted fit-legend"><span class="fit-dot fit-green"></span>su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
+      <p class="muted fit-legend">Sin marca: está en su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       ${alBordeDeLaSuspension(s.squad)}
       ${avisoDePlantel()}
@@ -2555,14 +2637,16 @@ function renderCalendar() {
   // En la pretemporada el mercado está abierto todo enero: se puede entrar y
   // salir las veces que haga falta y el almanaque te espera en el mismo día.
   const enPretemporada = (s.season.pretemporada || 0) > 0;
+  const mercadoAbierto = Engine.mercadoAbierto();
+  const diasDeMercado = Engine.diasDeMercadoQueQuedan();
   app.innerHTML = `
     ${header()}
     <div class="card">
       <h2 id="calendar-fecha">${dateLabel}</h2>
       <p class="muted" id="calendar-nota">${s.lastDecisionNote ? s.lastDecisionNote : (enPretemporada ? 'Pretemporada: el torneo arranca en febrero.' : 'Otro día tranquilo en el club.')}</p>
-      ${enPretemporada ? '<p class="mercado-aviso abierto"><strong>El mercado de verano está abierto.</strong> Podés entrar y salir todo enero.</p>' : ''}
+      ${mercadoAbierto ? `<p class="mercado-aviso abierto"><strong>El mercado de verano está abierto.</strong> Cierra el 28 de febrero${diasDeMercado ? ` — quedan ${diasDeMercado} ${diasDeMercado === 1 ? 'día' : 'días'}` : ', hoy es el último día'}.</p>` : ''}
       <button class="option-btn" id="continue-btn">Avanzar</button>
-      ${enPretemporada ? '<button class="option-btn" id="mercado-btn">Ir al mercado de pases</button>' : ''}
+      ${mercadoAbierto ? '<button class="option-btn" id="mercado-btn">Ir al mercado de pases</button>' : ''}
     </div>
     ${noticiasHtml()}
   `;
@@ -3368,6 +3452,35 @@ function drawPenalty() {
   }
 }
 
+// Los avisos de después del partido, separados por lo que significan. Antes
+// iba todo en el mismo cartel rojo —el de las lesiones—, así que ver que un
+// juvenil había mejorado daba el mismo susto que una rotura de ligamentos.
+//
+//   rojo    lo malo: lesiones, expulsiones, suspensiones
+//   verde   lo bueno: el que se recuperó y vuelve
+//   ámbar   lo que no es ni una cosa ni la otra: sube o baja de valoración,
+//           la cuarta amarilla
+function avisosDelPartidoHtml(fisicos, desarrollo) {
+  const texto = (n) => (typeof n === 'string' ? n : n.texto);
+  const tono = (n) => (typeof n === 'string'
+    ? (/se recuperó/i.test(n) ? 'bueno' : 'malo')
+    : (n.tono || 'malo'));
+  const lista = fisicos || [];
+  const bloque = (clase, titulo, notas) => (notas.length ? `
+    <div class="avisos-partido ${clase}">
+      <h3>${titulo}</h3>
+      ${notas.map((n) => `<p>${texto(n)}</p>`).join('')}
+    </div>
+  ` : '');
+
+  return [
+    bloque('avisos-malos', 'Parte médico', lista.filter((n) => tono(n) === 'malo')),
+    bloque('avisos-buenos', 'Altas y regresos', lista.filter((n) => tono(n) === 'bueno')),
+    bloque('avisos-neutros', 'Evolución del plantel',
+      lista.filter((n) => tono(n) === 'aviso').concat(desarrollo || [])),
+  ].join('');
+}
+
 function renderMatchResult() {
   const s = Engine.state;
   const m = s.pendingMatch;
@@ -3432,18 +3545,7 @@ function renderMatchResult() {
       ${shootoutText ? `<p class="shootout-line">${shootoutText}</p>` : ''}
       ${(m.eventos || []).length ? `<h3>Cómo se dio</h3>${eventosDelPartidoHtml(m.eventos)}` : ''}
       ${s.lastDecisionNote ? `<p class="muted">${s.lastDecisionNote}</p>` : ''}
-      ${(s.lastAvailabilityNotes || []).length ? `
-        <div class="injury-notes">
-          <h3>Parte médico</h3>
-          ${s.lastAvailabilityNotes.map((n) => `<p>${n}</p>`).join('')}
-        </div>
-      ` : ''}
-      ${(s.lastDevelopmentNotes || []).length ? `
-        <div class="injury-notes desarrollo-notes">
-          <h3>Evolución del plantel</h3>
-          ${s.lastDevelopmentNotes.map((n) => `<p>${n}</p>`).join('')}
-        </div>
-      ` : ''}
+      ${avisosDelPartidoHtml(s.lastAvailabilityNotes, s.lastDevelopmentNotes)}
       <button class="option-btn" id="continue-btn">Continuar</button>
     </div>
   `;
@@ -3479,11 +3581,14 @@ function renderContractRenewal() {
 function renderTransfer() {
   const s = Engine.state;
   const libres = Engine.jugadoresLibres();
-  const enPretemporada = s.season.transferReason === 'pretemporada';
+  // Se vuelve al almanaque tanto desde enero (pretemporada) como desde
+  // febrero, que es mercado abierto con el torneo ya en marcha.
+  const enPretemporada = s.season.transferReason === 'pretemporada' || s.season.transferReason === 'verano';
   const windowLabel = {
     'between-editions': 'Mercado de pases — entre el Apertura y el Clausura',
     'pre-season': 'Mercado de pases — pretemporada',
     pretemporada: 'Mercado de pases — pretemporada',
+    verano: 'Mercado de pases — verano, hasta el 28 de febrero',
   }[s.season.transferReason] || 'Mercado de pases — mitad de temporada';
   app.innerHTML = `
     ${header()}

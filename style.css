@@ -397,16 +397,26 @@ h1, h2, h3 {
 }
 
 
-.injury-notes {
-  border: 1px solid #b91c1c;
+/* Los avisos de después del partido, con el color de lo que significan: rojo
+   lo malo, verde lo bueno, ámbar lo que no es ni una cosa ni la otra (que un
+   pibe suba o baje de valoración no es una mala noticia). */
+.avisos-partido {
+  border: 1px solid;
   border-radius: 10px;
   padding: 10px 12px;
   margin: 12px 0;
-  background: #1f1113;
 }
 
-.injury-notes h3 { margin-top: 0; }
-.injury-notes p { margin: 6px 0; }
+.avisos-partido h3 { margin-top: 0; }
+.avisos-partido p { margin: 6px 0; }
+
+.avisos-malos { border-color: #b91c1c; background: #1f1113; }
+.avisos-buenos { border-color: #15803d; background: #0f1a13; }
+.avisos-neutros { border-color: #b45309; background: #1d1710; }
+
+.avisos-malos h3 { color: #fca5a5; }
+.avisos-buenos h3 { color: #86efac; }
+.avisos-neutros h3 { color: #fcd34d; }
 
 /* Secciones que se abren solo si las querés ver: el detalle no se come
    la pantalla del celular. Las usan el fin de temporada y el mercado. */
@@ -1350,7 +1360,6 @@ body.sin-scroll { overflow: hidden; }
 
 /* La evolución del plantel usa el mismo recuadro que el parte médico, pero
    en verde: son novedades buenas (o el desgaste de los veteranos), no bajas. */
-.desarrollo-notes { border-left-color: var(--accent); }
 
 /* Aviso de amarillas acumuladas en el plantel: ámbar, como una tarjeta. */
 .amarillas-aviso {
@@ -2039,4 +2048,26 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   border-left: 3px solid #f87171;
   background: rgba(248, 113, 113, 0.09);
   font-size: 0.9rem;
+}
+
+/* La ficha del jugador que tocaste en el plantel. */
+.ficha-jugador {
+  margin: 8px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid #334155;
+  border-left: 3px solid #38bdf8;
+  border-radius: 8px;
+  background: #0f172a;
+  font-size: 0.82rem;
+}
+
+.ficha-jugador.con-baja { border-left-color: #f87171; }
+.ficha-nombre { margin-bottom: 2px; }
+.ficha-jugador .muted { font-size: 0.78rem; }
+
+.ficha-baja {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #1f2937;
+  color: #fca5a5;
 }

@@ -165,8 +165,10 @@ const Noticias = {
     if (!avisos || !avisos.length) return;
     const s = engine.state;
     const club = engine.getClub(s.clubId);
-    avisos.forEach((aviso) => {
-      const esBaja = /lesion|expulsad|amarilla/i.test(aviso);
+    avisos.forEach((av) => {
+      // Cada aviso viene como { tono, texto } (ver Engine.updateAvailability).
+      const aviso = typeof av === 'string' ? av : av.texto;
+      const esBaja = typeof av === 'string' ? /lesion|expulsad|amarilla/i.test(aviso) : av.tono !== 'bueno';
       this.push(s, 'lesiones',
         `${club.name}: ${aviso}`,
         esBaja
