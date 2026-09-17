@@ -538,11 +538,95 @@ const Engine = {
     return FORMATIONS.find((f) => f.id === this.state.formation) || FORMATIONS.find((f) => f.id === '433') || FORMATIONS[0];
   },
 
+  // ---------- Lo que la formación te da y lo que te cuesta ----------
+  //
+  // Hasta acá la formación sumaba `mod` a TU fuerza y nada más. O sea que la
+  // 3-2-5 (+5) era mejor que la 5-4-1 (-3) siempre, en cualquier partido, y
+  // no había un solo motivo para pararse atrás: elegir el estilo no era una
+  // decisión, era agarrar el número más alto.
+  //
+  // Ahora lo que te da adelante lo pagás atrás: el mismo empuje se le suma al
+  // rival. Pararte con cinco defensores te hace menos peligroso pero te
+  // convierte en un equipo difícil de romper, y salir a la cancha con cinco
+  // delanteros te deja el fondo abierto. Eso es lo que hace que la elección
+  // signifique algo: no hay una formación mejor, hay una para cada partido.
+  riesgoDeLaFormacion(formation) {
+    if (!formation) return 0;
+    const porEstilo = { Defensiva: -2, Equilibrada: 0, Ofensiva: 2 }[formation.style] || 0;
+    return Math.round((formation.mod || 0) * 1.1 + porEstilo);
+  },
+
+  // ---------- Lo que el estilo del DT cambia en la cancha ----------
+  //
+  // El estilo que elegís al crear el DT daba un empujón al arrancar (+10 de
+  // ánimo, o +10% de presupuesto) y después no existía más: era una decisión
+  // que en la temporada 3 ya no significaba nada. Ahora te acompaña toda la
+  // carrera, y cada estilo sirve para algo distinto:
+  //
+  // - Ofensivo: tu equipo ataca mejor de lo que dice el planteo (+1).
+  // - Conservador: se para mejor atrás (-1 de lo que le dejás al rival).
+  // - Equilibrado: no empuja para ningún lado, pero cuando salís a buscar un
+  //   partido tu equipo se desordena la mitad que el de cualquier otro.
+  bonusDeEstiloDeDT() {
+    const estilo = this.state.dt && this.state.dt.style;
+    if (estilo === 'ofensivo') return { ataque: 1, riesgo: 0, aguante: 1 };
+    if (estilo === 'conservador') return { ataque: 0, riesgo: -1, aguante: 1 };
+    // Equilibrado: no empuja para ningún lado, pero cuando salís a buscar el
+    // partido el equipo se desordena la mitad. Antes era "ningún efecto".
+    return { ataque: 0, riesgo: 0, aguante: 0.5 };
+  },
+
+  // Cambiar de formación NO rearma el equipo de cero.
+  //
+  // Antes llamaba a recomputeStartingSlots(), que elige los once por
+  // valoración desde el plantel entero: si habías puesto a mano a cuatro
+  // jugadores, al pasar de 4-3-3 a 4-2-1-2 se iban todos y volvían los
+  // "mejores". Ahora se conservan los mismos once y lo único que cambia es
+  // dónde se paran (ver reacomodarElOnce).
   setFormation(id) {
     if (!FORMATIONS.some((f) => f.id === id)) return;
-    this.state.formation = id;
-    this.recomputeStartingSlots();
+    const s = this.state;
+    const actuales = (s.startingSlots || []).map((e) => e.playerId).filter(Boolean);
+    s.formation = id;
+    if (actuales.length === this.slotOrderForFormation(this.currentFormation()).length) {
+      this.reacomodarElOnce(actuales);
+    } else {
+      this.recomputeStartingSlots();
+    }
     this.save();
+  },
+
+  // Reparte a estos once en los casilleros de la formación actual, cada uno lo
+  // más cerca posible de su puesto.
+  //
+  // El reparto se hace mirando TODAS las combinaciones jugador-casillero y
+  // tomando siempre la que más rinde de las que quedan libres (effectiveRating
+  // ya castiga jugar fuera de su posición). Hacerlo casillero por casillero de
+  // arriba hacia abajo daba desastres: el primer casillero se llevaba al mejor
+  // jugador disponible y al último le quedaba un delantero de lateral.
+  reacomodarElOnce(ids) {
+    const s = this.state;
+    const formation = this.currentFormation();
+    const slotCounts = { POR: 1, DEF: formation.def, MED: formation.med, OFF: formation.off || 0, DEL: formation.del };
+    const vistos = { POR: 0, DEF: 0, MED: 0, OFF: 0, DEL: 0 };
+    const casilleros = this.slotOrderForFormation(formation).map((slot) => ({ slot, indice: vistos[slot]++ }));
+    const jugadores = ids.map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
+
+    const pares = [];
+    casilleros.forEach((c, ci) => jugadores.forEach((p, pi) => {
+      pares.push({ ci, pi, valor: this.effectiveRating(p, c.slot, formation, c.indice, slotCounts[c.slot]) });
+    }));
+    pares.sort((a, b) => b.valor - a.valor);
+
+    const puestos = new Array(casilleros.length).fill(null);
+    const usados = new Set();
+    pares.forEach(({ ci, pi }) => {
+      if (puestos[ci] || usados.has(pi)) return;
+      puestos[ci] = jugadores[pi].id;
+      usados.add(pi);
+    });
+    s.startingSlots = casilleros.map((c, ci) => ({ slot: c.slot, playerId: puestos[ci] }));
+    this.repairStartingSlots();
   },
 
   // 'OFF' es la línea de enganches/mediapuntas/extremos entre el mediocampo
@@ -1166,11 +1250,34 @@ const Engine = {
   // 0,5 un tiempo. Los goles esperados son proporcionales al tiempo jugado,
   // así que alcanza con partir los lambdas. Por defecto vale 1, así que todo
   // lo que ya llamaba a esto sigue igual.
-  simulateScore(homeStrength, awayStrength, homeAdvantage, duracion = 1) {
+  // Los goles de un partido (o de un tiempo, con `duracion`).
+  //
+  // La fuerza de los dos equipos entra por `diff` y mueve las dos lambdas en
+  // sentido contrario: si sos más fuerte, hacés más y te hacen menos. Eso
+  // está bien para comparar planteles, pero NO alcanza para el planteo: un
+  // equipo puede pararse atrás y hacer que el partido tenga menos goles de
+  // los dos lados, y eso por `diff` es imposible de expresar (bajarle el
+  // peligro al rival me subía el mío).
+  //
+  // Para eso están los dos factores: multiplican el peligro de cada lado por
+  // separado. Los usa el partido del usuario con la formación elegida (ver
+  // jugarUnTiempo); el resto de la liga los deja en 1 y se simula exactamente
+  // igual que siempre, porque el factor se aplica DESPUÉS del clamp de
+  // siempre y no toca la calibración.
+  //
+  // Son factores y no sumas a propósito: así ir al frente rinde contra un
+  // rival flojo (el 25% más de peligro sobre dos goles son medio gol) y no
+  // rinde contra uno bravo (ese mismo 25% arriba les regala más de lo que te
+  // da). Con sumas fijas, una formación terminaba siendo siempre la mejor
+  // sin importar contra quién jugabas.
+  simulateScore(homeStrength, awayStrength, homeAdvantage, duracion = 1, factorLocal = 1, factorVisitante = 1) {
     const diff = homeStrength - awayStrength;
-    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16)) * duracion;
-    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40)) * duracion;
-    return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
+    const baseLocal = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16));
+    const baseVisitante = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
+    return {
+      homeGoals: this.sampleGoals(baseLocal * factorLocal * duracion),
+      awayGoals: this.sampleGoals(baseVisitante * factorVisitante * duracion),
+    };
   },
 
   // Los 30 minutos del alargue: un tercio de un partido, con los mismos
@@ -3472,8 +3579,11 @@ const Engine = {
 
   puestoEsperado() {
     const key = this.state.objective && this.state.objective.key;
-    const esperado = this.PUESTO_ESPERADO[key];
-    return esperado || 10;
+    const esperado = this.PUESTO_ESPERADO[key] || 10;
+    // Lo que prometiste en la presentación corre la vara: -1 si dijiste que
+    // venías a pelear arriba, +1 si pusiste paños fríos (ver
+    // presentationResponses).
+    return Math.max(1, esperado + (this.state.promesa || 0));
   },
 
   confianza() {
@@ -3613,14 +3723,34 @@ const Engine = {
     return { key: 'consolidarse', text: 'Consolidar a la institución en la categoría, con los pies en la tierra.' };
   },
 
-  // Las 3 respuestas posibles en la presentación en sociedad. Son genéricas
-  // (no cambian según el objetivo) para arrancar simple; el efecto es un
-  // empujón chico de ánimo, como cualquier otra decisión del juego.
+  // Las 3 respuestas posibles en la presentación en sociedad.
+  //
+  // Lo que decís en el micrófono queda: además del ánimo del plantel, mueve la
+  // confianza de la dirigencia y —esto es lo importante— la vara con la que te
+  // van a medir toda la temporada. Si prometés pelear arriba, te piden un
+  // puesto más que el que le corresponde al club; si pusiste paños fríos, te
+  // perdonan uno. Antes las tres opciones eran casi lo mismo (±ánimo) y
+  // elegir una u otra no cambiaba nada del año.
   presentationResponses() {
     return [
-      { label: 'Aceptar el desafío con confianza', moraleMod: 5, note: 'El plantel se entusiasma con el objetivo planteado.' },
-      { label: 'Pedir tiempo, esto es un proceso', moraleMod: 0, note: 'La dirigencia entiende que hay que ir paso a paso.' },
-      { label: 'Poner paños fríos, no prometer nada', moraleMod: -3, note: 'La cautela deja algo fría a la hinchada.' },
+      {
+        label: 'Aceptar el desafío: venimos a pelear arriba',
+        detalle: 'El plantel se enciende y la dirigencia te cree, pero te van a exigir un puesto más.',
+        moraleMod: 5, confianzaMod: 6, promesa: -1,
+        note: 'El plantel se entusiasma con el objetivo planteado.',
+      },
+      {
+        label: 'Pedir tiempo: esto es un proceso',
+        detalle: 'Nadie se enciende ni se enoja. Te miden con la vara que le corresponde al club.',
+        moraleMod: 0, confianzaMod: 0, promesa: 0,
+        note: 'La dirigencia entiende que hay que ir paso a paso.',
+      },
+      {
+        label: 'Poner paños fríos: no prometer nada',
+        detalle: 'Deja frío al vestuario y a la dirigencia, pero te van a perdonar un puesto.',
+        moraleMod: -3, confianzaMod: -3, promesa: 1,
+        note: 'La cautela deja algo fría a la hinchada.',
+      },
     ];
   },
 
@@ -3629,6 +3759,11 @@ const Engine = {
     const option = this.presentationResponses()[optionIndex];
     if (option) {
       s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
+      if (option.confianzaMod) this.sumarConfianza(option.confianzaMod);
+      // La promesa que hiciste en el micrófono: corre la vara de la dirigencia
+      // para toda la temporada (ver puestoEsperado).
+      s.promesa = option.promesa || 0;
+      s.lastDecisionNote = option.note;
     }
     // Después de la presentación se sigue con lo que armó startNewSeason. La
     // carrera arranca el 1° de enero, así que lo que viene es la pretemporada;
@@ -4241,12 +4376,42 @@ const Engine = {
     const s = this.state;
     const ctx = s.matchContext;
     const p = s.partido;
-    const mia = this.squadStrength() + tacticMod + this.currentFormation().mod + s.morale / 3;
-    const suya = this.clubStrength(ctx.opponentId) + (p.riesgoRival || 0);
+    const formacion = this.currentFormation();
+    const estilo = this.bonusDeEstiloDeDT();
+    const mia = this.squadStrength() + s.morale / 3;
+    const suya = this.clubStrength(ctx.opponentId);
     const ventaja = ctx.isNeutral ? 0 : 4;
     const local = ctx.isHome ? mia : suya;
     const visitante = ctx.isHome ? suya : mia;
-    const score = this.simulateScore(local, visitante, ventaja, 0.5);
+    // La formación NO entra por la fuerza del equipo sino por el peligro de
+    // cada lado: lo que te da adelante se lo suma el rival atrás (ver
+    // riesgoDeLaFormacion y simulateScore). Mientras estuvo metida en la
+    // fuerza, pararse con cinco defensores le bajaba el nivel al rival y eso
+    // terminaba haciéndome MÁS peligroso a mí, que es justo lo contrario.
+    // El PESO es cuánto vale cada punto de la formación, y el NEUTRO es la
+    // formación contra la que se mide todo: la 4-3-3 equilibrada (mod 1,
+    // riesgo 1), que es la que usa la mayoría de los clubes. Así el planteo
+    // más común queda en factor 1 y la cantidad de goles de la liga no se
+    // mueve por esto: lo único que cambia es la diferencia entre un planteo y
+    // otro, que es de lo que se trata.
+    // Lo que decidís antes del partido y en el entretiempo va por el mismo
+    // camino que la formación: suma peligro de un lado y del otro, en vez de
+    // hacerte "más fuerte". Mientras eso iba por la fuerza del equipo casi no
+    // se notaba (÷40), y salir a buscar un partido no tenía riesgo real.
+    const PESO = 0.055;        // cuánto vale cada punto de la formación
+    const PESO_CHARLA = 0.06;  // cuánto vale cada punto de lo que decidís
+    const NEUTRO = 1;          // la 4-3-3 equilibrada, el planteo más común
+    const factorMio = 1
+      + ((formacion.mod || 0) + estilo.ataque - NEUTRO) * PESO
+      + (tacticMod || 0) * PESO_CHARLA;
+    const factorSuyo = 1
+      + (this.riesgoDeLaFormacion(formacion) + estilo.riesgo - NEUTRO) * PESO
+      + (p.riesgoRival || 0) * estilo.aguante * PESO_CHARLA;
+    const score = this.simulateScore(
+      local, visitante, ventaja, 0.5,
+      ctx.isHome ? factorMio : factorSuyo,
+      ctx.isHome ? factorSuyo : factorMio,
+    );
     const mios = ctx.isHome ? score.homeGoals : score.awayGoals;
     const suyos = ctx.isHome ? score.awayGoals : score.homeGoals;
 
@@ -4308,7 +4473,11 @@ const Engine = {
     const op = opciones[optionIndex] || opciones[opciones.length - 1];
     p.decision = op.label;
     p.nota = op.nota;
-    p.riesgoRival = op.riesgoRival || 0;
+    // Lo del vestuario AJUSTA el plan del primer tiempo, no lo reemplaza: si
+    // salías a presionar arriba (riesgoRival 3) y decidís aguantar (-4), el
+    // segundo tiempo se juega con -1. Y "no tocar nada" deja el plan como
+    // estaba, que es lo que dice el botón.
+    p.riesgoRival = (p.riesgoRival || 0) + (op.riesgoRival || 0);
     // Los cambios ya se hicieron en el vestuario (ver hacerUnCambio): el
     // segundo tiempo se juega con el once que quedó en s.startingSlots.
     this.jugarUnTiempo(2, (p.tacticMod || 0) + (op.tacticMod || 0));
@@ -4407,7 +4576,17 @@ const Engine = {
     const s = this.state;
     const option = s.currentDecision.options[optionIndex];
     s.lastDecisionNote = option.note;
-    s.morale = Math.max(-15, Math.min(15, s.morale + option.moraleMod));
+    s.morale = Math.max(-15, Math.min(15, s.morale + (option.moraleMod || 0)));
+    // Lo que la decisión le mueve a la dirigencia y a las piernas del equipo.
+    // Antes lo único que hacía una decisión era ánimo y táctica, y por eso
+    // había opciones que no tenían NADA a favor (ver DECISIONS en data.js).
+    if (option.confianzaMod) this.sumarConfianza(option.confianzaMod);
+    if (option.energiaBonus) {
+      this.getStartingXI().starters.forEach((entry) => {
+        const p = s.squad.find((x) => x.id === entry.id);
+        if (p) p.energia = Math.min(ENERGIA_MAXIMA, this.energiaDe(p) + option.energiaBonus);
+      });
+    }
 
     if (option.growthBoost) {
       const youngsters = s.squad.filter((p) => p.age <= 21);
@@ -4422,7 +4601,7 @@ const Engine = {
     // juega con lo que decidas ahí (ver resolverEntretiempo).
     s.partido = {
       tacticMod: option.tacticMod,
-      riesgoRival: 0,
+      riesgoRival: option.riesgoRival || 0,
       mios: 0,
       suyos: 0,
       eventos: [],
@@ -5826,13 +6005,17 @@ const Engine = {
   resolveFifaEvent(careRequested) {
     const s = this.state;
     const results = s.fifaEvent.callUps.map((p) => {
+      // Pedir que le cuiden los minutos ya no es gratis: se lesiona mucho
+      // menos, pero juega menos y aprende menos. Antes cuidarlo era siempre
+      // la opción correcta y entonces no era una decisión.
       const injuryChance = careRequested ? 0.05 : 0.15;
+      const mejoraChance = careRequested ? 0.08 : 0.25;
       const real = s.squad.find((sp) => sp.id === p.id);
       if (Math.random() < injuryChance) {
         real.rating = Math.max(35, real.rating - 3);
         return `${p.name} volvió con una molestia física tras la fecha FIFA.`;
       }
-      if (Math.random() < 0.25) {
+      if (Math.random() < mejoraChance) {
         real.rating = Math.min(99, real.rating + 1);
         return `${p.name} hizo un gran partido con ${this.nationName(p.nation)} y sumó experiencia.`;
       }

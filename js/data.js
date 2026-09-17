@@ -192,6 +192,15 @@ const FORMATIONS = [
     medWidth: 'intermedio', delWidth: 'compacta',
   },
   {
+    // La 4-3-3 defensiva: los mismos tres del medio, pero con el 5 solo atrás
+    // haciendo de pivote y los dos mediocampistas por delante. Es la misma
+    // idea que la equilibrada corrida unos metros para atrás.
+    id: '433d', name: '4-3-3', def: 4, med: 1, off: 2, del: 3, style: 'Defensiva', mod: -1,
+    medShape: ['mediocampista defensivo'],
+    offShape: ['mediocampista mixto', 'mediocampista mixto'],
+    offWidth: 'intermedio', delWidth: 'abierta',
+  },
+  {
     id: '451', name: '4-5-1', def: 4, med: 5, del: 1, style: 'Defensiva', mod: -1,
     // MI - MC (interior) - MCD (pivote, el más retrasado) - MC (interior) - MD
     medShape: ['volante por izquierda', 'mediocampista mixto', 'mediocampista defensivo', 'mediocampista mixto', 'volante por derecha'],
@@ -226,9 +235,13 @@ const FORMATIONS = [
     medWidth: 'compacta',
   },
   {
-    id: '433o', name: '4-3-3', def: 4, med: 3, del: 3, style: 'Ofensiva', mod: 3,
-    // Interior izq y der ofensivos (llegada de área), MCD en el medio como pivote
-    medShape: ['mediocampista ofensivo', 'mediocampista defensivo', 'mediocampista ofensivo'],
+    // La 4-3-3 ofensiva: los dos mediocampistas atrás y un enganche metido
+    // entre ellos y los tres de arriba. Antes era la misma línea de tres que
+    // la equilibrada y solo cambiaban los nombres de los roles, así que en la
+    // cancha se dibujaba igual y elegir una u otra no se notaba.
+    id: '433o', name: '4-3-3', def: 4, med: 2, off: 1, del: 3, style: 'Ofensiva', mod: 3,
+    medShape: ['mediocampista mixto', 'mediocampista mixto'],
+    offShape: ['mediocampista ofensivo'],
     medWidth: 'intermedio', delWidth: 'abierta',
   },
   {
@@ -467,15 +480,29 @@ const SQUAD_POSITIONS = [
   'DEL', 'DEL', 'DEL', 'DEL',
 ];
 
+// Las decisiones de la semana, antes de cada partido.
+//
+// REGLA: ninguna opción puede ser peor que otra en todo. Si una opción no
+// tiene nada a favor, no es una decisión: es una trampa, y el jugador termina
+// eligiendo siempre la misma. Antes pasaba en tres de las cinco ("responder
+// con evasivas", "explicarle que debe esperar" e "ignorar el pedido" eran
+// estrictamente peores que la opción de al lado). Cada una paga con algo:
+//
+// - tacticMod: peligro que le agregás a tu ataque en ese partido.
+// - riesgoRival: peligro que le regalás al rival (ver jugarUnTiempo).
+// - moraleMod: ánimo del plantel.
+// - confianzaMod: lo que piensa la dirigencia de vos.
+// - energiaBonus: energía que recuperan los titulares antes del partido.
+// - growthBoost: chance de que un pibe mejore.
 const DECISIONS = [
   {
     id: 'tactica',
     title: 'Charla táctica',
     description: 'Antes del partido definís cómo va a plantarse el equipo.',
     options: [
-      { label: 'Salir a presionar arriba', tacticMod: 4, moraleMod: 0, note: 'El equipo va a buscar el arco rival desde el arranque.' },
-      { label: 'Jugar de contragolpe', tacticMod: 1, moraleMod: 0, note: 'Un planteo equilibrado, esperando los espacios.' },
-      { label: 'Plantarse atrás y cuidar el resultado', tacticMod: -3, moraleMod: 0, note: 'Prioridad: no recibir goles.' },
+      { label: 'Salir a presionar arriba', tacticMod: 4, riesgoRival: 3, moraleMod: 0, note: 'El equipo va a buscar el arco rival desde el arranque, con la defensa más expuesta.' },
+      { label: 'Jugar de contragolpe', tacticMod: 1, riesgoRival: 0, moraleMod: 0, note: 'Un planteo equilibrado, esperando los espacios.' },
+      { label: 'Plantarse atrás y cuidar el resultado', tacticMod: -3, riesgoRival: -4, moraleMod: 0, note: 'Prioridad: no recibir goles. Vas a crear poco.' },
     ],
   },
   {
@@ -483,9 +510,9 @@ const DECISIONS = [
     title: 'Rueda de prensa',
     description: 'Un periodista pregunta por la floja racha del equipo.',
     options: [
-      { label: 'Bancar públicamente al plantel', tacticMod: 0, moraleMod: 4, note: 'Los jugadores sienten el respaldo del técnico.' },
-      { label: 'Pedir más esfuerzo sin filtro', tacticMod: 2, moraleMod: -2, note: 'El plantel sale caliente, con más intensidad pero incómodo.' },
-      { label: 'Responder con evasivas', tacticMod: 0, moraleMod: 0, note: 'Nadie se entera de nada, todo sigue igual.' },
+      { label: 'Bancar públicamente al plantel', tacticMod: 0, moraleMod: 4, confianzaMod: -2, note: 'Los jugadores sienten el respaldo del técnico; arriba no cayó tan bien.' },
+      { label: 'Pedir más esfuerzo sin filtro', tacticMod: 2, moraleMod: -2, confianzaMod: 1, note: 'El plantel sale caliente, con más intensidad pero incómodo.' },
+      { label: 'Responder con evasivas', tacticMod: 0, moraleMod: 0, note: 'Nadie se entera de nada: no ganás nada, pero no pagás nada.' },
     ],
   },
   {
@@ -494,8 +521,8 @@ const DECISIONS = [
     description: 'Un jugador suplente te pide más minutos.',
     options: [
       { label: 'Darle titularidad esta fecha', tacticMod: -1, moraleMod: 3, note: 'El plantel valora que escuchás a todos, aunque el equipo pierde rodaje.' },
-      { label: 'Explicarle que debe esperar su turno', tacticMod: 0, moraleMod: -2, note: 'El jugador no queda conforme.' },
-      { label: 'Rotar todo el equipo para la fecha', tacticMod: -2, moraleMod: 2, note: 'Piernas frescas, pero menos funcionamiento colectivo.' },
+      { label: 'Explicarle que debe esperar su turno', tacticMod: 1, moraleMod: -2, note: 'Se queda con bronca, pero el equipo sale con los de siempre y mejor aceitado.' },
+      { label: 'Rotar todo el equipo para la fecha', tacticMod: -2, moraleMod: 2, energiaBonus: 10, note: 'Piernas frescas, pero menos funcionamiento colectivo.' },
     ],
   },
   {
@@ -503,9 +530,9 @@ const DECISIONS = [
     title: 'Pedido de la dirigencia',
     description: 'Desde arriba piden un triunfo sí o sí en esta fecha.',
     options: [
-      { label: 'Aceptar la presión y salir con todo', tacticMod: 3, moraleMod: -1, note: 'Se juega a matar o morir.' },
+      { label: 'Aceptar la presión y salir con todo', tacticMod: 3, riesgoRival: 2, moraleMod: -1, confianzaMod: 2, note: 'Se juega a matar o morir.' },
       { label: 'Pedir tiempo y jugar tranquilo', tacticMod: 0, moraleMod: 1, note: 'Le bajás el tono a la exigencia.' },
-      { label: 'Ignorar el pedido', tacticMod: 0, moraleMod: -3, note: 'La dirigencia queda molesta con la decisión.' },
+      { label: 'Ignorar el pedido y protegerlos', tacticMod: 0, moraleMod: 3, confianzaMod: -4, note: 'El plantel juega sin esa presión encima; la dirigencia queda molesta con vos.' },
     ],
   },
   {
@@ -513,9 +540,9 @@ const DECISIONS = [
     title: 'Entrenamiento de la semana',
     description: 'Definís en qué enfocar los trabajos previos al partido.',
     options: [
-      { label: 'Foco físico', tacticMod: -1, moraleMod: 1, note: 'El equipo llega más fresco físicamente.' },
+      { label: 'Foco físico', tacticMod: -1, moraleMod: 1, energiaBonus: 9, note: 'El equipo llega más fresco físicamente.' },
       { label: 'Foco táctico', tacticMod: 3, moraleMod: 0, note: 'Se trabajaron los movimientos para el partido.', growthBoost: true },
-      { label: 'Día de descanso', tacticMod: -2, moraleMod: 3, note: 'El plantel agradece el descanso extra.' },
+      { label: 'Día de descanso', tacticMod: -2, moraleMod: 3, energiaBonus: 16, note: 'El plantel agradece el descanso extra y sale con las piernas enteras.' },
     ],
   },
 ];

@@ -1784,6 +1784,53 @@ function avisoDePlantel() {
   return `<p class="aviso-plantel">Te ${libres === 1 ? 'queda 1 lugar' : `quedan ${libres} lugares`} en el plantel (${s.squad.length} de ${MAX_SQUAD}).</p>`;
 }
 
+// Cómo se para la formación, en palabras: "4 defensores, 1 mediocampista
+// defensivo, 2 mediocampistas, 3 delanteros". Sirve para distinguir de un
+// vistazo las tres 4-3-3, que se llaman igual pero no se paran igual.
+function formaEnPalabras(f) {
+  const lineas = [];
+  const nombrar = (cantidad, shape, generico) => {
+    if (!cantidad) return;
+    if (shape && shape.length === cantidad) {
+      const unicos = [...new Set(shape)];
+      lineas.push(unicos.length === 1 && cantidad > 1 ? `${cantidad} ${unicos[0]}s` : shape.join(' + '));
+    } else {
+      lineas.push(`${cantidad} ${generico}${cantidad > 1 ? 's' : ''}`);
+    }
+  };
+  nombrar(f.def, f.defShape, 'defensor');
+  nombrar(f.med, f.medShape, 'mediocampista');
+  nombrar(f.off || 0, f.offShape, 'mediocampista ofensivo');
+  nombrar(f.del, f.delShape, 'delantero');
+  return `${f.name} ${f.style.toLowerCase()}: ${lineas.join(', ')}.`;
+}
+
+// Las dos barritas del balance: lo que la formación te suma adelante y lo que
+// le regala al rival atrás. Sin esto, elegir una formación era elegir un
+// nombre — y hasta hace poco elegir la más ofensiva era gratis.
+function balanceDeLaFormacionHtml(empuje, riesgo) {
+  const barra = (valor, clase) => {
+    const ancho = Math.min(100, Math.abs(valor) * 12);
+    return `<span class="balance-barra"><span class="balance-relleno ${clase} ${valor < 0 ? 'negativo' : ''}" style="width:${ancho}%"></span></span>`;
+  };
+  const signo = (v) => (v > 0 ? `+${v}` : `${v}`);
+  return `
+    <div class="formacion-balance">
+      <div class="balance-fila">
+        <span class="balance-que">Tu ataque</span>${barra(empuje, 'ataque')}<span class="balance-cuanto">${signo(empuje)}</span>
+      </div>
+      <div class="balance-fila">
+        <span class="balance-que">Lo que le dejás al rival</span>${barra(riesgo, 'riesgo')}<span class="balance-cuanto">${signo(riesgo)}</span>
+      </div>
+      <p class="muted">${riesgo > 2
+        ? 'Un planteo de ir al frente: creás más, pero el rival también.'
+        : riesgo < -1
+          ? 'Un equipo difícil de romper: vas a crear menos, y el rival mucho menos.'
+          : 'Un planteo parejo, sin regalar nada ni arriesgar de más.'}</p>
+    </div>
+  `;
+}
+
 function renderSquadPanel() {
   const s = Engine.state;
   if (!s || !s.squad) { squadPanel.innerHTML = ''; return; }
@@ -1795,6 +1842,8 @@ function renderSquadPanel() {
   const styles = ['Defensiva', 'Equilibrada', 'Ofensiva'];
   const activeStyle = xi.formation.style;
   const visibleFormations = FORMATIONS.filter((f) => f.style === activeStyle);
+  const empuje = xi.formation.mod || 0;
+  const riesgo = Engine.riesgoDeLaFormacion(xi.formation);
 
   squadPanel.innerHTML = `
     <div class="card side-card">
@@ -1804,8 +1853,9 @@ function renderSquadPanel() {
       </div>
       <h3>Formación</h3>
       <div class="formation-select">
-        ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}">${f.name}</button>`).join('')}
+        ${visibleFormations.map((f) => `<button class="tab-btn ${f.id === s.formation ? 'active' : ''}" data-formation="${f.id}" title="${formaEnPalabras(f)}">${f.name}</button>`).join('')}
       </div>
+      ${balanceDeLaFormacionHtml(empuje, riesgo)}
       <div class="pitch-scroll">
         ${buildPitchSvg(xi, club)}
       </div>
@@ -1849,9 +1899,9 @@ let dtNationDraft = 'ARG';
 let dtStyleDraft = 'equilibrado';
 
 const DT_STYLES = [
-  { id: 'ofensivo', name: 'Ofensivo', desc: 'Te gusta que el equipo siempre vaya al frente. Arrancás la carrera con más confianza (+10 de ánimo).' },
-  { id: 'equilibrado', name: 'Equilibrado', desc: 'Adaptás el plan según el rival, sin bonus ni penalidad — el club habla por sí solo.' },
-  { id: 'conservador', name: 'Conservador', desc: 'Cuidás cada peso y jugás con las cuentas claras. Arrancás con +10% de presupuesto inicial.' },
+  { id: 'ofensivo', name: 'Ofensivo', desc: 'Tu equipo ataca mejor de lo que marca el planteo (+1 al ataque en todos los partidos) y arrancás con +10 de ánimo.' },
+  { id: 'equilibrado', name: 'Equilibrado', desc: 'Leés el partido mejor que nadie: lo que decidís antes del partido y en el entretiempo pesa un 35% más.' },
+  { id: 'conservador', name: 'Conservador', desc: 'Tu equipo se para mejor atrás (-1 a lo que le dejás al rival) y arrancás con +10% de presupuesto.' },
 ];
 
 // ---------- La pantalla de inicio ----------
@@ -2183,7 +2233,7 @@ function renderPresentation() {
 
         <h3 class="presenta-pregunta">Te pasan el micrófono. ¿Qué decís?</h3>
         <div class="options">
-          ${responses.map((opt, i) => `<button class="option-btn presenta-opcion" data-i="${i}">${opt.label}</button>`).join('')}
+          ${responses.map((opt, i) => `<button class="option-btn presenta-opcion apilado" data-i="${i}"><strong>${opt.label}</strong>${opt.detalle ? `<span>${opt.detalle}</span>` : ''}</button>`).join('')}
         </div>
       </div>
     </div>
@@ -2838,6 +2888,21 @@ function estiloDeCompeticion() {
   return ` style="--comp-fondo:${comp.ui.fondo};--comp-brillo:${comp.ui.brillo};--comp-acento:${comp.ui.acento}"`;
 }
 
+// Lo que cada decisión mueve, en números. Se muestra al lado de la nota
+// porque ahora todas mueven algo distinto y eso es justamente lo que hay que
+// poder comparar antes de elegir (ver DECISIONS en data.js).
+function efectoDeLaDecisionHtml(opt) {
+  const partes = [];
+  const signo = (v) => (v > 0 ? `+${v}` : `${v}`);
+  if (opt.tacticMod) partes.push(`ataque ${signo(opt.tacticMod)}`);
+  if (opt.riesgoRival) partes.push(`al rival ${signo(opt.riesgoRival)}`);
+  if (opt.moraleMod) partes.push(`ánimo ${signo(opt.moraleMod)}`);
+  if (opt.confianzaMod) partes.push(`dirigencia ${signo(opt.confianzaMod)}`);
+  if (opt.energiaBonus) partes.push(`energía +${opt.energiaBonus}`);
+  if (opt.growthBoost) partes.push('puede mejorar un pibe');
+  return partes.length ? ` <span class="efecto">(${partes.join(' · ')})</span>` : '';
+}
+
 function renderPreMatch() {
   const s = Engine.state;
   const d = s.currentDecision;
@@ -2851,7 +2916,12 @@ function renderPreMatch() {
       <h2>${d.title}</h2>
       <p>${d.description}</p>
       <div class="options">
-        ${d.options.map((opt, i) => `<button class="option-btn" data-i="${i}">${opt.label}</button>`).join('')}
+        ${d.options.map((opt, i) => `
+          <button class="option-btn apilado" data-i="${i}">
+            <strong>${opt.label}</strong>
+            <span>${opt.note}${efectoDeLaDecisionHtml(opt)}</span>
+          </button>
+        `).join('')}
       </div>
     </div>
   `;
@@ -3416,10 +3486,10 @@ function renderFifaBreak() {
         <ul>
           ${ev.callUps.map((p) => `<li>${nationFlag(p.nation)} ${p.name} (${p.rating}) — ${Engine.nationName(p.nation)}</li>`).join('')}
         </ul>
-        <p class="muted">¿Le pedís a la selección que le cuide los minutos para reducir el riesgo de lesión?</p>
+        <p class="muted">¿Le pedís a la selección que le cuide los minutos?</p>
         <div class="options">
-          <button class="option-btn" id="care-btn">Pedir que le cuiden los minutos</button>
-          <button class="option-btn" id="nocare-btn">No intervenir</button>
+          <button class="option-btn apilado" id="care-btn"><strong>Pedir que le cuiden los minutos</strong><span>Se lesiona mucho menos, pero juega poco y no vuelve con nada nuevo.</span></button>
+          <button class="option-btn apilado" id="nocare-btn"><strong>No intervenir</strong><span>Juega todo: más riesgo de lesión, más chances de volver mejor.</span></button>
         </div>
       </div>
     `;

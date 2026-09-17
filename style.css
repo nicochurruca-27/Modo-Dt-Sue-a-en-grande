@@ -2016,3 +2016,35 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 
 .contraoferta-respuesta.si { border-color: var(--accent); background: rgba(34, 197, 94, 0.1); }
 .contraoferta-respuesta.no { border-color: #f87171; background: rgba(248, 113, 113, 0.09); }
+
+/* ---------- El balance de la formación ---------- */
+.formacion-balance { margin: 8px 0 12px; }
+
+.balance-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 0.78rem;
+}
+
+.balance-que { flex: 0 0 auto; min-width: 128px; color: var(--muted); }
+.balance-cuanto { flex: 0 0 auto; min-width: 26px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.balance-barra {
+  flex: 1 1 auto;
+  height: 7px;
+  border-radius: 4px;
+  background: #1e293b;
+  overflow: hidden;
+}
+
+.balance-relleno { display: block; height: 100%; border-radius: 4px; }
+.balance-relleno.ataque { background: var(--accent); }
+.balance-relleno.riesgo { background: #f87171; }
+/* Un valor negativo es a favor: menos ataque propio, o menos riesgo atrás. */
+.balance-relleno.negativo { background: #64748b; }
+.formacion-balance .muted { margin: 2px 0 0; font-size: 0.76rem; }
+
+/* Los números de lo que mueve cada decisión, al lado de su explicación. */
+.option-btn .efecto { opacity: 0.8; font-variant-numeric: tabular-nums; }
