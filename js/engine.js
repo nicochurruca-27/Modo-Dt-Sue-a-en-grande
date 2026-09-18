@@ -4289,7 +4289,12 @@ const Engine = {
       context: 'league',
       opponentId: isHome ? userMatch.away : userMatch.home,
       isHome,
-      sede: this.estadioDe(isHome ? userMatch.home : userMatch.away),
+      // La cancha es SIEMPRE la del local del partido. Acá decía
+      // `isHome ? userMatch.home : userMatch.away`, y las dos ramas terminan
+      // siendo tu propio club: `userMatch.away` sos vos cuando jugás de
+      // visitante. Por eso, de visitante, te decía que jugabas en tu cancha
+      // ("Jugás de visitante en el Cilindro" dirigiendo a Racing).
+      sede: this.estadioDe(userMatch.home),
       interzonal: encontrado.interzonal,
       // La última fecha de Primera es la de los clásicos.
       clasico: encontrado.interzonal && season.interzonal && season.roundIndex === season.interzonal.length - 1,
