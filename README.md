@@ -487,6 +487,9 @@ index.html     → esqueleto de la página y el orden en que se cargan los scrip
 css/styles.css → estilos visuales
 js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
+js/state.js   → la partida guardada: qué hay adentro, cómo se guarda sola en
+                el navegador, y exportarla/importarla como archivo para
+                llevarla del celular a la computadora
 js/internacional.js → clubes del resto de Sudamérica para las copas, y el
                 sorteo real con el que arranca la primera temporada
 js/escudos.js → escudos reales embebidos como data URI

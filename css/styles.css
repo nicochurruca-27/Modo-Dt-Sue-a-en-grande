@@ -2071,3 +2071,37 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   border-top: 1px solid #1f2937;
   color: #fca5a5;
 }
+
+/* ---------- Exportar e importar la partida ---------- */
+.partida-archivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.topbar-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.topbar-acciones .partida-archivo { margin-top: 0; }
+
+.partida-aviso {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  padding: 6px 9px;
+  border-radius: 7px;
+  border-left: 3px solid;
+  font-size: 0.8rem;
+}
+
+.partida-aviso.ok { border-color: var(--accent); background: rgba(34, 197, 94, 0.1); }
+.partida-aviso.mal { border-color: #f87171; background: rgba(248, 113, 113, 0.1); }
+
+/* En la pantalla de inicio los dos botones van centrados y discretos. */
+.inicio .partida-archivo { justify-content: center; margin-top: 14px; }
+.inicio .partida-aviso { text-align: center; }

@@ -57,7 +57,6 @@
 //   instantáneamente al arrancar el año (no hay nada interactivo ahí), para
 //   que los cupos a copas y los ascensos/descensos tengan sentido siempre.
 
-const SAVE_KEY = 'dt-simulador-save-v3';
 
 const FIFA_ROUNDS = [5, 11];
 // Cuántas semanas dura la pretemporada. El año arranca el 1° de enero y el
@@ -208,26 +207,26 @@ const BRACKET_KIND_LABELS = {
 };
 
 const Engine = {
+  // Toda la carrera vive acá adentro. Cómo se guarda, cómo se carga y cómo
+  // se lleva a otro aparato es asunto de GameState (js/state.js): el motor
+  // no toca localStorage, se lo pide. Estos cuatro quedan como atajos porque
+  // los llama medio juego.
   state: null,
 
   hasSave() {
-    return !!localStorage.getItem(SAVE_KEY);
+    return GameState.hay();
   },
 
   save() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
+    return GameState.saveToLocalStorage();
   },
 
   load() {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return false;
-    this.state = JSON.parse(raw);
-    return true;
+    return GameState.loadFromLocalStorage();
   },
 
   resetGame() {
-    localStorage.removeItem(SAVE_KEY);
-    this.state = { screen: 'dt-create' };
+    GameState.resetGame();
   },
 
   // Primer paso de toda carrera nueva: nombre, nacionalidad y estilo

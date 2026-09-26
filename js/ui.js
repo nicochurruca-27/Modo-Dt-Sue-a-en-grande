@@ -135,6 +135,7 @@ function render() {
   renderTablePanel();
   renderSquadPanel();
   renderMarketPanel();
+  wireBotonesDePartida();
   const endCareerBtn = document.getElementById('end-career-btn');
   if (endCareerBtn) {
     endCareerBtn.addEventListener('click', () => {
@@ -2090,6 +2091,70 @@ function paredDeEscudosHtml() {
   `;
 }
 
+// ---------- Llevar la partida de un aparato a otro ----------
+//
+// El guardado vive en el navegador de cada aparato: la carrera del celular no
+// aparece sola en la computadora. Estos dos botones bajan un archivo con todo
+// adentro y lo vuelven a cargar donde quieras (ver GameState en js/state.js).
+//
+// Están en dos lados: en la pantalla de inicio (que es donde vas a querer
+// traer una carrera) y arriba de todo mientras jugás (que es donde vas a
+// querer llevártela).
+let avisoDePartida = null;
+
+function botonesDePartidaHtml(conImportar = true) {
+  const hayCarrera = !!(Engine.state && Engine.state.clubId);
+  // El aviso ("se bajó el archivo", "ese archivo no es una partida") se
+  // muestra una vez y se va: lo consume este mismo dibujo.
+  const aviso = avisoDePartida;
+  avisoDePartida = null;
+  return `
+    <div class="partida-archivo">
+      <button class="option-btn small ghost" id="exportar-partida-btn" ${hayCarrera ? '' : 'disabled'}>Exportar partida</button>
+      ${conImportar ? '<button class="option-btn small ghost" id="importar-partida-btn">Importar partida</button>' : ''}
+      <input type="file" id="importar-partida-input" accept="application/json,.json" hidden />
+      ${aviso ? `<p class="partida-aviso ${aviso.ok ? 'ok' : 'mal'}">${aviso.nota}</p>` : ''}
+    </div>
+  `;
+}
+
+function wireBotonesDePartida() {
+  const exportar = document.getElementById('exportar-partida-btn');
+  if (exportar) {
+    exportar.addEventListener('click', () => {
+      avisoDePartida = GameState.exportar();
+      render();
+    });
+  }
+  const importar = document.getElementById('importar-partida-btn');
+  const input = document.getElementById('importar-partida-input');
+  if (importar && input) {
+    importar.addEventListener('click', () => {
+      // Traer una partida pisa la que estás jugando: se avisa antes.
+      if (Engine.state && Engine.state.clubId
+        && !confirm('Importar una partida reemplaza la carrera que tenés ahora. ¿Seguimos?')) return;
+      input.click();
+    });
+    input.addEventListener('change', () => {
+      const archivo = input.files && input.files[0];
+      if (!archivo) return;
+      const lector = new FileReader();
+      lector.onload = () => {
+        avisoDePartida = GameState.importar(String(lector.result));
+        if (avisoDePartida.ok) {
+          // Se entra derecho a la carrera que acabás de traer.
+          pantallaDeInicio = false;
+          borradoAConfirmar = false;
+          selectedPlayerId = null;
+        }
+        render();
+      };
+      lector.onerror = () => { avisoDePartida = { ok: false, nota: 'No se pudo leer el archivo.' }; render(); };
+      lector.readAsText(archivo);
+    });
+  }
+}
+
 function renderInicio() {
   const guardada = carreraGuardada();
   const acciones = borradoAConfirmar
@@ -2124,6 +2189,7 @@ function renderInicio() {
         <h1 class="inicio-titulo">Modo DT<span>Sueño en Grande</span></h1>
         <p class="inicio-bajada">Dirigí un club argentino de verdad: la liga con sus playoffs, la Copa Argentina, la Libertadores y la Sudamericana, el mercado de pases y una dirigencia que te mira.</p>
         <div class="inicio-acciones">${acciones}</div>
+        ${borradoAConfirmar ? '' : botonesDePartidaHtml()}
       </div>
     </div>
   `;
@@ -2137,6 +2203,7 @@ function renderInicio() {
   if (volver) volver.addEventListener('click', () => { borradoAConfirmar = false; render(); });
   const borrar = document.getElementById('inicio-borrar-btn');
   if (borrar) borrar.addEventListener('click', () => { Engine.resetGame(); entrar(); });
+  wireBotonesDePartida();
 }
 
 function renderDTCreate() {
@@ -2380,7 +2447,10 @@ function header() {
       ${dirigenciaHtml()}
       ${compromisoHtml()}
       <div class="muted">Presupuesto: ${money(s.budget)}${table ? ` · Posición en zona: ${pos}°/${table.length}` : ''} · Ánimo: ${s.morale}</div>
-      <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
+      <div class="topbar-acciones">
+        <button class="option-btn small danger" id="end-career-btn">Terminar carrera</button>
+        ${botonesDePartidaHtml()}
+      </div>
     </div>
   `;
 }
