@@ -537,7 +537,7 @@ function cruceDeCopaArgentinaHtml(cruce) {
 // El ancho que hay para dibujar adentro del panel: lo que mide el panel menos
 // el padding de la tarjeta. Se mide sobre el elemento real porque el panel no
 // mide lo mismo en la PC que en el celular, y en la PC además se ensancha
-// cuando la pantalla da (ver la media query de #table-panel en style.css).
+// cuando la pantalla da (ver la media query de #table-panel en css/styles.css).
 //
 // Si todavía no se pintó —en el celular el panel arranca escondido— se cae a
 // un ancho conservador, el del panel angosto.
@@ -3821,7 +3821,7 @@ function renderSeasonEnd() {
 // ---------- Panel del mercado de pases ----------
 //
 // En la PC vive abajo del bloque de noticias (los dos están en la columna
-// del medio, ver .center-col en style.css); en el celular es la cuarta
+// del medio, ver .center-col en css/styles.css); en el celular es la cuarta
 // pestaña. Es el mismo HTML en los dos lados, no hay versión duplicada.
 //
 // La lógica de planteles, estados y negociación está toda en js/mercado.js.
@@ -4202,7 +4202,7 @@ function renderMarketPanel() {
 // Barra de pestañas de solo celular (vertical): cambia cuál de los 4
 // paneles se ve sin tener que scrollear (Tabla, Partido, Plantel, Mercado).
 // En PC / celular horizontal esta barra está oculta y los paneles se ven
-// todos juntos, con el mercado abajo del partido (ver style.css).
+// todos juntos, con el mercado abajo del partido (ver css/styles.css).
 function setupMobileTabs() {
   const layout = document.querySelector('.layout');
   const buttons = document.querySelectorAll('#mobile-tabs button');

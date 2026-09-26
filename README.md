@@ -483,8 +483,8 @@ abriendo el archivo desde el disco (`file://`).
 ## Estructura del proyecto
 
 ```
-index.html    → esqueleto de la página
-style.css     → estilos visuales
+index.html     → esqueleto de la página y el orden en que se cargan los scripts
+css/styles.css → estilos visuales
 js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
 js/internacional.js → clubes del resto de Sudamérica para las copas, y el

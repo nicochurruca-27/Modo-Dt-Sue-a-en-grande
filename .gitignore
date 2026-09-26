@@ -1,5 +1,5 @@
 # El archivo único que se arma para jugar sin la carpeta al lado. Es generado
-# a partir de index.html + style.css + js/, así que no se versiona: sería
+# a partir de index.html + css/styles.css + js/, así que no se versiona: sería
 # duplicar todo el código del repo y habría que regenerarlo en cada cambio.
 modo-dt-sueno-en-grande.html
 

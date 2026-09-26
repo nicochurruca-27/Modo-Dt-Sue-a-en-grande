@@ -4,7 +4,7 @@
 NO hace falta correr esto para jugar desde el repo: con abrir index.html
 alcanza. Esto es para tener una copia suelta que se pueda mandar por
 WhatsApp o por mail y que funcione con doble click, sin la carpeta js/ ni
-el style.css al lado.
+la carpeta css/ al lado.
 
 Uso:
     python3 tools/armar-archivo-unico.py
@@ -36,9 +36,9 @@ def main():
     html = leer('index.html')
 
     # El CSS, en un <style> en la cabecera.
-    css = leer('style.css')
+    css = leer('css/styles.css')
     html = html.replace(
-        '<link rel="stylesheet" href="style.css" />',
+        '<link rel="stylesheet" href="css/styles.css" />',
         f'<style>\n{css}\n</style>',
     )
 
@@ -47,7 +47,7 @@ def main():
         ruta = match.group(1)
         return f'<script>\n{leer(ruta)}\n</script>'
 
-    html, cuantos = re.subn(r'<script src="([^"]+)"></script>', inlinear, html)
+    html, cuantos = re.subn(r'<script defer src="([^"]+)"></script>', inlinear, html)
     if not cuantos:
         sys.exit('No encontré ningún <script src> en index.html.')
 
