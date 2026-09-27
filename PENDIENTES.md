@@ -83,27 +83,25 @@ Los jugadores del usuario ya llevan partidos, goles y asistencias. Falta:
 
 ## 4. El partido minuto a minuto
 
-El minuto a minuto está hecho: el reloj corre del 1' al 90' a la velocidad que
+El partido está completo: el reloj corre del 1' al 90' a la velocidad que
 elijas, los eventos salen en el momento (goles, remates, córners, faltas,
-amarillas, lesiones), el peligro de los dos arcos se recalcula en cada minuto
-con el planteo que tengas puesto, y podés cambiar el esquema, tocar los ajustes
-al vuelo y hacer los cambios en cualquier minuto. Lo que falta:
+amarillas, rojas, penales y lesiones), el peligro de los dos arcos se
+recalcula en cada minuto con el planteo que tengas puesto, y podés cambiar el
+esquema, tocar los ajustes al vuelo y hacer los cambios cuando quieras. Las
+tarjetas dependen del árbitro que te toque y los penales se patean en el
+minuto en que pasan. Lo que queda:
 
-- **Más tipos de evento**: expulsiones en vivo, penales dentro del juego (hoy
-  el penal es una pantalla aparte), palos, ocasiones claras que no terminan en
-  remate.
-- **La doble amarilla**: hoy un jugador ya amonestado no puede ver otra en el
-  mismo partido, así que no hay expulsión por dos amarillas dentro del juego
-  (la roja se sigue resolviendo al terminar, ver `aplicarBajas`).
-- **Las estadísticas del rival no se guardan** después del partido: remates,
-  córners y faltas viven en `s.partido` y se pierden cuando termina. Para una
-  tabla de estadísticas de la temporada hay que llevarlas a `s.stats`.
-- **Los goles del rival con su autor** ya funcionan para los clubes argentinos.
-  Los del continente no tienen plantel cargado y el gol queda a nombre del club.
-- **La posesión** no existe todavía: sería el dato natural para acompañar a
-  "posesión paciente" en el tablero.
-
----
+- **Los goles del rival con su autor** ya funcionan para los clubes
+  argentinos. Los del continente no tienen plantel cargado y el gol queda a
+  nombre del club (es el punto 1: faltan esos planteles).
+- **El arquero no puede ser expulsado**: si lo fuera habría que meter al
+  suplente sacando a un jugador de campo, y el motor todavía no sabe hacer
+  ese cambio. Por ahora ve muy pocas amarillas y ninguna roja.
+- **Faltan los palos y las ocasiones claras** que no terminan en remate, y el
+  penal errado no genera rebote.
+- **Las estadísticas se guardan por partido** (`s.pendingMatch.stats`) pero no
+  se suman por temporada: para una tabla de "remates por partido del año" hay
+  que acumularlas en `s.stats`.
 
 ## 5. La carrera del DT
 

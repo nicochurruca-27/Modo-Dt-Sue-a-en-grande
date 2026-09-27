@@ -2128,9 +2128,8 @@ function sonarSegunLaPantalla() {
 
   // Los silbatos (el del arranque de cada tiempo y el largo del final) los
   // toca el reloj del partido, que es el que sabe en qué minuto va (ver
-  // silbatosDelMinuto). Acá queda solo el del final por penales, que pasa
-  // fuera del reloj.
-  if (pantalla !== antes && pantalla === 'match-result' && antes === 'penalty') Sonido.playWhistle(true);
+  // silbatosDelMinuto). Los penales también pasan adentro del partido, así
+  // que acá no queda ningún silbato.
   // Un gol es un gol: en el primer tiempo, en el segundo o de penal.
   if (goles > ultimoSonido.goles) Sonido.playGoal();
 
@@ -3261,7 +3260,7 @@ function wireGoalZones(onZoneClick) {
 
 function animatePenaltyResult(side) {
   const s = Engine.state;
-  const pen = s.pendingMatch.penalty;
+  const pen = Engine.penalActual();
   const ball = document.getElementById('goal-ball');
   const keeper = document.getElementById('goal-keeper');
   const banner = document.getElementById('goal-banner');
@@ -3313,7 +3312,15 @@ function animatePenaltyResult(side) {
     ultimoSonido.goles = golesMiosAhora(Engine.state);
   }, 650);
 
-  setTimeout(() => { render(); }, 2000);
+  setTimeout(() => {
+    // Si el penal fue en pleno partido, se vuelve a la cancha y el reloj
+    // sigue donde estaba.
+    if (Engine.state.partido && Engine.state.partido.penal) {
+      Engine.seguirDespuesDelPenal();
+      partidoPausado = false;
+    }
+    render();
+  }, 2000);
 }
 
 let penaltyShooterId = null;
@@ -3329,19 +3336,19 @@ let penaltyShooterId = null;
 // que se cuenta después: goles, amarillas, lesiones y cambios. Los remates,
 // los córners y las faltas son del relato en vivo, y acá serían cincuenta
 // renglones de ruido.
-const EVENTOS_QUE_QUEDAN = ['gol', 'amarilla', 'roja', 'lesion', 'cambio'];
+const EVENTOS_QUE_QUEDAN = ['gol', 'amarilla', 'roja', 'penal', 'lesion', 'cambio'];
 
 function eventosDelPartidoHtml(eventos, hasta) {
   const lista = (eventos || [])
     .filter((e) => EVENTOS_QUE_QUEDAN.includes(e.tipo))
     .filter((e) => !hasta || e.minuto <= hasta);
   if (!lista.length) return '<p class="muted">Todavía no pasó nada para contar.</p>';
-  const icono = { gol: '⚽', amarilla: '🟨', lesion: '🏥', cambio: '🔁' };
+  const icono = { gol: '⚽', amarilla: '🟨', roja: '🟥', lesion: '🏥', cambio: '🔁', penal: '🥅' };
   return `<ul class="partido-eventos">${lista.map((e) => `
     <li class="${e.mio ? 'mio' : ''}">
       <span class="minuto">${e.minuto}'</span>
       <span class="icono">${icono[e.tipo] || '·'}</span>
-      <span class="quien">${e.nombre || (e.mio ? 'Tu equipo' : 'El rival')}${e.tipo === 'amarilla' ? ' <span class="muted">(amonestado)</span>' : ''}${e.tipo === 'lesion' ? ' <span class="muted">(se lesionó)</span>' : ''}</span>
+      <span class="quien">${e.nombre || (e.mio ? 'Tu equipo' : 'El rival')}${e.tipo === 'amarilla' ? ' <span class="muted">(amonestado)</span>' : ''}${e.tipo === 'roja' ? ` <span class="muted">(${e.doble ? 'doble amarilla' : 'expulsado'})</span>` : ''}${e.tipo === 'gol' && e.depenal ? ' <span class="muted">(de penal)</span>' : ''}${e.tipo === 'penal' ? ` <span class="muted">(penal ${e.resultado === 'atajada' ? 'atajado' : 'errado'})</span>` : ''}${e.tipo === 'lesion' ? ' <span class="muted">(se lesionó)</span>' : ''}</span>
     </li>
   `).join('')}</ul>`;
 }
@@ -3503,6 +3510,7 @@ function renderPartido() {
         </div>
       </div>
 
+      <p class="muted arbitro-linea">Árbitro: ${Engine.arbitroDelPartido().label.toLowerCase()}</p>
       <div class="partido-stats" id="partido-stats">${estadisticasHtml()}</div>
 
       <h3>Lo que va pasando</h3>
@@ -3588,20 +3596,40 @@ function cablearElEsquema() {
 
 // Las cuatro estadísticas de arriba, tuyas contra las de él.
 function estadisticasHtml() {
-  const e = Engine.estadisticasDelPartido();
+  return tablaDeEstadisticasHtml(Engine.estadisticasDelPartido(), Engine.posesionDelPartido());
+}
+
+// La planilla: la misma tabla en el partido en vivo y en la pantalla de
+// resultado (ahí se lee de lo que quedó guardado del partido).
+function tablaDeEstadisticasHtml(e, posesionMia) {
   const filas = [
     ['Remates', 'remates'],
     ['Córners', 'corners'],
     ['Faltas', 'faltas'],
     ['Amarillas', 'amarillas'],
+    ['Rojas', 'rojas'],
   ];
-  return filas.map(([label, clave]) => `
+  const mia = posesionMia == null ? 50 : posesionMia;
+  const posesion = `
     <div class="stat-fila">
-      <span class="mia">${e.mias[clave]}</span>
-      <span class="que">${label}</span>
-      <span class="suya">${e.suyas[clave]}</span>
+      <span class="mia">${mia}%</span>
+      <span class="que">Posesión</span>
+      <span class="suya">${100 - mia}%</span>
     </div>
-  `).join('');
+    <div class="barra-posesion"><span style="width:${mia}%"></span></div>
+  `;
+  const cuerpo = filas
+    // Las rojas solo aparecen cuando hay alguna: en un partido normal es una
+    // fila de ceros que no le dice nada a nadie.
+    .filter(([, clave]) => clave !== 'rojas' || (e.mias.rojas || e.suyas.rojas))
+    .map(([label, clave]) => `
+      <div class="stat-fila">
+        <span class="mia">${e.mias[clave] || 0}</span>
+        <span class="que">${label}</span>
+        <span class="suya">${e.suyas[clave] || 0}</span>
+      </div>
+    `).join('');
+  return posesion + cuerpo;
 }
 
 // Los dos pares de botones. Dentro de cada par solo puede haber uno prendido,
@@ -3638,20 +3666,26 @@ function cablearLosAjustes() {
 }
 
 const ICONO_DEL_EVENTO = {
-  gol: '⚽', amarilla: '🟨', lesion: '🏥', remate: '🎯',
-  corner: '🚩', falta: '✋', cambio: '🔁', silbato: '⏱️',
+  gol: '⚽', amarilla: '🟨', roja: '🟥', lesion: '🏥', remate: '🎯',
+  corner: '🚩', falta: '✋', cambio: '🔁', silbato: '⏱️', penal: '🥅',
 };
 
 function textoDelEvento(e) {
   const quien = e.nombre;
   switch (e.tipo) {
     case 'gol': return e.mio
-      ? `<strong>¡Gol!</strong> ${quien || 'Lo empujó cualquiera'}`
-      : `Gol del rival${quien ? ` — ${quien}` : ''}`;
+      ? `<strong>¡Gol${e.depenal ? ' de penal' : ''}!</strong> ${quien || 'Lo empujó cualquiera'}`
+      : `Gol ${e.depenal ? 'de penal ' : ''}del rival${quien ? ` — ${quien}` : ''}`;
     case 'remate': return `Remate ${e.detalle || 'al arco'}${quien ? ` de ${quien}` : ''}`;
     case 'corner': return `Tiro de esquina ${e.mio ? 'a favor' : 'para el rival'}`;
     case 'falta': return `Falta${quien ? ` de ${quien}` : e.mio ? ' tuya' : ' del rival'}`;
     case 'amarilla': return `Amarilla${quien ? ` para ${quien}` : ''}`;
+    case 'roja': return e.doble
+      ? `<strong>Se va expulsado</strong>${quien ? ` ${quien}` : ''}: segunda amarilla`
+      : `<strong>¡Roja directa!</strong>${quien ? ` ${quien}` : ''}`;
+    case 'penal': return e.resultado === 'atajada'
+      ? `Penal atajado${e.mio ? '' : ' por tu arquero'}`
+      : `Penal ${e.mio ? 'errado' : 'errado por el rival'}${quien ? ` — ${quien}` : ''}`;
     case 'lesion': return `${quien} quedó tendido en el piso`;
     case 'cambio': return quien;
     case 'silbato': return quien;
@@ -3890,8 +3924,15 @@ function renderPenalty() {
 
 function drawPenalty() {
   const s = Engine.state;
-  const pen = s.pendingMatch.penalty;
-  const opponent = Engine.getClub(s.pendingMatch.opponentId);
+  const pen = Engine.penalActual();
+  const rivalId = s.partido && s.matchContext ? s.matchContext.opponentId : s.pendingMatch.opponentId;
+  const opponent = Engine.getClub(rivalId);
+  // Con el partido en juego el penal tiene minuto y marcador: se avisa de
+  // qué momento del partido estamos hablando.
+  const enJuego = !!(s.partido && s.partido.penal);
+  const cuando = enJuego
+    ? `<p class="muted entretiempo-donde">Minuto ${pen.minuto} · van ${s.partido.mios} a ${s.partido.suyos}</p>`
+    : '';
 
   if (pen.side === 'user') {
     const shooters = Engine.getPenaltyShooters();
@@ -3899,6 +3940,7 @@ function drawPenalty() {
     app.innerHTML = `
       ${header()}
       <div class="card">
+        ${cuando}
         <h2>¡Penal a favor!</h2>
         <p>Elegí quién lo patea.</p>
         <div class="options" id="shooter-list">
@@ -3928,6 +3970,7 @@ function drawPenalty() {
     app.innerHTML = `
       ${header()}
       <div class="card">
+        ${cuando}
         <h2>Penal en contra</h2>
         <p>${opponent.name} va a patear. Elegí para dónde se tira ${keeper.name}.</p>
         ${goalWidgetHtml(kit)}
@@ -4032,6 +4075,7 @@ function renderMatchResult() {
       ${penaltyText ? `<p class="muted">${penaltyText}</p>` : ''}
       ${shootoutText ? `<p class="shootout-line">${shootoutText}</p>` : ''}
       ${(m.eventos || []).length ? `<h3>Cómo se dio</h3>${eventosDelPartidoHtml(m.eventos)}` : ''}
+      ${m.stats ? `<h3>La planilla</h3><div class="partido-stats">${tablaDeEstadisticasHtml(m.stats, m.posesion)}</div>` : ''}
       ${s.lastDecisionNote ? `<p class="muted">${s.lastDecisionNote}</p>` : ''}
       ${avisosDelPartidoHtml(s.lastAvailabilityNotes, s.lastDevelopmentNotes)}
       <button class="option-btn" id="continue-btn">Continuar</button>

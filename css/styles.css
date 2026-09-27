@@ -2291,3 +2291,27 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 @media (max-width: 520px) {
   .ajuste-par { grid-template-columns: 1fr; }
 }
+
+/* El árbitro del partido y la barra de posesión, en el tablero del vivo. */
+.arbitro-linea {
+  margin: 10px 0 4px;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.barra-posesion {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.45);
+  overflow: hidden;
+  margin: 2px 0 6px;
+}
+
+.barra-posesion span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s linear;
+}

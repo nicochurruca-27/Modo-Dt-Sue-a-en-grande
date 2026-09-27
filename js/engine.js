@@ -4497,17 +4497,23 @@ const Engine = {
       + (this.riesgoDeLaFormacion(formacion) + estilo.riesgo - NEUTRO) * PESO
       + (plan.riesgoRival || 0) * estilo.aguante * PESO_CHARLA;
 
-    // Con uno menos creás bastante menos y además te atacan más.
+    // Con uno menos creás bastante menos y además te atacan más. Y al revés:
+    // si al rival lo dejan con diez, le pasa exactamente lo mismo.
     const enCancha = this.getStartingXI().starters.length;
     const faltan = Math.max(0, 11 - enCancha);
     const conLosQueQuedan = Math.min(1, enCancha / 11);
     const seLesAbre = 1 + faltan * 0.07;
+    const susFaltantes = Math.max(0, Math.min(4, (p && p.rivalesExpulsados) || 0));
+    const conLosQueQuedaEl = 1 - susFaltantes / 11;
+    const seMeAbre = 1 + susFaltantes * 0.07;
 
     const diff = local - visitante;
     const baseLocal = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + ventaja / 16));
     const baseVisitante = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
-    const golesLocal = baseLocal * (ctx.isHome ? factorMio * conLosQueQuedan : factorSuyo * seLesAbre);
-    const golesVisitante = baseVisitante * (ctx.isHome ? factorSuyo * seLesAbre : factorMio * conLosQueQuedan);
+    const mioAlAtacar = factorMio * conLosQueQuedan * seMeAbre;
+    const suyoAlAtacar = factorSuyo * seLesAbre * conLosQueQuedaEl;
+    const golesLocal = baseLocal * (ctx.isHome ? mioAlAtacar : suyoAlAtacar);
+    const golesVisitante = baseVisitante * (ctx.isHome ? suyoAlAtacar : mioAlAtacar);
     return {
       mia: ctx.isHome ? golesLocal : golesVisitante,
       suya: ctx.isHome ? golesVisitante : golesLocal,
@@ -4571,7 +4577,11 @@ const Engine = {
   // Ahora pasa en un minuto concreto: el partido se frena ahí, el jugador
   // queda afuera y vos decidís a quién metés. Si no metés a nadie, seguís con
   // uno menos y el equipo lo paga (ver peligroDelPartido).
-  CHANCE_DE_LESION_POR_PARTIDO: 0.26,
+  // Una lesión cada seis o siete partidos. Estaba en 0,26 (una cada cuatro) y
+  // se hacía pesado: el parte médico era casi todas las semanas. El cansancio
+  // la sigue subiendo —con el plantel fundido termina cerca de 0,15 por
+  // partido—, así que rotar sigue sirviendo.
+  CHANCE_DE_LESION_POR_PARTIDO: 0.11,
 
   // ¿Se lesiona alguien en ESTE minuto? El cansancio manda: sube la chance y
   // decide a quién le toca (el que viene fundido entra más veces al bolillero).
@@ -4628,10 +4638,13 @@ const Engine = {
       p.onceAntes = s.startingSlots.map((e) => ({ ...e }));
       p.bancoAntes = [...(s.banco || [])];
     }
-    const casillero = s.startingSlots.find((e) => e.playerId === lesion.id);
-    if (casillero) casillero.playerId = null;
+    // Se anota EN QUÉ casillero jugaba: si además hay un expulsado, hay dos
+    // huecos en la cancha y el que entra tiene que ocupar el del lesionado,
+    // no el primero que aparezca.
+    const donde = s.startingSlots.findIndex((e) => e.playerId === lesion.id);
+    if (donde >= 0) s.startingSlots[donde].playerId = null;
     this.anotarEvento({ tipo: 'lesion', mio: true, nombre: jugador.name, id: jugador.id }, lesion.minuto);
-    p.lesion = { ...lesion, cubierta: false };
+    p.lesion = { ...lesion, cubierta: false, casillero: donde };
     if (!p.notasFisicas) p.notasFisicas = [];
     p.notasFisicas.push({ tono: 'malo', texto: `${jugador.name} se lesionó a los ${lesion.minuto}': ${lesion.detail.toLowerCase()}. Se pierde ${lesion.matches} ${lesion.matches === 1 ? 'partido' : 'partidos'}.` });
   },
@@ -4646,7 +4659,8 @@ const Engine = {
     const entra = s.squad.find((x) => x.id === entraId);
     if (!entra || !this.isAvailable(entra)) return false;
     if ((s.startingSlots || []).some((e) => e.playerId === entraId)) return false;
-    const hueco = s.startingSlots.find((e) => !e.playerId);
+    const suyo = s.startingSlots[p.lesion.casillero];
+    const hueco = suyo && !suyo.playerId ? suyo : s.startingSlots.find((e) => !e.playerId);
     if (!hueco) return false;
 
     hueco.playerId = entraId;
@@ -4694,8 +4708,49 @@ const Engine = {
   CORNERS_BASE: 1.8,
   CORNERS_POR_GOL_ESPERADO: 2.2,
   FALTAS_POR_PARTIDO: 7,
-  // Amarillas por titular y por partido: el mismo número de siempre.
-  AMARILLAS_POR_PARTIDO: 0.16,
+  // Amarillas por titular y por partido, ANTES de pasar por el árbitro.
+  AMARILLAS_POR_PARTIDO: 0.15,
+  // Una roja directa por equipo cada veinte partidos, más o menos.
+  ROJA_DIRECTA_POR_PARTIDO: 0.05,
+  // Al que ya tiene una amarilla el árbitro le perdona bastante más: la
+  // segunda sale al 40% del ritmo de la primera. (Y si sale, es la ducha.)
+  AMARILLA_DEL_AMONESTADO: 0.4,
+  // Un penal cada cuatro partidos, contando los dos arcos.
+  PENALES_POR_PARTIDO: 0.25,
+
+  // ---------- El árbitro ----------
+  //
+  // Las tarjetas no salen iguales todos los domingos. Antes cada jugador
+  // tenía la misma chance en todos los partidos y entonces TODOS los partidos
+  // terminaban con dos o tres amarillas: nunca había un partido limpio ni uno
+  // de esos que se le va de las manos al referí. Ahora cada partido tiene su
+  // árbitro y él decide el clima: con uno que deja jugar podés terminar sin
+  // ninguna, y con un tarjetero volás por el aire.
+  //
+  // El rigor multiplica amarillas y rojas. Los pesos están puestos para que
+  // el promedio quede en 1,08 y el grueso de los partidos caiga por debajo:
+  // los tarjeteros son pocos, pero cuando te toca uno se nota.
+  ARBITROS: [
+    { id: 'permisivo', label: 'Deja jugar', rigor: 0.45, peso: 30 },
+    { id: 'normal', label: 'Parejo', rigor: 1, peso: 40 },
+    { id: 'exigente', label: 'Exigente', rigor: 1.6, peso: 22 },
+    { id: 'tarjetero', label: 'Tarjetero', rigor: 2.4, peso: 8 },
+  ],
+
+  sortearElArbitro() {
+    const total = this.ARBITROS.reduce((t, a) => t + a.peso, 0);
+    let tirada = Math.random() * total;
+    for (const a of this.ARBITROS) {
+      tirada -= a.peso;
+      if (tirada <= 0) return a.id;
+    }
+    return 'normal';
+  },
+
+  arbitroDelPartido() {
+    const p = this.state.partido;
+    return this.ARBITROS.find((a) => a.id === (p && p.arbitro)) || this.ARBITROS[1];
+  },
 
   VELOCIDADES: [
     { id: 'x1', label: '1x', ms: 900 },
@@ -4737,7 +4792,7 @@ const Engine = {
   // El marcador y las estadísticas, para el tablero de arriba.
   estadisticasDelPartido() {
     const p = this.state.partido;
-    const vacio = { remates: 0, corners: 0, faltas: 0, amarillas: 0 };
+    const vacio = { remates: 0, corners: 0, faltas: 0, amarillas: 0, rojas: 0, penales: 0 };
     if (!p || !p.stats) return { mias: { ...vacio }, suyas: { ...vacio } };
     return p.stats;
   },
@@ -4745,7 +4800,8 @@ const Engine = {
   sumarEstadistica(mio, clave) {
     const p = this.state.partido;
     if (!p || !p.stats) return;
-    p.stats[mio ? 'mias' : 'suyas'][clave] += 1;
+    const lado = p.stats[mio ? 'mias' : 'suyas'];
+    lado[clave] = (lado[clave] || 0) + 1;
   },
 
   // ¿Hay que frenar el reloj? Se pregunta antes y después de cada minuto, así
@@ -4755,6 +4811,7 @@ const Engine = {
     const p = s.partido;
     if (!p) return 'final';
     if (p.lesion) { s.screen = 'lesion'; return 'lesion'; }
+    if (p.penal && !p.penal.resolved) { s.screen = 'penalty'; return 'penal'; }
     if (p.minuto >= this.MINUTO_DEL_DESCANSO && !p.pasoElDescanso) {
       p.pasoElDescanso = true;
       this.irAlEntretiempo();
@@ -4856,19 +4913,64 @@ const Engine = {
       anotar({ tipo: 'falta', mio: false, nombre: unRival(delRival) });
     }
 
-    // ---- Las amarillas ----
+    // ---- Las tarjetas ----
     // Se cuentan por jugador, como siempre; la suspensión a la quinta se
-    // resuelve al terminar el partido (ver aplicarBajas).
+    // resuelve al terminar el partido (ver updateAvailability). Lo que manda
+    // el ritmo es el árbitro que te tocó (ver ARBITROS): con uno que deja
+    // jugar podés terminar el partido sin ninguna.
+    const rigor = this.arbitroDelPartido().rigor;
     const yaAmonestados = new Set((p.eventos || []).filter((e) => e.tipo === 'amarilla' && e.mio && e.id).map((e) => e.id));
-    enCancha.filter((j) => this.isAvailable(j) && !yaAmonestados.has(j.id)).forEach((j) => {
-      if (Math.random() > porMinuto(this.AMARILLAS_POR_PARTIDO)) return;
+    enCancha.filter((j) => this.isAvailable(j)).forEach((j) => {
+      const segunda = yaAmonestados.has(j.id);
+      // El arquero casi no ve tarjetas: está a cincuenta metros de casi
+      // todas las jugadas. Y tampoco lo pueden echar (abajo): si lo echaran
+      // habría que poner al suplente sacando a un jugador de campo, y eso el
+      // juego todavía no lo sabe hacer.
+      const ritmo = this.AMARILLAS_POR_PARTIDO * rigor
+        * (segunda ? this.AMARILLA_DEL_AMONESTADO : 1)
+        * (j.pos === 'POR' ? 0.2 : 1);
+      if (Math.random() > porMinuto(ritmo)) return;
       this.sumarEstadistica(true, 'amarillas');
       anotar({ tipo: 'amarilla', mio: true, nombre: j.name, id: j.id });
+      // La segunda amarilla es la ducha: se va y no se puede reemplazar.
+      if (segunda && j.pos !== 'POR') this.expulsar(j, true, minuto, anotar);
     });
-    if (Math.random() < porMinuto(this.AMARILLAS_POR_PARTIDO * 11)) {
+    // La roja directa: la plancha, el codazo, el último hombre.
+    if (Math.random() < porMinuto(this.ROJA_DIRECTA_POR_PARTIDO * rigor) && enCancha.length > 7) {
+      const echables = enCancha.filter((j) => this.isAvailable(j) && j.pos !== 'POR');
+      const quien = echables[Math.floor(Math.random() * echables.length)];
+      if (quien) this.expulsar(quien, false, minuto, anotar);
+    }
+    // Las del rival son de adorno para el relato, salvo una cosa: si lo dejan
+    // con diez, el partido se le abre a él y se te abre a vos (ver
+    // peligroDelPartido).
+    if (Math.random() < porMinuto(this.AMARILLAS_POR_PARTIDO * 11 * rigor)) {
       this.sumarEstadistica(false, 'amarillas');
       anotar({ tipo: 'amarilla', mio: false, nombre: unRival(delRival) });
     }
+    if (Math.random() < porMinuto((this.ROJA_DIRECTA_POR_PARTIDO + this.AMARILLAS_POR_PARTIDO * 0.6) * rigor)
+        && (p.rivalesExpulsados || 0) < 3) {
+      p.rivalesExpulsados = (p.rivalesExpulsados || 0) + 1;
+      this.sumarEstadistica(false, 'rojas');
+      anotar({ tipo: 'roja', mio: false, nombre: unRival(delRival) });
+    }
+
+    // ---- El penal ----
+    // Se lo lleva el que está atacando más: el peligro de cada arco reparte.
+    if (Math.random() < porMinuto(this.PENALES_POR_PARTIDO)) {
+      const total = peligro.mia + peligro.suya;
+      const esMio = Math.random() < (total > 0 ? peligro.mia / total : 0.5);
+      p.penal = { side: esMio ? 'user' : 'rival', resolved: false, scored: null, minuto };
+      this.sumarEstadistica(esMio, 'penales');
+    }
+
+    // ---- La posesión ----
+    // No se sortea: es la foto de cómo se está jugando. El que tiene más
+    // peligro suele tener más la pelota, y "posesión paciente" / "jugar de
+    // contra" la mueven a propósito. Se promedia minuto a minuto, así que si
+    // cambiás el planteo en el 60' el número se va corriendo de a poco.
+    p.posesionAcumulada = (p.posesionAcumulada || 0) + this.posesionDeEsteMinuto(peligro);
+    p.minutosDePosesion = (p.minutosDePosesion || 0) + 1;
 
     // ---- ¿Se rompió alguno? ----
     const lesion = this.sortearLesionDelMinuto(minuto);
@@ -4888,6 +4990,61 @@ const Engine = {
   },
 
   COMO_TERMINO_EL_REMATE: ['al arco', 'afuera', 'tapado', 'al palo', 'desviado'],
+
+  // Uno menos. A diferencia de la lesión, acá NO hay reemplazo: el casillero
+  // queda vacío hasta el final y el equipo juega con diez (o con nueve). La
+  // suspensión se resuelve al terminar el partido, con el resto de las bajas
+  // (ver updateAvailability).
+  expulsar(jugador, dobleAmarilla, minuto, anotar) {
+    const s = this.state;
+    const p = s.partido;
+    if (!p || !jugador) return;
+    if (!p.onceAntes) {
+      p.onceAntes = s.startingSlots.map((e) => ({ ...e }));
+      p.bancoAntes = [...(s.banco || [])];
+    }
+    const casillero = s.startingSlots.find((e) => e.playerId === jugador.id);
+    if (casillero) casillero.playerId = null;
+    this.sumarEstadistica(true, 'rojas');
+    const evento = { tipo: 'roja', mio: true, nombre: jugador.name, id: jugador.id, doble: !!dobleAmarilla };
+    if (anotar) anotar(evento);
+    else this.anotarEvento(evento, minuto);
+  },
+
+  // Cuánto de la pelota tenés vos en este minuto, de 0 a 100. Sale del
+  // peligro de los dos arcos (el que ataca más la tiene más) y de lo que
+  // elegiste: tener la pelota es el plan de "posesión paciente" y
+  // justamente lo contrario del "jugar de contra".
+  posesionDeEsteMinuto(peligro) {
+    const total = peligro.mia + peligro.suya;
+    const base = total > 0 ? (peligro.mia / total) * 100 : 50;
+    // Se aplasta contra el 50: un equipo que hace el doble de goles no tiene
+    // el doble de la pelota.
+    let mia = 50 + (base - 50) * 0.55;
+    const ajustes = (this.state.partido && this.state.partido.ajustes) || {};
+    if (ajustes.ritmo === 'posesion') mia += 9;
+    if (ajustes.ritmo === 'contra') mia -= 11;
+    if (ajustes.lineas === 'autobus') mia -= 6;
+    if (ajustes.lineas === 'adelantar') mia += 3;
+    const enCancha = this.getStartingXI().starters.length;
+    mia -= (11 - enCancha) * 3.5;
+    mia += ((this.state.partido && this.state.partido.rivalesExpulsados) || 0) * 3.5;
+    return Math.max(22, Math.min(78, mia));
+  },
+
+  posesionDelPartido() {
+    const p = this.state.partido;
+    if (!p || !p.minutosDePosesion) return 50;
+    return Math.round(p.posesionAcumulada / p.minutosDePosesion);
+  },
+
+  // El penal que se está por patear, esté el partido en juego o ya terminado
+  // (los de la definición por penales van por otro lado, ver shootout).
+  penalActual() {
+    const s = this.state;
+    if (s.partido && s.partido.penal) return s.partido.penal;
+    return (s.pendingMatch && s.pendingMatch.penalty) || null;
+  },
 
   // El vestuario, después del primer tiempo.
   irAlEntretiempo() {
@@ -5020,16 +5177,16 @@ const Engine = {
       enCancha,
       jugaron: p.jugaron || enCancha,
       notasFisicas: p.notasFisicas || [],
+      // La planilla del partido, para que no se pierda al cerrarlo.
+      stats: p.stats,
+      posesion: this.posesionDelPartido(),
+      arbitro: p.arbitro,
+      penalty: p.ultimoPenal || null,
     };
     s.partido = null;
-
-    if (Math.random() < 0.25) {
-      s.pendingMatch.penalty = { side: Math.random() < 0.5 ? 'user' : 'rival', resolved: false, scored: null };
-      s.screen = 'penalty';
-      this.save();
-    } else {
-      this.finalizePendingScore();
-    }
+    // El penal ya no aparece de la nada al terminar: ahora pasa en un minuto
+    // del partido, con su falta y su minuto (ver simularUnMinuto).
+    this.finalizePendingScore();
   },
 
   chooseDecision(optionIndex) {
@@ -5073,9 +5230,16 @@ const Engine = {
       cambios: [],
       jugaron: [],
       ajustes: { lineas: null, ritmo: null },
+      // El árbitro del partido: decide si se van a ver muchas tarjetas o
+      // ninguna (ver ARBITROS).
+      arbitro: this.sortearElArbitro(),
+      rivalesExpulsados: 0,
+      posesionAcumulada: 0,
+      minutosDePosesion: 0,
+      penal: null,
       stats: {
-        mias: { remates: 0, corners: 0, faltas: 0, amarillas: 0 },
-        suyas: { remates: 0, corners: 0, faltas: 0, amarillas: 0 },
+        mias: { remates: 0, corners: 0, faltas: 0, amarillas: 0, rojas: 0, penales: 0 },
+        suyas: { remates: 0, corners: 0, faltas: 0, amarillas: 0, rojas: 0, penales: 0 },
       },
     };
     s.screen = 'partido';
@@ -5116,7 +5280,11 @@ const Engine = {
   // porque el que pateó la mandó a la tribuna.
   resolvePenalty(direction, shooterOrKeeper) {
     const s = this.state;
-    const pen = s.pendingMatch.penalty;
+    // El penal puede ser uno del partido en curso (pasa en un minuto, frena
+    // el juego y después se sigue jugando) o el de una definición. Los dos
+    // se patean igual; lo único que cambia es a dónde va el gol.
+    const enJuego = !!(s.partido && s.partido.penal);
+    const pen = enJuego ? s.partido.penal : s.pendingMatch.penalty;
     const guess = PENALTY_ZONES[Math.floor(Math.random() * PENALTY_ZONES.length)].id;
     let scored;
     let matched;
@@ -5142,6 +5310,28 @@ const Engine = {
     pen.atajadoEnElPalo = matched; // el arquero fue para el lado correcto
     pen.resultado = scored ? 'gol' : (matched ? 'atajada' : 'errado');
 
+    if (enJuego) {
+      const p = s.partido;
+      // Se guarda para que la pantalla de resultado pueda contar cómo fue
+      // (la cinemática ya pasó, pero el relato del final la nombra).
+      p.ultimoPenal = { ...pen };
+      if (scored) {
+        if (pen.side === 'user') p.mios += 1; else p.suyos += 1;
+        this.anotarEvento({
+          tipo: 'gol', mio: pen.side === 'user', depenal: true,
+          nombre: pen.side === 'user' ? pen.shooterName : null,
+          id: pen.side === 'user' && shooterOrKeeper ? shooterOrKeeper.id : null,
+        }, pen.minuto);
+      } else {
+        this.anotarEvento({
+          tipo: 'penal', mio: pen.side === 'user', resultado: pen.resultado,
+          nombre: pen.side === 'user' ? pen.shooterName : null,
+        }, pen.minuto);
+      }
+      this.save();
+      return;
+    }
+
     if (scored) {
       const scoringIsHome = (pen.side === 'user') === s.pendingMatch.isHome;
       if (scoringIsHome) s.pendingMatch.homeGoals++;
@@ -5149,6 +5339,16 @@ const Engine = {
     }
 
     this.finalizePendingScore();
+  },
+
+  // Se pateó el penal y el partido sigue. Lo llama la pantalla cuando
+  // termina de mostrar la jugada.
+  seguirDespuesDelPenal() {
+    const s = this.state;
+    if (!s.partido) return;
+    s.partido.penal = null;
+    s.screen = 'partido';
+    this.save();
   },
 
   finalizePendingScore() {
@@ -5294,20 +5494,6 @@ const Engine = {
       }
     });
 
-    // Los que estuvieron en la cancha en ese partido. Si el partido lo jugaste
-    // vos, es el once con el que TERMINÓ (ver cerrarPartidoDelUsuario): los
-    // cambios del entretiempo cuentan. Antes se usaba el once guardado, que es
-    // el de antes de los cambios, y entonces el jugador que habías sacado en
-    // el descanso podía aparecer lesionado o expulsado en el parte médico.
-    const enCancha = (s.pendingMatch && s.pendingMatch.enCancha) || null;
-    const titulares = (enCancha
-      ? enCancha.map((id) => s.squad.find((p) => p.id === id))
-      : this.getStartingXI().starters.map((entry) => s.squad.find((p) => p.id === entry.id))
-    ).filter((p) => p && this.isAvailable(p));
-    if (!titulares.length) return avisos;
-
-    const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
-
     // Las lesiones NO se sortean acá: pasan en un minuto del partido, frenan el
     // juego y las ves (ver sortearLesionDelMinuto). Lo que llega desde
     // ahí son las notas del parte médico, que se agregan al final.
@@ -5332,19 +5518,19 @@ const Engine = {
       }
     });
 
-    // Expulsiones. Las fechas de una roja directa las gradúa el Tribunal de
-    // Disciplina según la jugada, así que van de 1 a 4; la doble amarilla es
-    // siempre una sola fecha.
-    if (Math.random() < 0.07) {
-      const disponibles = titulares.filter((p) => this.isAvailable(p));
-      if (disponibles.length) {
-        const p = sortear(disponibles);
-        const dobleAmarilla = Math.random() < 0.5;
-        const matches = dobleAmarilla ? 1 : 1 + Math.floor(Math.random() * 4);
-        p.out = { reason: 'suspensión', detail: dobleAmarilla ? 'Doble amarilla' : 'Expulsado', matches };
-        avisos.push({ tono: 'malo', texto: `${p.name} ${dobleAmarilla ? 'se fue por doble amarilla' : 'se fue expulsado'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.` });
-      }
-    }
+    // Expulsiones. Ya NO se sortean acá: el que se fue, se fue en la cancha y
+    // lo viste irse (ver expulsar). Acá solo se cumple la sanción. Las fechas
+    // de una roja directa las gradúa el Tribunal de Disciplina según la
+    // jugada, así que van de 1 a 4; la doble amarilla es siempre una sola.
+    ((s.pendingMatch && s.pendingMatch.eventos) || [])
+      .filter((e) => e.tipo === 'roja' && e.mio && e.id)
+      .forEach((ev) => {
+        const p = s.squad.find((x) => x.id === ev.id);
+        if (!p) return;
+        const matches = ev.doble ? 1 : 1 + Math.floor(Math.random() * 4);
+        p.out = { reason: 'suspensión', detail: ev.doble ? 'Doble amarilla' : 'Expulsado', matches };
+        avisos.push({ tono: 'malo', texto: `${p.name} ${ev.doble ? 'se fue por doble amarilla' : 'se fue expulsado'}: no puede jugar ${matches === 1 ? 'el próximo partido' : `los próximos ${matches} partidos`}.` });
+      });
 
     // Si alguno de los que quedó afuera era titular, el hueco se cubre solo.
     this.repairStartingSlots();

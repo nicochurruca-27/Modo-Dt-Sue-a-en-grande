@@ -85,10 +85,21 @@ abrir seguís donde quedaste.
     momento, así que adelantar el equipo cuando te empatan a los 75 cambia lo
     que queda por jugar.
   - El partido **frena solo** en el entretiempo (el vestuario de siempre: cómo
-    viene, quién está amonestado y qué hacés con el segundo tiempo) y en el
-    minuto de una lesión, para que decidas el cambio vos. El árbitro pita al
-    arrancar cada tiempo y al final. Al terminar, la pantalla de resultado
-    muestra la planilla del partido —goles, tarjetas, lesiones y cambios—.
+    viene, quién está amonestado y qué hacés con el segundo tiempo), en el
+    minuto de una lesión —para que decidas el cambio vos— y **cuando hay un
+    penal**, que se patea ahí mismo, con su minuto, y después el partido
+    sigue. El árbitro pita al arrancar cada tiempo y al final.
+  - **Cada partido tiene su árbitro** y eso cambia el clima: con uno que deja
+    jugar podés terminar sin una sola amarilla y con un tarjetero volás por el
+    aire. Medido sobre 400 partidos: 8% de los partidos sin ninguna tarjeta,
+    la mayoría entre una y cuatro, y alguno que se le va de las manos con diez
+    o más. **Las expulsiones pasan en la cancha** —doble amarilla o roja
+    directa—: el que se va deja el hueco, no se puede reemplazar y el equipo
+    juega el resto con uno menos, que se siente en los dos arcos. Si al rival
+    lo dejan con diez, también.
+  - Al terminar, la pantalla de resultado muestra la planilla —goles,
+    tarjetas, lesiones y cambios— y **las estadísticas del partido**, posesión
+    incluida.
 - **El presupuesto de sueldos se renegocia cada temporada.** El plantel se
   encarece solo con los años (un jugador en su mejor momento cobra más que el
   mismo pibe hace tres temporadas), así que un presupuesto fijo condenaba a
