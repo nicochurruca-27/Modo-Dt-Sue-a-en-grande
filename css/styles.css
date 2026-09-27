@@ -2105,3 +2105,6 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 /* En la pantalla de inicio los dos botones van centrados y discretos. */
 .inicio .partida-archivo { justify-content: center; margin-top: 14px; }
 .inicio .partida-aviso { text-align: center; }
+
+/* El interruptor del sonido, en la misma fila que exportar/importar. */
+.sonido-btn { min-width: 8.5em; }

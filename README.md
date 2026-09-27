@@ -487,6 +487,9 @@ index.html     → esqueleto de la página y el orden en que se cargan los scrip
 css/styles.css → estilos visuales
 js/data.js    → "contenido" del juego: los 66 clubes, nombres de jugadores
                 por país, decisiones posibles
+js/audio.js   → los sonidos, hechos con osciladores en el momento (no hay
+                ni un archivo de audio en el proyecto): el clic de los
+                botones, el silbato del árbitro, el gol y las noticias
 js/state.js   → la partida guardada: qué hay adentro, cómo se guarda sola en
                 el navegador, y exportarla/importarla como archivo para
                 llevarla del celular a la computadora

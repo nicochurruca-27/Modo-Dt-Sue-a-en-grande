@@ -136,6 +136,7 @@ function render() {
   renderSquadPanel();
   renderMarketPanel();
   wireBotonesDePartida();
+  sonarSegunLaPantalla();
   const endCareerBtn = document.getElementById('end-career-btn');
   if (endCareerBtn) {
     endCareerBtn.addEventListener('click', () => {
@@ -2091,6 +2092,48 @@ function paredDeEscudosHtml() {
   `;
 }
 
+// ---------- Cuándo suena cada cosa ----------
+//
+// El clic de los botones va acá, en un solo lugar: engancharlo botón por
+// botón sería imposible de mantener (el juego redibuja la pantalla entera en
+// cada paso y crea botones nuevos todo el tiempo). Un oyente en el documento
+// que mira si lo que tocaste es un botón alcanza y sobra.
+document.addEventListener('click', (e) => {
+  const boton = e.target && e.target.closest ? e.target.closest('button') : null;
+  if (boton && !boton.disabled) Sonido.playClick();
+});
+
+// El silbato y el gol salen de mirar cómo cambia la pantalla, que es el único
+// lugar por el que pasa TODO el juego. Así no hay que acordarse de tocar el
+// sonido cada vez que se agrega una pantalla nueva.
+let ultimoSonido = { pantalla: null, goles: 0 };
+
+function golesMiosAhora(s) {
+  if (s.partido) return s.partido.mios || 0;
+  const m = s.pendingMatch;
+  if (!m) return 0;
+  return m.isHome ? m.homeGoals : m.awayGoals;
+}
+
+function sonarSegunLaPantalla() {
+  const s = Engine.state;
+  if (!s) return;
+  const pantalla = pantallaDeInicio ? 'inicio' : s.screen;
+  const antes = ultimoSonido.pantalla;
+  const goles = golesMiosAhora(s);
+
+  if (pantalla !== antes) {
+    // Arranca el partido: los dos pitidos del árbitro.
+    if (antes === 'pre-match' && (pantalla === 'entretiempo' || pantalla === 'lesion')) Sonido.playWhistle();
+    // Y el pitido largo del final.
+    else if (pantalla === 'match-result' && antes && antes !== 'match-result') Sonido.playWhistle(true);
+  }
+  // Un gol es un gol: en el primer tiempo, en el segundo o de penal.
+  if (goles > ultimoSonido.goles) Sonido.playGoal();
+
+  ultimoSonido = { pantalla, goles };
+}
+
 // ---------- Llevar la partida de un aparato a otro ----------
 //
 // El guardado vive en el navegador de cada aparato: la carrera del celular no
@@ -2110,6 +2153,7 @@ function botonesDePartidaHtml(conImportar = true) {
   avisoDePartida = null;
   return `
     <div class="partida-archivo">
+      <button class="option-btn small ghost sonido-btn" id="sonido-btn" aria-pressed="${Sonido.activo}">${Sonido.activo ? '🔊 Sonido: ON' : '🔇 Sonido: OFF'}</button>
       <button class="option-btn small ghost" id="exportar-partida-btn" ${hayCarrera ? '' : 'disabled'}>Exportar partida</button>
       ${conImportar ? '<button class="option-btn small ghost" id="importar-partida-btn">Importar partida</button>' : ''}
       <input type="file" id="importar-partida-input" accept="application/json,.json" hidden />
@@ -2119,6 +2163,20 @@ function botonesDePartidaHtml(conImportar = true) {
 }
 
 function wireBotonesDePartida() {
+  const sonido = document.getElementById('sonido-btn');
+  if (sonido) {
+    sonido.addEventListener('click', () => {
+      const prendido = Sonido.alternar();
+      // Se repinta el botón a mano y no con render(): apretar "sonido" no
+      // tiene por qué redibujar media pantalla.
+      sonido.textContent = prendido ? '🔊 Sonido: ON' : '🔇 Sonido: OFF';
+      sonido.setAttribute('aria-pressed', String(prendido));
+      document.querySelectorAll('#sonido-btn').forEach((b) => {
+        b.textContent = sonido.textContent;
+        b.setAttribute('aria-pressed', String(prendido));
+      });
+    });
+  }
   const exportar = document.getElementById('exportar-partida-btn');
   if (exportar) {
     exportar.addEventListener('click', () => {
@@ -2204,6 +2262,7 @@ function renderInicio() {
   const borrar = document.getElementById('inicio-borrar-btn');
   if (borrar) borrar.addEventListener('click', () => { Engine.resetGame(); entrar(); });
   wireBotonesDePartida();
+  sonarSegunLaPantalla();
 }
 
 function renderDTCreate() {
@@ -2649,7 +2708,15 @@ function arrancarLosDias() {
     relojDelAlmanaque = null;
     // Si mientras tanto se cambió de pantalla, no se toca nada más.
     if (!Engine.state || Engine.state.screen !== 'calendar') { render(); return; }
+    const noticiasAntes = (Engine.state.noticias || []).length;
     if (Engine.avanzarUnDia() === 'frena') { volverALaPestaniaDelPartido(); render(); return; }
+    // Si en ese día salió una noticia que te toca, suena: las destacadas y
+    // cualquiera que hable de tu club. Las otras (que Independiente fichó a
+    // Fulano) no: con los días corriendo a tres por segundo sería un
+    // teletipo. Igual, adentro de playNews hay un freno de un segundo y pico.
+    const noticias = Engine.state.noticias || [];
+    const nueva = noticias.length > noticiasAntes ? noticias[0] : null;
+    if (nueva && (nueva.destacada || nueva.clubId === Engine.state.clubId)) Sonido.playNews();
     const fecha = document.getElementById('calendar-fecha');
     if (!fecha) { render(); return; }
     fecha.textContent = formatCalendarDate(Engine.state.calendar.dayCount);
@@ -3229,6 +3296,11 @@ function animatePenaltyResult(side) {
     const [texto, clase] = carteles[resultado];
     banner.textContent = texto;
     banner.className = `goal-result-banner show ${clase}`;
+    // El sonido va con el cartel y no con el render de después: el gol se
+    // escucha cuando la pelota entra. Se anota el marcador para que el
+    // render que viene no lo vuelva a tocar.
+    if (resultado === 'gol') Sonido.playGoal();
+    ultimoSonido.goles = golesMiosAhora(Engine.state);
   }, 650);
 
   setTimeout(() => { render(); }, 2000);
