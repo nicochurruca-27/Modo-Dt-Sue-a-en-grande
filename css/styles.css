@@ -2269,7 +2269,7 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 .feed-vivo li.suyo { border-left-color: rgba(248, 113, 113, 0.65); }
 .feed-vivo li.neutro { color: var(--muted); }
 .feed-vivo li.ev-gol { font-size: 0.95rem; }
-.feed-vivo li.ev-remate, .feed-vivo li.ev-corner, .feed-vivo li.ev-falta { opacity: 0.72; }
+.feed-vivo li.ev-corner, .feed-vivo li.ev-falta { opacity: 0.72; }
 
 .feed-vivo .minuto { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 32px; }
 .feed-vivo .icono { flex: 0 0 auto; }

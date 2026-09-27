@@ -72,9 +72,12 @@ abrir seguís donde quedaste.
 - **Los partidos se juegan minuto a minuto.** Antes un partido era un botón:
   apretabas y salía el resultado entero. Ahora corre el reloj del 1' al 90',
   **a la velocidad que elijas** (1x, 2x, 5x o Instantáneo), con la barra de
-  tiempo, el marcador, las estadísticas de los dos (remates, córners, faltas,
-  amarillas) y **el relato en vivo**: cada gol con su autor, los remates, los
-  tiros de esquina, las faltas, las tarjetas y las lesiones, con su minuto.
+  tiempo, el marcador, la posesión, las estadísticas de los dos (remates,
+  córners, faltas, tarjetas) y **el relato en vivo**, con su minuto: los goles
+  con su autor, las tarjetas, las lesiones, los penales y las ocasiones —la
+  que atajó el arquero, la que pegó en el palo—. Los córners y las faltas se
+  cuentan en la planilla pero no van al relato: un renglón cada dos minutos
+  tapa lo que importa.
   - **Metés mano cuando querés.** Dos pares de botones de ajuste al vuelo
     —*adelantar líneas* o *autobús atrás*, *jugar de contra* o *posesión
     paciente*—, el esquema (se puede cambiar en cualquier minuto, y no rearma

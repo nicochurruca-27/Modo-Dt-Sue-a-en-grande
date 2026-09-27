@@ -3668,6 +3668,8 @@ function cablearLosAjustes() {
 const ICONO_DEL_EVENTO = {
   gol: '⚽', amarilla: '🟨', roja: '🟥', lesion: '🏥', remate: '🎯',
   corner: '🚩', falta: '✋', cambio: '🔁', silbato: '⏱️', penal: '🥅',
+  // (córner y falta ya no se generan: quedan por si hay un partido a medio
+  // jugar guardado de antes)
 };
 
 function textoDelEvento(e) {
@@ -3676,7 +3678,9 @@ function textoDelEvento(e) {
     case 'gol': return e.mio
       ? `<strong>¡Gol${e.depenal ? ' de penal' : ''}!</strong> ${quien || 'Lo empujó cualquiera'}`
       : `Gol ${e.depenal ? 'de penal ' : ''}del rival${quien ? ` — ${quien}` : ''}`;
-    case 'remate': return `Remate ${e.detalle || 'al arco'}${quien ? ` de ${quien}` : ''}`;
+    case 'remate': return ocasionHtml(e);
+    // Los córners y las faltas ya no van al relato (están en la planilla),
+    // pero un partido guardado a mitad de camino puede traerlos.
     case 'corner': return `Tiro de esquina ${e.mio ? 'a favor' : 'para el rival'}`;
     case 'falta': return `Falta${quien ? ` de ${quien}` : e.mio ? ' tuya' : ' del rival'}`;
     case 'amarilla': return `Amarilla${quien ? ` para ${quien}` : ''}`;
@@ -3691,6 +3695,29 @@ function textoDelEvento(e) {
     case 'silbato': return quien;
     default: return quien || '';
   }
+}
+
+// Las ocasiones: las únicas jugadas sin gol que suben al relato. El texto
+// cambia de lado —tu arquero atajando no se cuenta igual que el de ellos—.
+function ocasionHtml(e) {
+  const quien = e.nombre;
+  const deQuien = quien ? ` de ${quien}` : '';
+  const aQuien = quien ? ` a ${quien}` : '';
+  const mias = {
+    atajada: `Se la tapó el arquero${aQuien}`,
+    palo: `¡Al palo! El remate${deQuien}`,
+    rozando: `Se fue rozando el palo el remate${deQuien}`,
+    corner: `Remate${deQuien}: el arquero la manda al córner`,
+  };
+  const suyas = {
+    atajada: `Atajó tu arquero el remate${deQuien}`,
+    palo: `¡Le pegó en el palo${aQuien}!`,
+    rozando: `Se fue cerca el remate${deQuien}`,
+    corner: `Tu arquero manda al córner el remate${deQuien}`,
+  };
+  const tabla = e.mio ? mias : suyas;
+  // Un partido viejo puede traer el detalle en texto ("afuera", "tapado").
+  return tabla[e.detalle] || `Remate${deQuien}${e.detalle ? ` ${e.detalle}` : ''}`;
 }
 
 function feedItemHtml(e) {

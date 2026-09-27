@@ -4877,41 +4877,36 @@ const Engine = {
     }
 
     // ---- Lo que no termina en gol ----
-    // El que ataca más patea más y saca más córners: los dos salen del mismo
-    // peligro que los goles, así el feed cuenta el partido que se está
-    // jugando y no un partido cualquiera.
+    //
+    // Los remates, los córners y las faltas se cuentan SIEMPRE: son la
+    // planilla del partido y ahí están los tres. Pero al relato no va todo:
+    // un córner o una falta cada dos minutos tapan lo que importa (el gol,
+    // la amarilla, la lesión, el penal). Así que al feed solo suben las
+    // ocasiones de verdad —la que atajó el arquero, la que pegó en el palo—
+    // y el resto queda en el número de arriba.
+    //
+    // El que ataca más patea más y saca más córners: los tres salen del
+    // mismo peligro que los goles, así la planilla cuenta el partido que se
+    // está jugando y no un partido cualquiera.
     const remates = (lambda) => this.REMATES_BASE + this.REMATES_POR_GOL_ESPERADO * lambda;
     const corners = (lambda) => this.CORNERS_BASE + this.CORNERS_POR_GOL_ESPERADO * lambda;
     const nombreMio = () => {
       const bol = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
       return bol.length ? bol[Math.floor(Math.random() * bol.length)].name : null;
     };
+    const unRemate = (mio, quien) => {
+      this.sumarEstadistica(mio, 'remates');
+      if (Math.random() > this.REMATES_QUE_SON_OCASION) return;
+      const como = this.OCASIONES[Math.floor(Math.random() * this.OCASIONES.length)];
+      anotar({ tipo: 'remate', mio, nombre: quien, detalle: como });
+    };
 
-    if (!golMio && Math.random() < porMinuto(remates(peligro.mia))) {
-      this.sumarEstadistica(true, 'remates');
-      anotar({ tipo: 'remate', mio: true, nombre: nombreMio(), detalle: this.COMO_TERMINO_EL_REMATE[Math.floor(Math.random() * this.COMO_TERMINO_EL_REMATE.length)] });
-    }
-    if (!golSuyo && Math.random() < porMinuto(remates(peligro.suya))) {
-      this.sumarEstadistica(false, 'remates');
-      anotar({ tipo: 'remate', mio: false, nombre: unRival(rivalArriba), detalle: this.COMO_TERMINO_EL_REMATE[Math.floor(Math.random() * this.COMO_TERMINO_EL_REMATE.length)] });
-    }
-    if (Math.random() < porMinuto(corners(peligro.mia))) {
-      this.sumarEstadistica(true, 'corners');
-      anotar({ tipo: 'corner', mio: true });
-    }
-    if (Math.random() < porMinuto(corners(peligro.suya))) {
-      this.sumarEstadistica(false, 'corners');
-      anotar({ tipo: 'corner', mio: false });
-    }
-    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) {
-      this.sumarEstadistica(true, 'faltas');
-      const quien = enCancha.length ? enCancha[Math.floor(Math.random() * enCancha.length)] : null;
-      anotar({ tipo: 'falta', mio: true, nombre: quien ? quien.name : null });
-    }
-    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) {
-      this.sumarEstadistica(false, 'faltas');
-      anotar({ tipo: 'falta', mio: false, nombre: unRival(delRival) });
-    }
+    if (!golMio && Math.random() < porMinuto(remates(peligro.mia))) unRemate(true, nombreMio());
+    if (!golSuyo && Math.random() < porMinuto(remates(peligro.suya))) unRemate(false, unRival(rivalArriba));
+    if (Math.random() < porMinuto(corners(peligro.mia))) this.sumarEstadistica(true, 'corners');
+    if (Math.random() < porMinuto(corners(peligro.suya))) this.sumarEstadistica(false, 'corners');
+    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) this.sumarEstadistica(true, 'faltas');
+    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) this.sumarEstadistica(false, 'faltas');
 
     // ---- Las tarjetas ----
     // Se cuentan por jugador, como siempre; la suspensión a la quinta se
@@ -4989,7 +4984,10 @@ const Engine = {
     return { minuto, eventos: nuevos.filter(Boolean), corte };
   },
 
-  COMO_TERMINO_EL_REMATE: ['al arco', 'afuera', 'tapado', 'al palo', 'desviado'],
+  // De cada tres remates, uno es de los que hacen levantar a la gente. Esos
+  // son los que aparecen en el relato; los otros dos se cuentan y nada más.
+  REMATES_QUE_SON_OCASION: 0.34,
+  OCASIONES: ['atajada', 'palo', 'rozando', 'corner'],
 
   // Uno menos. A diferencia de la lesión, acá NO hay reemplazo: el casillero
   // queda vacío hasta el final y el equipo juega con diez (o con nueve). La
