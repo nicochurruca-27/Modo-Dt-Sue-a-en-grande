@@ -2315,3 +2315,33 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   border-radius: 999px;
   transition: width 0.3s linear;
 }
+
+/* La tabla de promedios: cinco columnas en un panel de 250 píxeles, así que
+   hay que apretar. El promedio va con tres decimales, en números tabulares
+   para que el punto caiga en la misma vertical en todas las filas, y es lo
+   único que no se puede achicar: el nombre del club se corta antes. */
+.tabla-promedios { table-layout: fixed; }
+
+.tabla-promedios th, .tabla-promedios td { padding: 4px 3px; font-size: 0.8em; }
+
+.tabla-promedios th:first-child, .tabla-promedios td:first-child { width: 22px; }
+.tabla-promedios th:nth-child(3), .tabla-promedios td:nth-child(3) { width: 24px; }
+.tabla-promedios th:nth-child(4), .tabla-promedios td:nth-child(4) { width: 30px; }
+.tabla-promedios th:last-child, .tabla-promedios td:last-child { width: 44px; }
+
+/* El nombre largo se corta con puntos suspensivos en vez de empujar la
+   columna del promedio fuera del panel. */
+.tabla-promedios .col-club { min-width: 0; }
+.tabla-promedios .table-club { gap: 5px; }
+.tabla-promedios .table-club-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabla-promedios .col-promedio {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}

@@ -1436,25 +1436,115 @@ const Engine = {
   // Solo entran los puntos de las fases regulares del Apertura y el Clausura
   // (32 partidos por año). Los playoffs, la Copa Argentina y las copas
   // internacionales no cuentan.
+  // Cuántas temporadas entran en la cuenta, contando la que se está jugando.
+  TEMPORADAS_DEL_PROMEDIO: 3,
+
+  // ---------- Cómo se guarda ----------
+  //
+  // En la partida vive UNA sola cosa: `s.historialPuntos`, un array por club
+  // con las temporadas TERMINADAS, cada una con el año en que se jugó:
+  //
+  //   historialPuntos: { boca: [{ pts: 58, pj: 32, temporada: 1 }, ...] }
+  //
+  // Los puntos de la temporada EN CURSO no se copian acá. Ya están en la
+  // Tabla Anual, que se arma de las tablas de zona, y tener el mismo número
+  // en dos lugares termina siempre igual: uno de los dos se desincroniza y
+  // aparece un bug imposible de encontrar. La tabla de promedios los suma al
+  // vuelo (ver tablaDePromedios). Para ver el desglose de un club como lo
+  // pide la pantalla está historialDePromedios().
   registrarTemporadaEnHistorial(tablaAnual) {
     const s = this.state;
     s.historialPuntos = s.historialPuntos || {};
+    const temporada = (s.season && s.season.year) || 1;
     tablaAnual.forEach((row) => {
-      const previas = s.historialPuntos[row.id] || [];
-      s.historialPuntos[row.id] = previas.concat([{ pts: row.pts, pj: row.played }]).slice(-3);
+      const previas = (s.historialPuntos[row.id] || []).filter((x) => x.temporada !== temporada);
+      s.historialPuntos[row.id] = previas
+        .concat([{ pts: row.pts, pj: row.played, temporada }])
+        .slice(-this.TEMPORADAS_DEL_PROMEDIO);
     });
+    // Queda marcado que la temporada en curso ya entró al historial, para
+    // que la tabla no la cuente dos veces entre que termina el año y
+    // arranca el siguiente.
+    if (s.season) s.season.enElHistorial = true;
   },
 
-  tablaDePromedios(tablaAnual) {
+  // Las temporadas terminadas de un club que todavía cuentan: las de la
+  // ventana de tres años. Un club que estuvo cinco años en la Nacional
+  // vuelve con el historial vacío —esas campañas viejas ya no cuentan— y el
+  // promedio se le calcula solo con lo que juegue de acá en adelante, que es
+  // como funciona de verdad.
+  temporadasQueCuentan(clubId, hastaTemporada) {
     const historial = (this.state && this.state.historialPuntos) || {};
-    return tablaAnual
+    const s = this.state;
+    const actual = hastaTemporada || (s.season && s.season.year) || 1;
+    const yaEsta = !!(s.season && s.season.enElHistorial);
+    // La ventana son tres años contando el actual; si el año en curso ya se
+    // guardó, la ventana es la misma pero termina en él.
+    const desde = actual - (this.TEMPORADAS_DEL_PROMEDIO - 1);
+    return (historial[clubId] || [])
+      .filter((x) => (x.temporada === undefined ? true : x.temporada >= desde && x.temporada <= actual))
+      .slice(-(yaEsta ? this.TEMPORADAS_DEL_PROMEDIO : this.TEMPORADAS_DEL_PROMEDIO - 1));
+  },
+
+  // El desglose de un club, tal como se lee: lo que lleva este año y las
+  // temporadas anteriores que todavía pesan.
+  historialDePromedios(clubId) {
+    const anual = this.tablaAnualRows() || [];
+    const fila = anual.find((r) => r.id === clubId);
+    const yaEsta = !!(this.state.season && this.state.season.enElHistorial);
+    return {
+      ptsTemporadaActual: yaEsta || !fila ? 0 : fila.pts,
+      pjTemporadaActual: yaEsta || !fila ? 0 : fila.played,
+      temporadasAnteriores: this.temporadasQueCuentan(clubId).map((x) => ({ pts: x.pts, pj: x.pj })),
+    };
+  },
+
+  // La tabla de promedios de la temporada que se está jugando. Es la que
+  // mira la pantalla y la misma que decide el descenso a fin de año.
+  obtenerTablaPromedios() {
+    return this.tablaDePromedios(this.tablaAnualRows());
+  },
+
+  // Suma las temporadas anteriores que cuentan más lo que va del año y
+  // divide. Ordena de mayor a menor promedio; si dos empatan, adelante va el
+  // que tiene mejor diferencia de gol en la temporada actual.
+  tablaDePromedios(tablaAnual) {
+    const yaEsta = !!(this.state.season && this.state.season.enElHistorial);
+    // La tabla existe desde el día cero, antes de que se juegue una sola
+    // fecha: ahí son los dos años anteriores y nada más. Por eso la base son
+    // los clubes de Primera y no las filas de la Anual, que en enero todavía
+    // no tiene ninguna.
+    const filas = (tablaAnual && tablaAnual.length ? tablaAnual : []).slice();
+    if (!yaEsta) {
+      // Solo mientras la temporada está en juego. Cuando ya se cerró, la
+      // tabla es la de los que la jugaron: entre el cierre y el arranque del
+      // año siguiente los ascendidos ya figuran en Primera, y meterlos acá
+      // los mostraría últimos con 0.000 pisando al que de verdad se fue al
+      // descenso.
+      const puestos = new Set(filas.map((r) => r.id));
+      (this.state.clubs || [])
+        .filter((c) => c.division === 'D1' && !puestos.has(c.id))
+        .forEach((c) => filas.push({ id: c.id, name: c.name, pts: 0, played: 0, gf: 0, ga: 0 }));
+    }
+    if (!filas.length) return [];
+    return filas
       .map((row) => {
-        const temporadas = historial[row.id] || [];
-        const pts = temporadas.reduce((t, x) => t + x.pts, 0);
-        const pj = temporadas.reduce((t, x) => t + x.pj, 0);
-        return { id: row.id, name: row.name, pts, pj, temporadas: temporadas.length, promedio: pj ? pts / pj : 0 };
+        const anteriores = this.temporadasQueCuentan(row.id);
+        let pts = anteriores.reduce((t, x) => t + x.pts, 0);
+        let pj = anteriores.reduce((t, x) => t + x.pj, 0);
+        // Lo que va de este año, salvo que ya esté guardado en el historial.
+        if (!yaEsta) { pts += row.pts; pj += row.played; }
+        return {
+          id: row.id,
+          name: row.name,
+          pts,
+          pj,
+          temporadas: anteriores.length + (yaEsta ? 0 : 1),
+          dg: row.gf - row.ga,
+          promedio: pj ? pts / pj : 0,
+        };
       })
-      .sort((a, b) => b.promedio - a.promedio);
+      .sort((a, b) => b.promedio - a.promedio || b.dg - a.dg || b.pts - a.pts);
   },
 
   // Al arrancar una carrera nadie tiene historial, así que la tabla de
@@ -1466,11 +1556,16 @@ const Engine = {
   sembrarHistorialDePromedios() {
     const s = this.state;
     s.historialPuntos = {};
+    // La carrera arranca en la temporada 1, así que las dos inventadas son
+    // la 0 y la -1: quedan adentro de la ventana de tres años y se caen
+    // solas a medida que pasen las temporadas de verdad.
     s.clubs.filter((c) => c.division === 'D1').forEach((club) => {
       const temporadas = [];
-      for (let i = 0; i < 2; i++) {
+      for (let i = 2; i >= 1; i--) {
+        // Un grande arranca cerca de 1,7 puntos por partido y uno chico
+        // cerca de 1,1: el mismo reparto que tiene la tabla de verdad.
         const porPartido = 0.95 + club.reputation * 0.19 + (Math.random() * 0.3 - 0.15);
-        temporadas.push({ pts: Math.round(Math.max(0.6, porPartido) * 32), pj: 32 });
+        temporadas.push({ pts: Math.round(Math.max(0.6, porPartido) * 32), pj: 32, temporada: 1 - i });
       }
       s.historialPuntos[club.id] = temporadas;
     });

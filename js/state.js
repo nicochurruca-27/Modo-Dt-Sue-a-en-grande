@@ -30,6 +30,8 @@
 //   mercado           negociaciones, acuerdos y fichados
 //   cedidos           los que están a préstamo en otro club
 //   noticias          el portal de noticias
+//   historialPuntos   los puntos y partidos de las temporadas terminadas de
+//                     cada club, para la tabla de promedios
 //   log               el historial de resultados
 //   stats             partidos, goles y asistencias de cada jugador tuyo
 //   confianza         lo que piensa la dirigencia de vos
@@ -37,6 +39,37 @@
 //
 // Lo que NO se guarda: nada que se pueda volver a calcular (la fuerza de los
 // planteles rivales, por ejemplo, que sale de un generador sembrado).
+//
+// ---------- El historial de los promedios ----------
+//
+// El descenso de Primera se define por promedio: puntos sobre partidos de
+// las últimas TRES temporadas, la que se está jugando incluida. Para eso
+// hace falta acordarse de lo que pasó antes, y eso es `historialPuntos`: un
+// array por club con las temporadas TERMINADAS, cada una con el año.
+//
+//   historialPuntos: {
+//     boca:  [{ pts: 58, pj: 32, temporada: 0 }, { pts: 61, pj: 32, temporada: 1 }],
+//     union: [{ pts: 37, pj: 32, temporada: 0 }, { pts: 34, pj: 32, temporada: 1 }],
+//   }
+//
+// Los puntos de la temporada EN CURSO no están acá a propósito: ya viven en
+// las tablas de zona (de donde sale la Tabla Anual) y guardar el mismo
+// número en dos lados termina siempre con los dos números distintos. El
+// motor los suma al vuelo cuando arma la tabla; si lo que se quiere es el
+// desglose de un club —lo que lleva este año y lo que arrastra— está
+// `Engine.historialDePromedios(clubId)`, que devuelve:
+//
+//   { ptsTemporadaActual, pjTemporadaActual, temporadasAnteriores: [{ pts, pj }] }
+//
+// Al empezar una carrera nadie tiene pasado, así que la tabla de promedios
+// sería igual a la Anual y el descenso por promedio no significaría nada
+// hasta la tercera temporada. Por eso `Engine.sembrarHistorialDePromedios()`
+// inventa dos temporadas previas verosímiles para cada club de Primera,
+// sacadas de su reputación: un grande arranca con colchón y un chico
+// arranca comprometido desde la fecha 1.
+//
+// Cuando una temporada termina, `Engine.registrarTemporadaEnHistorial()` la
+// guarda y la ventana de tres años deja caer sola a la más vieja.
 
 const SAVE_KEY = 'dt-simulador-save-v3';
 

@@ -197,6 +197,15 @@ abrir seguís donde quedaste.
   fase de zonas del Apertura y la del Clausura (los playoffs no suman
   puntos) y se va actualizando fecha a fecha. Marca con colores los puestos
   de Libertadores, Sudamericana y descenso.
+- **Promedios**: la otra pestaña de Primera, y la que define el descenso.
+  Puntos sobre partidos de las **últimas tres temporadas**, contando lo que
+  va de esta, con tres decimales (`1.428`) como se publica. El último está
+  marcado en rojo: es el que hoy se va a la Primera Nacional. Está viva
+  desde la fecha 1 porque al empezar una carrera cada club de Primera
+  arranca con dos temporadas anteriores inventadas a partir de su
+  reputación: un grande arranca con colchón y un chico arranca comprometido.
+  A un recién ascendido no se le cuentan ceros por los años que estuvo en la
+  Nacional: se le divide solo por los partidos que jugó en Primera.
 - **Copa Argentina**: al arrancar el año se sortea un cuadro de 32 (los 30
   clubes de Primera + 2 de la Nacional, garantizando que tu club esté
   adentro) y se juega en paralelo al Apertura (o al único torneo de la
@@ -308,13 +317,13 @@ abrir seguís donde quedaste.
   siguientes de la Tabla Anual). Si un mismo club gana más de un título, el
   cupo que libera se reparte corriendo la Tabla Anual hacia abajo. Un campeón
   que además desciende conserva igual su cupo, como en la realidad.
-- **Ascensos y descensos** (a fin de año, 2 de cada): en Primera descienden
-  los dos últimos de la Tabla Anual; en la Nacional ascienden el ganador de
-  una Final directa entre los líderes de cada zona, y el ganador de un
-  Torneo Reducido (2º a 8º de cada zona + el perdedor de la Final).
-  En la realidad el segundo descenso sale de la tabla de promedios de las
-  últimas 3 temporadas: acá se usan los dos últimos de la Anual a propósito,
-  para no arrastrar una segunda tabla con el historial de cada club.
+- **Ascensos y descensos** (a fin de año, 2 de cada): en Primera baja el
+  **último de la tabla de promedios** y, aparte, el último de la **Tabla
+  Anual** que no sea ese mismo —si el peor promedio es además el último de
+  la Anual no baja dos veces: el segundo descenso se lo lleva el anteúltimo
+  de la Anual—. En la Nacional ascienden el ganador de una Final directa
+  entre los líderes de cada zona, y el ganador de un Torneo Reducido (2º a
+  8º de cada zona + el perdedor de la Final).
 - **Mercado de pases**: hay dos ventanas por año. Una al terminar el
   Apertura, y otra de pretemporada al terminar el Clausura, cuando ya sabés
   en qué categoría vas a jugar. (La Nacional tiene la de pretemporada y otra

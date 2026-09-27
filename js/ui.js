@@ -227,6 +227,51 @@ function anualTableBody() {
   `;
 }
 
+// ---------- La tabla de promedios ----------
+//
+// La tabla que mira todo el mundo de marzo en adelante: puntos sobre
+// partidos de las últimas tres temporadas, con tres decimales. El último
+// baja (ver Engine.obtenerTablaPromedios y finishMyDivisionYear).
+function promedioFormateado(n) {
+  // Siempre tres decimales, como se publica: 1.428, no 1.43 ni 1.4.
+  return (Math.round(n * 1000) / 1000).toFixed(3);
+}
+
+function filaDePromedioHtml(row, index, ultimo) {
+  const s = Engine.state;
+  const clases = [row.id === s.clubId ? 'me' : '', ultimo ? 'zone-desc' : ''].filter(Boolean).join(' ');
+  const club = Engine.getClub(row.id) || row;
+  return `<tr class="${clases}">
+    <td>${index + 1}</td>
+    <td class="col-club" title="${row.name}"><span class="table-club">${clubCrest(club, 18)}<span class="table-club-texto">${row.name}</span></span></td>
+    <td>${row.pj}</td>
+    <td>${row.pts}</td>
+    <td class="col-promedio">${promedioFormateado(row.promedio)}</td>
+  </tr>`;
+}
+
+function renderTablaPromedios() {
+  const tabla = Engine.obtenerTablaPromedios();
+  if (!tabla || !tabla.length) {
+    return '<p class="muted">La tabla de promedios arranca con la primera fecha del Apertura.</p>';
+  }
+  const ultimo = tabla[tabla.length - 1];
+  return `
+    <p class="muted">Puntos sobre partidos de las últimas tres temporadas, contando lo que va de esta. Solo suma la fase de zonas.</p>
+    <div class="table-wrap">
+      <table class="table compact tabla-promedios">
+        <thead><tr><th>#</th><th class="col-club">Club</th><th>PJ</th><th>Pts</th><th>Prom.</th></tr></thead>
+        <tbody>
+          ${tabla.map((r, i) => filaDePromedioHtml(r, i, i === tabla.length - 1)).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${tableLegend([{ zone: 'desc', text: 'Zona de descenso por promedio' }])}
+    <p class="muted"><strong>${ultimo.name}</strong> es el que hoy se va a la Primera Nacional por promedio. El segundo descenso lo define la Tabla Anual.</p>
+    <p class="muted">A un recién ascendido no se le cuentan ceros por los años en la Nacional: se le divide solo por los partidos que jugó en Primera.</p>
+  `;
+}
+
 // Resultado de la Libertadores y la Sudamericana que se jugaron este año
 // (con los clasificados de la temporada anterior). La primera temporada de
 // una carrera no tiene copas todavía.
@@ -1206,6 +1251,9 @@ function renderTablePanel() {
     // del Clausura, suma los dos. Solo existe en Primera; la Nacional juega un
     // torneo anual único, así que su tabla de zona ya es la del año.
     ...(s.season.myDivision === 'D1' ? [{ id: 'anual', label: 'Anual' }] : []),
+    // Y la de promedios, que es la que manda para el descenso. También es
+    // solo de Primera: en la Nacional bajan los dos últimos de cada zona.
+    ...(s.season.myDivision === 'D1' ? [{ id: 'promedios', label: 'Promedios' }] : []),
   ];
   // Si la pestaña guardada ya no existe (pasa al descender a la Nacional,
   // que no tiene Tabla Anual), se vuelve a la primera.
@@ -1217,6 +1265,8 @@ function renderTablePanel() {
   let body;
   if (tablePanelTab === 'anual') {
     body = anualTableBody();
+  } else if (tablePanelTab === 'promedios') {
+    body = renderTablaPromedios();
   } else if (tablePanelTab.startsWith('copa-')) {
     // Lo del año pasado va plegado y solo en la carpeta de la Copa Argentina,
     // que es la única que está siempre: son siete títulos y, mientras jugás la
@@ -1233,7 +1283,9 @@ function renderTablePanel() {
     body = zonaHtml(myZoneLetter);
   }
 
-  const heading = tablePanelTab === 'anual' ? 'Tabla Anual' : tabs[activeIndex].label;
+  const heading = tablePanelTab === 'anual' ? 'Tabla Anual'
+    : tablePanelTab === 'promedios' ? 'Promedios'
+      : tabs[activeIndex].label;
   tablePanel.innerHTML = `
     <div class="card side-card">
       <div class="panel-tab-switch">
