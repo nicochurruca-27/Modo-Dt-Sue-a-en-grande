@@ -3,7 +3,7 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
-Última revisión: 17/9/2026.
+Última revisión: 27/9/2026.
 
 ---
 
@@ -83,19 +83,25 @@ Los jugadores del usuario ya llevan partidos, goles y asistencias. Falta:
 
 ## 4. El partido minuto a minuto
 
-Está hecho el segundo escalón: el partido se juega en **tramos** (dos tiempos,
-y el tiempo se parte en dos si hay una lesión), genera eventos con minuto y
-autor, frena en el entretiempo y en la lesión, y recalcula con lo que decidís.
-Falta el minuto a minuto de verdad:
+El minuto a minuto está hecho: el reloj corre del 1' al 90' a la velocidad que
+elijas, los eventos salen en el momento (goles, remates, córners, faltas,
+amarillas, lesiones), el peligro de los dos arcos se recalcula en cada minuto
+con el planteo que tengas puesto, y podés cambiar el esquema, tocar los ajustes
+al vuelo y hacer los cambios en cualquier minuto. Lo que falta:
 
-- **Los eventos tienen que salir en el momento**, no sortearse por tramo y
-  después repartirse los minutos. Hay que recorrer los 90 minutos.
-- **Poder intervenir en cualquier momento**: un cambio en el minuto 70, cambiar
-  el esquema cuando te empatan.
 - **Más tipos de evento**: expulsiones en vivo, penales dentro del juego (hoy
-  el penal es una pantalla aparte), palos, ocasiones.
+  el penal es una pantalla aparte), palos, ocasiones claras que no terminan en
+  remate.
+- **La doble amarilla**: hoy un jugador ya amonestado no puede ver otra en el
+  mismo partido, así que no hay expulsión por dos amarillas dentro del juego
+  (la roja se sigue resolviendo al terminar, ver `aplicarBajas`).
+- **Las estadísticas del rival no se guardan** después del partido: remates,
+  córners y faltas viven en `s.partido` y se pierden cuando termina. Para una
+  tabla de estadísticas de la temporada hay que llevarlas a `s.stats`.
 - **Los goles del rival con su autor** ya funcionan para los clubes argentinos.
   Los del continente no tienen plantel cargado y el gol queda a nombre del club.
+- **La posesión** no existe todavía: sería el dato natural para acompañar a
+  "posesión paciente" en el tablero.
 
 ---
 

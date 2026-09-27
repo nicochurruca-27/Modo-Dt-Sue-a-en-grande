@@ -493,13 +493,25 @@ const Engine = {
   // siempre, envejece y evoluciona solo con los años, y NO incluye a los
   // jugadores que vos le compraste. Todo eso ya estaba escrito; lo único que
   // faltaba era que el motor de partido lo mirara.
-  clubStrength(clubId) {
+  // `dia` es el día que tiene ese club: uno bueno o uno malo. Si no se pasa,
+  // se sortea acá (es lo que hace la simulación del resto de la liga, un
+  // partido por llamada). En TU partido no se puede sortear en cada llamada:
+  // el peligro se recalcula minuto a minuto y noventa sorteos se promedian
+  // solos hasta desaparecer, y con ellos la posibilidad de que el rival
+  // tenga un mal día. Por eso el tuyo se sortea una sola vez, al arrancar el
+  // partido, y se guarda en s.partido.diaDelRival.
+  clubStrength(clubId, dia) {
     if (clubId === this.state.clubId) return this.squadStrength();
     const club = this.getClub(clubId);
     if (!club) return 50;
     // El ±3 es la diferencia entre un día bueno y uno malo. Antes era ±5 sobre
     // un número fijo y era lo ÚNICO que separaba dos partidos del mismo club.
-    return this.fuerzaDelPlantel(clubId, club) + (Math.random() * 6 - 3);
+    const suDia = dia === undefined || dia === null ? this.sortearElDiaDelRival() : dia;
+    return this.fuerzaDelPlantel(clubId, club) + suDia;
+  },
+
+  sortearElDiaDelRival() {
+    return Math.random() * 6 - 3;
   },
 
   // El nivel del mejor once posible de un club: el arquero y los diez de campo
@@ -608,6 +620,16 @@ const Engine = {
     const s = this.state;
     const actuales = (s.startingSlots || []).map((e) => e.playerId).filter(Boolean);
     s.formation = id;
+    // Con el partido en juego el esquema se cambia SIN tocar quién está
+    // adentro: los que están se reacomodan y punto. Si hay un hueco (un
+    // lesionado sin reemplazo) el hueco se queda; rellenarlo desde el banco
+    // sería un cambio gratis, y jugar con diez es justamente lo que estás
+    // eligiendo aguantar.
+    if (s.partido) {
+      this.reacomodarElOnce(actuales, true);
+      this.save();
+      return;
+    }
     if (actuales.length === this.slotOrderForFormation(this.currentFormation()).length) {
       this.reacomodarElOnce(actuales);
     } else {
@@ -624,7 +646,7 @@ const Engine = {
   // ya castiga jugar fuera de su posición). Hacerlo casillero por casillero de
   // arriba hacia abajo daba desastres: el primer casillero se llevaba al mejor
   // jugador disponible y al último le quedaba un delantero de lateral.
-  reacomodarElOnce(ids) {
+  reacomodarElOnce(ids, sinRellenar) {
     const s = this.state;
     const formation = this.currentFormation();
     const slotCounts = { POR: 1, DEF: formation.def, MED: formation.med, OFF: formation.off || 0, DEL: formation.del };
@@ -646,7 +668,7 @@ const Engine = {
       usados.add(pi);
     });
     s.startingSlots = casilleros.map((c, ci) => ({ slot: c.slot, playerId: puestos[ci] }));
-    this.repairStartingSlots();
+    if (!sinRellenar) this.repairStartingSlots();
   },
 
   // 'OFF' es la línea de enganches/mediapuntas/extremos entre el mediocampo
@@ -1281,7 +1303,7 @@ const Engine = {
   //
   // Para eso están los dos factores: multiplican el peligro de cada lado por
   // separado. Los usa el partido del usuario con la formación elegida (ver
-  // jugarUnTramo); el resto de la liga los deja en 1 y se simula exactamente
+  // peligroDelPartido); el resto de la liga los deja en 1 y se simula exactamente
   // igual que siempre, porque el factor se aplica DESPUÉS del clamp de
   // siempre y no toca la calibración.
   //
@@ -4404,21 +4426,28 @@ const Engine = {
 
   // ---------- Un partido interactivo (liga, copa o cuadro eliminatorio) ----------
 
-  // ---------- El partido, por tiempos ----------
+  // ---------- El partido, minuto a minuto ----------
   //
-  // Antes un partido era un botón: apretabas y salía el resultado. Ahora se
-  // juega en dos tiempos y en el entretiempo entrás al vestuario: ves cómo
-  // viene, quién hizo los goles y en qué minuto, quién está amonestado, y
-  // decidís si vas a buscarlo o lo aguantás. Ese cambio se juega de verdad en
-  // el segundo tiempo.
+  // Antes un partido era un botón: apretabas y salía el resultado. Después
+  // pasó a jugarse en dos tiempos, con el vestuario en el medio. Ahora corre
+  // el reloj: de 1' a 90', un minuto por vez, con el marcador, la barra de
+  // tiempo y el relato en vivo, y vos podés meter mano en cualquier momento
+  // —un cambio, adelantar las líneas, pasar a cinco defensores— y eso se
+  // juega de verdad en los minutos que quedan.
   //
-  // Es el escalón previo al minuto a minuto: el partido ya sabe partirse y
-  // recalcular a mitad de camino, que es lo que hace falta para después
-  // partirlo en noventa.
-
-  // Cuántas amarillas por titular y por tiempo. Es la mitad de la que había
-  // por partido entero (0,16), así que el total por partido no cambia.
-  AMARILLAS_POR_TIEMPO: 0.08,
+  // Todo el partido vive en `s.partido`, que se guarda con la partida:
+  //
+  //   minuto         en qué minuto va el reloj
+  //   mios / suyos   el marcador
+  //   eventos        el relato, cada uno con su minuto
+  //   stats          remates, córners, faltas y amarillas de cada lado
+  //   tacticMod      lo que decidiste antes del partido y en el vestuario
+  //   riesgoRival    cuánto espacio le estás dejando
+  //   ajustes        los dos botones de ajuste al vuelo
+  //   cambios        los que hiciste (tres por partido)
+  //   jugaron        quiénes pisaron la cancha (para el rodaje y las notas)
+  //   lesion         el que se rompió, mientras decidís qué hacer
+  //   onceAntes      tu once de antes del partido, para devolverlo al final
 
   // Los jugadores del rival, para poder decir quién le hizo el gol. Los clubes
   // del continente no tienen plantel cargado: ahí el gol queda a nombre del
@@ -4432,111 +4461,107 @@ const Engine = {
     }
   },
 
-  // Juega un tiempo y devuelve lo que pasó. `tacticMod` es lo que sumó la
-  // decisión de antes del partido (primer tiempo) o la del vestuario (segundo).
-  // Un tramo de partido, de `desde` a `hasta` (minutos). Un tiempo entero es
-  // un tramo de 45; cuando hay una lesión en el medio, el tiempo se juega en
-  // dos tramos y en el medio decidís el cambio (ver jugarElTiempo).
-  jugarUnTramo(desde, hasta, tacticMod) {
+  // ---------- El peligro de cada arco ----------
+  //
+  // Cuántos goles se esperan de cada lado en NOVENTA minutos, con el planteo
+  // que hay puesto en este momento. De acá salen las dos únicas probabilidades
+  // que mueven el partido, y se vuelve a calcular en cada minuto: si cambiás
+  // la formación o tocás un botón de ajuste, el minuto siguiente ya se juega
+  // distinto.
+  //
+  // La cuenta es exactamente la de antes (fuerza de los planteles + localía,
+  // con la formación y lo que decidís entrando como FACTOR y no como fuerza),
+  // así que la cantidad de goles de una temporada no se mueve por haber
+  // pasado al minuto a minuto.
+  peligroDelPartido() {
     const s = this.state;
     const ctx = s.matchContext;
     const p = s.partido;
     const formacion = this.currentFormation();
     const estilo = this.bonusDeEstiloDeDT();
-    // El ánimo pesa /6 y no /3. Con /3 movía 5 puntos de fuerza —más que
-    // cualquier formación, más que cualquier charla— y como no volvía nunca al
-    // centro, dos respuestas desafortunadas por mes te dejaban un equipo 5
-    // puntos peor durante toda la temporada. Medido: la MISMA carrera con las
-    // mismas decisiones tácticas terminaba 2ª o 13ª según cómo hubieras
-    // contestado en las ruedas de prensa.
+    const plan = this.planDelPartido();
+
     const mia = this.squadStrength() + s.morale / 6;
-    const suya = this.clubStrength(ctx.opponentId);
+    const suya = this.clubStrength(ctx.opponentId, p ? p.diaDelRival : undefined);
     const ventaja = ctx.isNeutral ? 0 : 4;
     const local = ctx.isHome ? mia : suya;
     const visitante = ctx.isHome ? suya : mia;
-    // La formación NO entra por la fuerza del equipo sino por el peligro de
-    // cada lado: lo que te da adelante se lo suma el rival atrás (ver
-    // riesgoDeLaFormacion y simulateScore). Mientras estuvo metida en la
-    // fuerza, pararse con cinco defensores le bajaba el nivel al rival y eso
-    // terminaba haciéndome MÁS peligroso a mí, que es justo lo contrario.
-    // El PESO es cuánto vale cada punto de la formación, y el NEUTRO es la
-    // formación contra la que se mide todo: la 4-3-3 equilibrada (mod 1,
-    // riesgo 1), que es la que usa la mayoría de los clubes. Así el planteo
-    // más común queda en factor 1 y la cantidad de goles de la liga no se
-    // mueve por esto: lo único que cambia es la diferencia entre un planteo y
-    // otro, que es de lo que se trata.
-    // Lo que decidís antes del partido y en el entretiempo va por el mismo
-    // camino que la formación: suma peligro de un lado y del otro, en vez de
-    // hacerte "más fuerte". Mientras eso iba por la fuerza del equipo casi no
-    // se notaba (÷40), y salir a buscar un partido no tenía riesgo real.
+
     const PESO = 0.055;        // cuánto vale cada punto de la formación
     const PESO_CHARLA = 0.06;  // cuánto vale cada punto de lo que decidís
     const NEUTRO = 1;          // la 4-3-3 equilibrada, el planteo más común
     const factorMio = 1
       + ((formacion.mod || 0) + estilo.ataque - NEUTRO) * PESO
-      + (tacticMod || 0) * PESO_CHARLA;
+      + (plan.tacticMod || 0) * PESO_CHARLA;
     const factorSuyo = 1
       + (this.riesgoDeLaFormacion(formacion) + estilo.riesgo - NEUTRO) * PESO
-      + (p.riesgoRival || 0) * estilo.aguante * PESO_CHARLA;
-    // Cuánto del partido se juega en este tramo, y con cuánta gente. Jugar con
-    // uno menos (un lesionado sin reemplazo) pesa de verdad: el equipo rinde
-    // proporcionalmente a los que quedaron en la cancha.
-    const minutos = Math.max(1, hasta - desde);
-    const duracion = minutos / 90;
-    const enCancha = this.getStartingXI().starters
-      .map((e) => s.squad.find((x) => x.id === e.id))
-      .filter(Boolean);
-    // El desgaste se paga a medida que se juega, no al final: por eso en el
-    // entretiempo ya ves las barritas más bajas. Cada uno gasta según los
-    // minutos que estuvo, así el que entra en el segundo tiempo paga la mitad
-    // y el que sale en el descanso no paga los 45 que no jugó.
-    if (!Array.isArray(p.jugaron)) p.jugaron = [];
-    enCancha.forEach((j) => {
-      j.energia = Math.max(0, this.energiaDe(j) - this.costoDeUnPartido(j) * (minutos / 90));
-      if (!p.jugaron.includes(j.id)) p.jugaron.push(j.id);
-    });
+      + (plan.riesgoRival || 0) * estilo.aguante * PESO_CHARLA;
 
-    const faltan = Math.max(0, 11 - enCancha.length);
-    const conLosQueQuedan = Math.min(1, enCancha.length / 11);
-    // Con uno menos creás bastante menos y además te atacan más: las dos
-    // cosas, como en la cancha.
+    // Con uno menos creás bastante menos y además te atacan más.
+    const enCancha = this.getStartingXI().starters.length;
+    const faltan = Math.max(0, 11 - enCancha);
+    const conLosQueQuedan = Math.min(1, enCancha / 11);
     const seLesAbre = 1 + faltan * 0.07;
-    const score = this.simulateScore(
-      local, visitante, ventaja, duracion,
-      (ctx.isHome ? factorMio * conLosQueQuedan : factorSuyo * seLesAbre),
-      (ctx.isHome ? factorSuyo * seLesAbre : factorMio * conLosQueQuedan),
-    );
-    const mios = ctx.isHome ? score.homeGoals : score.awayGoals;
-    const suyos = ctx.isHome ? score.awayGoals : score.homeGoals;
 
-    const minuto = () => desde + Math.floor(Math.random() * minutos);
-    const bolGoles = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
-    const delRival = this.jugadoresDelRival(ctx.opponentId);
-    const rivalArriba = delRival.filter((j) => j.pos === 'DEL' || j.pos === 'MED');
-
-    for (let g = 0; g < mios; g++) {
-      const autor = bolGoles.length ? bolGoles[Math.floor(Math.random() * bolGoles.length)] : null;
-      p.eventos.push({ minuto: minuto(), tipo: 'gol', mio: true, nombre: autor ? autor.name : null, id: autor ? autor.id : null });
-    }
-    for (let g = 0; g < suyos; g++) {
-      const autor = rivalArriba.length ? rivalArriba[Math.floor(Math.random() * rivalArriba.length)] : null;
-      p.eventos.push({ minuto: minuto(), tipo: 'gol', mio: false, nombre: autor ? autor.name : null });
-    }
-    // Las amarillas se cuentan acá, tiempo por tiempo, para poder mostrarlas
-    // con su minuto. La suspensión a la quinta se resuelve igual que siempre,
-    // al terminar el partido (ver aplicarBajas).
-    enCancha.filter((j) => this.isAvailable(j)).forEach((j) => {
-      if (Math.random() > this.AMARILLAS_POR_TIEMPO * (minutos / 45)) return;
-      p.eventos.push({ minuto: minuto(), tipo: 'amarilla', mio: true, nombre: j.name, id: j.id });
-    });
-
-    p.mios += mios;
-    p.suyos += suyos;
-    p.eventos.sort((a, b) => a.minuto - b.minuto);
-    return { mios, suyos };
+    const diff = local - visitante;
+    const baseLocal = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + ventaja / 16));
+    const baseVisitante = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
+    const golesLocal = baseLocal * (ctx.isHome ? factorMio * conLosQueQuedan : factorSuyo * seLesAbre);
+    const golesVisitante = baseVisitante * (ctx.isHome ? factorSuyo * seLesAbre : factorMio * conLosQueQuedan);
+    return {
+      mia: ctx.isHome ? golesLocal : golesVisitante,
+      suya: ctx.isHome ? golesVisitante : golesLocal,
+    };
   },
 
-  // ---------- Las lesiones, ahora en pleno partido ----------
+  // El plan con el que se está jugando AHORA: lo que elegiste antes del
+  // partido, más lo del entretiempo, más los dos ajustes al vuelo.
+  planDelPartido() {
+    const p = this.state.partido;
+    if (!p) return { tacticMod: 0, riesgoRival: 0 };
+    let tacticMod = p.tacticMod || 0;
+    let riesgoRival = p.riesgoRival || 0;
+    const ajustes = p.ajustes || {};
+    Object.keys(this.AJUSTES_EN_VIVO).forEach((grupo) => {
+      const elegido = (this.AJUSTES_EN_VIVO[grupo] || []).find((a) => a.id === ajustes[grupo]);
+      if (!elegido) return;
+      tacticMod += elegido.tacticMod || 0;
+      riesgoRival += elegido.riesgoRival || 0;
+    });
+    return { tacticMod, riesgoRival };
+  },
+
+  // ---------- Los ajustes que se tocan con el partido en juego ----------
+  //
+  // Dos pares, uno por fila, y dentro de cada par solo puede haber uno
+  // prendido: o adelantás las líneas o te parás atrás, no las dos cosas.
+  // Volver a tocar el que está prendido lo apaga.
+  AJUSTES_EN_VIVO: {
+    lineas: [
+      { id: 'adelantar', label: 'Adelantar líneas', tacticMod: 3, riesgoRival: 3, nota: 'El equipo achica arriba: llegás más, y atrás quedan metros.' },
+      { id: 'autobus', label: 'Autobús atrás', tacticMod: -4, riesgoRival: -6, nota: 'Todos detrás de la pelota. No vas a crear nada, pero es muy difícil romperte.' },
+    ],
+    ritmo: [
+      // Ninguno de los dos es gratis, a propósito: jugar de contra te hace
+      // más peligroso pero le regalás la pelota, y tenerla vos apaga el
+      // partido de los dos lados.
+      { id: 'contra', label: 'Jugar de contra', tacticMod: 2, riesgoRival: 3, nota: 'Le dejás la pelota y salís rápido cuando la recuperás. Vas a llegar más, y él también.' },
+      { id: 'posesion', label: 'Posesión paciente', tacticMod: -1, riesgoRival: -3, nota: 'Tener la pelota también es defender: el rival casi no la toca, pero el partido se hace lento.' },
+    ],
+  },
+
+  // Prende o apaga un ajuste. Devuelve el que quedó puesto en ese par.
+  ajustarEnVivo(grupo, id) {
+    const p = this.state.partido;
+    if (!p || !this.AJUSTES_EN_VIVO[grupo]) return null;
+    if (!p.ajustes) p.ajustes = {};
+    p.ajustes[grupo] = p.ajustes[grupo] === id ? null : id;
+    this.save();
+    return p.ajustes[grupo];
+  },
+
+
+  // ---------- Las lesiones, en pleno partido ----------
   //
   // Antes la lesión se sorteaba DESPUÉS del partido y te la contaban en el
   // parte médico: no la veías pasar y no podías hacer nada. Encima el sorteo
@@ -4545,21 +4570,19 @@ const Engine = {
   //
   // Ahora pasa en un minuto concreto: el partido se frena ahí, el jugador
   // queda afuera y vos decidís a quién metés. Si no metés a nadie, seguís con
-  // uno menos y el equipo lo paga (ver jugarUnTramo).
-  CHANCE_DE_LESION_POR_TIEMPO: 0.13,
+  // uno menos y el equipo lo paga (ver peligroDelPartido).
+  CHANCE_DE_LESION_POR_PARTIDO: 0.26,
 
-  // ¿Se lesiona alguien en este tramo? El cansancio manda: sube la chance y
+  // ¿Se lesiona alguien en ESTE minuto? El cansancio manda: sube la chance y
   // decide a quién le toca (el que viene fundido entra más veces al bolillero).
-  sortearLesion(desde, hasta) {
+  sortearLesionDelMinuto(minuto) {
     const s = this.state;
-    const enCancha = this.getStartingXI().starters
-      .map((e) => s.squad.find((x) => x.id === e.id))
-      .filter((x) => x && this.isAvailable(x));
+    const enCancha = this.losQueEstanEnCancha();
     if (enCancha.length < 8) return null;
 
     const energiaMedia = enCancha.reduce((t, p) => t + this.energiaDe(p), 0) / enCancha.length;
-    const riesgo = this.CHANCE_DE_LESION_POR_TIEMPO * (1 + Math.max(0, ENERGIA_SIN_MERMA - energiaMedia) / 160);
-    if (Math.random() > riesgo) return null;
+    const riesgo = this.CHANCE_DE_LESION_POR_PARTIDO * (1 + Math.max(0, ENERGIA_SIN_MERMA - energiaMedia) / 160);
+    if (Math.random() > riesgo / this.MINUTOS_DE_PARTIDO) return null;
 
     const bolillero = [];
     enCancha.forEach((p) => {
@@ -4568,11 +4591,10 @@ const Engine = {
     });
     const quien = bolillero[Math.floor(Math.random() * bolillero.length)];
     const tipo = this.sorteoDeLesion();
-    const margen = Math.max(1, hasta - desde - 2);
     return {
       id: quien.id,
       nombre: quien.name,
-      minuto: desde + 1 + Math.floor(Math.random() * margen),
+      minuto,
       detail: tipo.detail,
       matches: tipo.matches,
     };
@@ -4589,25 +4611,6 @@ const Engine = {
     ];
     const t = tipos[Math.floor(Math.random() * tipos.length)];
     return { detail: t.detail, matches: t.min + Math.floor(Math.random() * (t.max - t.min + 1)) };
-  },
-
-  // Juega un tiempo entero, frenando si hay una lesión en el medio. `alCerrar`
-  // es el nombre del método que sigue después (el entretiempo o el cierre del
-  // partido): se guarda como texto porque queda en la partida guardada.
-  jugarElTiempo(desde, hasta, tacticMod, alCerrar) {
-    const s = this.state;
-    const p = s.partido;
-    const lesion = this.sortearLesion(desde, hasta);
-    if (!lesion) {
-      this.jugarUnTramo(desde, hasta, tacticMod);
-      this[alCerrar]();
-      return;
-    }
-    this.jugarUnTramo(desde, lesion.minuto, tacticMod);
-    this.sacarAlLesionado(lesion);
-    p.pendiente = { desde: lesion.minuto, hasta, tacticMod, alCerrar };
-    s.screen = 'lesion';
-    this.save();
   },
 
   // El jugador se rompe: queda fuera por N partidos y sale de la cancha en el
@@ -4627,8 +4630,7 @@ const Engine = {
     }
     const casillero = s.startingSlots.find((e) => e.playerId === lesion.id);
     if (casillero) casillero.playerId = null;
-    p.eventos.push({ minuto: lesion.minuto, tipo: 'lesion', mio: true, nombre: jugador.name, id: jugador.id });
-    p.eventos.sort((a, b) => a.minuto - b.minuto);
+    this.anotarEvento({ tipo: 'lesion', mio: true, nombre: jugador.name, id: jugador.id }, lesion.minuto);
     p.lesion = { ...lesion, cubierta: false };
     if (!p.notasFisicas) p.notasFisicas = [];
     p.notasFisicas.push({ tono: 'malo', texto: `${jugador.name} se lesionó a los ${lesion.minuto}': ${lesion.detail.toLowerCase()}. Se pierde ${lesion.matches} ${lesion.matches === 1 ? 'partido' : 'partidos'}.` });
@@ -4650,23 +4652,242 @@ const Engine = {
     hueco.playerId = entraId;
     s.banco = (s.banco || []).filter((id) => id !== entraId);
     if (!p.cambios) p.cambios = [];
-    p.cambios.push({ sale: p.lesion.id, entra: entraId, saleNombre: p.lesion.nombre, entraNombre: entra.name, porLesion: true });
+    p.cambios.push({ sale: p.lesion.id, entra: entraId, saleNombre: p.lesion.nombre, entraNombre: entra.name, porLesion: true, minuto: p.minuto || 0 });
+    this.anotarEvento({ tipo: 'cambio', mio: true, nombre: `Entra ${entra.name} por ${p.lesion.nombre}` });
     p.lesion.cubierta = true;
     this.save();
     return true;
   },
 
-  // Se reanuda el partido con lo que decidiste.
+  // Se reanuda el partido con lo que decidiste: vuelve a la cancha y sigue
+  // corriendo el reloj desde el minuto en el que se frenó.
   seguirDespuesDeLaLesion() {
     const s = this.state;
     const p = s.partido;
-    const pend = p.pendiente;
-    p.pendiente = null;
+    if (!p) { this.cerrarPartidoDelUsuario(); return; }
     p.lesion = null;
-    if (!pend) { this.cerrarPartidoDelUsuario(); return; }
-    this.jugarUnTramo(pend.desde, pend.hasta, pend.tacticMod);
-    this[pend.alCerrar]();
+    s.screen = 'partido';
+    this.save();
   },
+
+  // ---------- El partido, minuto a minuto ----------
+  //
+  // El reloj corre de 1' a 90' y cada minuto se juega de verdad: se sortea si
+  // pasa algo (un gol, un remate, un córner, una falta, una amarilla, una
+  // lesión) con el planteo que hay puesto EN ESE MOMENTO. Por eso un cambio
+  // en el minuto 70, adelantar las líneas cuando te empatan o pasar a cinco
+  // defensores para aguantarlo se sienten en lo que queda por jugar.
+  //
+  // La cuenta de los goles no cambió: peligroDelPartido() devuelve los mismos
+  // dos lambdas de siempre (goles esperados en 90 minutos para cada arco) y
+  // acá se tiran minuto a minuto como lambda/90. La esperanza es idéntica a
+  // la del sorteo de Poisson que había antes, así que una temporada entera
+  // sigue teniendo la misma cantidad de goles.
+  MINUTOS_DE_PARTIDO: 90,
+  MINUTO_DEL_DESCANSO: 45,
+
+  // Lo que se ve en el feed además de los goles. Son por equipo y por partido
+  // entero; los remates y los córners salen del peligro de cada arco (un
+  // equipo que ataca más patea más) y las faltas son parejas.
+  REMATES_BASE: 4.5,
+  REMATES_POR_GOL_ESPERADO: 3.5,
+  CORNERS_BASE: 1.8,
+  CORNERS_POR_GOL_ESPERADO: 2.2,
+  FALTAS_POR_PARTIDO: 7,
+  // Amarillas por titular y por partido: el mismo número de siempre.
+  AMARILLAS_POR_PARTIDO: 0.16,
+
+  VELOCIDADES: [
+    { id: 'x1', label: '1x', ms: 900 },
+    { id: 'x2', label: '2x', ms: 450 },
+    { id: 'x5', label: '5x', ms: 180 },
+    { id: 'ya', label: 'Instantáneo', ms: 0 },
+  ],
+
+  velocidadDelPartido() {
+    const id = this.state.velocidadPartido;
+    return this.VELOCIDADES.find((v) => v.id === id) || this.VELOCIDADES[0];
+  },
+
+  setVelocidadDelPartido(id) {
+    if (!this.VELOCIDADES.some((v) => v.id === id)) return;
+    this.state.velocidadPartido = id;
+    this.save();
+  },
+
+  // Los once (o los que queden) que están adentro ahora mismo.
+  losQueEstanEnCancha() {
+    const s = this.state;
+    return this.getStartingXI().starters
+      .map((e) => s.squad.find((x) => x.id === e.id))
+      .filter(Boolean);
+  },
+
+  // Mete un evento en la lista del partido, ordenada por minuto.
+  anotarEvento(evento, minuto) {
+    const p = this.state.partido;
+    if (!p) return null;
+    const ev = { ...evento, minuto: minuto === undefined ? (p.minuto || 0) : minuto };
+    if (!p.eventos) p.eventos = [];
+    p.eventos.push(ev);
+    p.eventos.sort((a, b) => a.minuto - b.minuto);
+    return ev;
+  },
+
+  // El marcador y las estadísticas, para el tablero de arriba.
+  estadisticasDelPartido() {
+    const p = this.state.partido;
+    const vacio = { remates: 0, corners: 0, faltas: 0, amarillas: 0 };
+    if (!p || !p.stats) return { mias: { ...vacio }, suyas: { ...vacio } };
+    return p.stats;
+  },
+
+  sumarEstadistica(mio, clave) {
+    const p = this.state.partido;
+    if (!p || !p.stats) return;
+    p.stats[mio ? 'mias' : 'suyas'][clave] += 1;
+  },
+
+  // ¿Hay que frenar el reloj? Se pregunta antes y después de cada minuto, así
+  // una lesión justo en el 45' no se come el descanso.
+  revisarCortes() {
+    const s = this.state;
+    const p = s.partido;
+    if (!p) return 'final';
+    if (p.lesion) { s.screen = 'lesion'; return 'lesion'; }
+    if (p.minuto >= this.MINUTO_DEL_DESCANSO && !p.pasoElDescanso) {
+      p.pasoElDescanso = true;
+      this.irAlEntretiempo();
+      return 'entretiempo';
+    }
+    if (p.minuto >= this.MINUTOS_DE_PARTIDO) {
+      this.cerrarPartidoDelUsuario();
+      return 'final';
+    }
+    return null;
+  },
+
+  // Un minuto de partido. Devuelve lo que pasó en ese minuto (para el feed en
+  // vivo) y si hay que frenar el reloj.
+  simularUnMinuto() {
+    const s = this.state;
+    let p = s.partido;
+    if (!p) return { minuto: this.MINUTOS_DE_PARTIDO, eventos: [], corte: 'final' };
+
+    // Si venimos de una pausa que todavía no se resolvió, no se juega nada.
+    const antes = this.revisarCortes();
+    if (antes) return { minuto: p.minuto || 0, eventos: [], corte: antes };
+
+    const minuto = (p.minuto || 0) + 1;
+    p.minuto = minuto;
+    if (minuto === 1) this.anotarEvento({ tipo: 'silbato', mio: null, nombre: 'Arrancó el partido' });
+    if (minuto === this.MINUTO_DEL_DESCANSO + 1) this.anotarEvento({ tipo: 'silbato', mio: null, nombre: 'Arrancó el segundo tiempo' });
+
+    const nuevos = [];
+    const anotar = (evento) => { const ev = this.anotarEvento(evento, minuto); if (ev) nuevos.push(ev); };
+
+    const ctx = s.matchContext;
+    const peligro = this.peligroDelPartido();
+    const enCancha = this.losQueEstanEnCancha();
+
+    // El desgaste se paga minuto a minuto: el que entra en el 70' paga 20
+    // minutos y el que salió en el descanso no paga los 45 que no jugó.
+    if (!Array.isArray(p.jugaron)) p.jugaron = [];
+    enCancha.forEach((j) => {
+      j.energia = Math.max(0, this.energiaDe(j) - this.costoDeUnPartido(j) / this.MINUTOS_DE_PARTIDO);
+      if (!p.jugaron.includes(j.id)) p.jugaron.push(j.id);
+    });
+
+    const delRival = this.jugadoresDelRival(ctx.opponentId);
+    const rivalArriba = delRival.filter((j) => j.pos === 'DEL' || j.pos === 'MED');
+    const unRival = (lista) => (lista.length ? lista[Math.floor(Math.random() * lista.length)].name : null);
+
+    // ---- Los goles ----
+    const porMinuto = (porPartido) => porPartido / this.MINUTOS_DE_PARTIDO;
+    let golMio = false;
+    let golSuyo = false;
+    if (Math.random() < porMinuto(peligro.mia)) {
+      const bolillero = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
+      const autor = bolillero.length ? bolillero[Math.floor(Math.random() * bolillero.length)] : null;
+      p.mios += 1;
+      golMio = true;
+      anotar({ tipo: 'gol', mio: true, nombre: autor ? autor.name : null, id: autor ? autor.id : null });
+    }
+    if (Math.random() < porMinuto(peligro.suya)) {
+      p.suyos += 1;
+      golSuyo = true;
+      anotar({ tipo: 'gol', mio: false, nombre: unRival(rivalArriba) });
+    }
+
+    // ---- Lo que no termina en gol ----
+    // El que ataca más patea más y saca más córners: los dos salen del mismo
+    // peligro que los goles, así el feed cuenta el partido que se está
+    // jugando y no un partido cualquiera.
+    const remates = (lambda) => this.REMATES_BASE + this.REMATES_POR_GOL_ESPERADO * lambda;
+    const corners = (lambda) => this.CORNERS_BASE + this.CORNERS_POR_GOL_ESPERADO * lambda;
+    const nombreMio = () => {
+      const bol = this.bolilleroDe(enCancha, this.GOLES_POR_PUESTO);
+      return bol.length ? bol[Math.floor(Math.random() * bol.length)].name : null;
+    };
+
+    if (!golMio && Math.random() < porMinuto(remates(peligro.mia))) {
+      this.sumarEstadistica(true, 'remates');
+      anotar({ tipo: 'remate', mio: true, nombre: nombreMio(), detalle: this.COMO_TERMINO_EL_REMATE[Math.floor(Math.random() * this.COMO_TERMINO_EL_REMATE.length)] });
+    }
+    if (!golSuyo && Math.random() < porMinuto(remates(peligro.suya))) {
+      this.sumarEstadistica(false, 'remates');
+      anotar({ tipo: 'remate', mio: false, nombre: unRival(rivalArriba), detalle: this.COMO_TERMINO_EL_REMATE[Math.floor(Math.random() * this.COMO_TERMINO_EL_REMATE.length)] });
+    }
+    if (Math.random() < porMinuto(corners(peligro.mia))) {
+      this.sumarEstadistica(true, 'corners');
+      anotar({ tipo: 'corner', mio: true });
+    }
+    if (Math.random() < porMinuto(corners(peligro.suya))) {
+      this.sumarEstadistica(false, 'corners');
+      anotar({ tipo: 'corner', mio: false });
+    }
+    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) {
+      this.sumarEstadistica(true, 'faltas');
+      const quien = enCancha.length ? enCancha[Math.floor(Math.random() * enCancha.length)] : null;
+      anotar({ tipo: 'falta', mio: true, nombre: quien ? quien.name : null });
+    }
+    if (Math.random() < porMinuto(this.FALTAS_POR_PARTIDO)) {
+      this.sumarEstadistica(false, 'faltas');
+      anotar({ tipo: 'falta', mio: false, nombre: unRival(delRival) });
+    }
+
+    // ---- Las amarillas ----
+    // Se cuentan por jugador, como siempre; la suspensión a la quinta se
+    // resuelve al terminar el partido (ver aplicarBajas).
+    const yaAmonestados = new Set((p.eventos || []).filter((e) => e.tipo === 'amarilla' && e.mio && e.id).map((e) => e.id));
+    enCancha.filter((j) => this.isAvailable(j) && !yaAmonestados.has(j.id)).forEach((j) => {
+      if (Math.random() > porMinuto(this.AMARILLAS_POR_PARTIDO)) return;
+      this.sumarEstadistica(true, 'amarillas');
+      anotar({ tipo: 'amarilla', mio: true, nombre: j.name, id: j.id });
+    });
+    if (Math.random() < porMinuto(this.AMARILLAS_POR_PARTIDO * 11)) {
+      this.sumarEstadistica(false, 'amarillas');
+      anotar({ tipo: 'amarilla', mio: false, nombre: unRival(delRival) });
+    }
+
+    // ---- ¿Se rompió alguno? ----
+    const lesion = this.sortearLesionDelMinuto(minuto);
+    if (lesion) {
+      this.sacarAlLesionado(lesion);
+      nuevos.push((p.eventos || []).find((e) => e.tipo === 'lesion' && e.minuto === minuto && e.id === lesion.id));
+    }
+
+    // Guardar los 90 minutos uno por uno sería tirar la partida entera al
+    // disco noventa veces. Alcanza con hacerlo cada cinco minutos y en cada
+    // corte: si cerrás la pestaña en el 63', volvés al 60'.
+    if (minuto % 5 === 0) this.save();
+
+    const corte = this.revisarCortes();
+    if (corte) this.save();
+    return { minuto, eventos: nuevos.filter(Boolean), corte };
+  },
+
+  COMO_TERMINO_EL_REMATE: ['al arco', 'afuera', 'tapado', 'al palo', 'desviado'],
 
   // El vestuario, después del primer tiempo.
   irAlEntretiempo() {
@@ -4705,10 +4926,12 @@ const Engine = {
     // salías a presionar arriba (riesgoRival 3) y decidís aguantar (-4), el
     // segundo tiempo se juega con -1. Y "no tocar nada" deja el plan como
     // estaba, que es lo que dice el botón.
+    p.tacticMod = (p.tacticMod || 0) + (op.tacticMod || 0);
     p.riesgoRival = (p.riesgoRival || 0) + (op.riesgoRival || 0);
-    // Los cambios ya se hicieron en el vestuario (ver hacerUnCambio): el
-    // segundo tiempo se juega con el once que quedó en s.startingSlots.
-    this.jugarElTiempo(46, 90, (p.tacticMod || 0) + (op.tacticMod || 0), 'cerrarPartidoDelUsuario');
+    // Los cambios y la formación ya se tocaron en el vestuario: el segundo
+    // tiempo arranca con el equipo que quedó puesto.
+    s.screen = 'partido';
+    this.save();
   },
 
   // ---------- Los cambios del entretiempo ----------
@@ -4759,7 +4982,9 @@ const Engine = {
     if (!this.swapPlayers(entraId, saleId)) return false;
     if (!p.cambios) p.cambios = [];
     const sale = s.squad.find((x) => x.id === saleId);
-    p.cambios.push({ sale: saleId, entra: entraId, saleNombre: sale ? sale.name : '', entraNombre: entra.name });
+    p.cambios.push({ sale: saleId, entra: entraId, saleNombre: sale ? sale.name : '', entraNombre: entra.name, minuto: p.minuto || 0 });
+    // El cambio también va al relato, con el minuto en el que lo hiciste.
+    this.anotarEvento({ tipo: 'cambio', mio: true, nombre: `Entra ${entra.name} por ${sale ? sale.name : ''}` });
     this.save();
     return true;
   },
@@ -4776,7 +5001,7 @@ const Engine = {
     // puede lesionar el tobillo diez minutos después de estar sentado.
     const enCancha = this.getStartingXI().starters.map((x) => x.id);
     // Se deshacen los cambios del entretiempo: ya jugaron el segundo tiempo
-    // (el motor los usó en jugarUnTramo) y el once vuelve a ser el tuyo.
+    // (el motor los usó minuto a minuto) y el once vuelve a ser el tuyo.
     if (p.onceAntes) {
       s.startingSlots = p.onceAntes;
       s.banco = p.bancoAntes;
@@ -4832,17 +5057,29 @@ const Engine = {
       }
     }
 
-    // Se juega el primer tiempo y se para en el vestuario. El segundo se
-    // juega con lo que decidas ahí (ver resolverEntretiempo).
+    // Arranca el reloj. De acá en adelante el partido lo lleva la pantalla,
+    // que le pide un minuto por vez al motor (ver simularUnMinuto).
     s.partido = {
-      tacticMod: option.tacticMod,
+      tacticMod: option.tacticMod || 0,
       riesgoRival: option.riesgoRival || 0,
+      minuto: 0,
+      pasoElDescanso: false,
+      // El día que tiene el rival, sorteado una sola vez para todo el partido
+      // (ver clubStrength).
+      diaDelRival: this.sortearElDiaDelRival(),
       mios: 0,
       suyos: 0,
       eventos: [],
       cambios: [],
+      jugaron: [],
+      ajustes: { lineas: null, ritmo: null },
+      stats: {
+        mias: { remates: 0, corners: 0, faltas: 0, amarillas: 0 },
+        suyas: { remates: 0, corners: 0, faltas: 0, amarillas: 0 },
+      },
     };
-    this.jugarElTiempo(1, 45, option.tacticMod, 'irAlEntretiempo');
+    s.screen = 'partido';
+    this.save();
   },
 
   getPenaltyShooters() {
@@ -5072,11 +5309,11 @@ const Engine = {
     const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
 
     // Las lesiones NO se sortean acá: pasan en un minuto del partido, frenan el
-    // juego y las ves (ver sortearLesion / jugarElTiempo). Lo que llega desde
+    // juego y las ves (ver sortearLesionDelMinuto). Lo que llega desde
     // ahí son las notas del parte médico, que se agregan al final.
 
     // Amarillas. Ya NO se sortean acá: las tarjetas salen con su minuto
-    // mientras se juega cada tramo (ver jugarUnTramo), así se pueden mostrar
+    // mientras corre el reloj (ver simularUnMinuto), así se pueden mostrar
     // en el entretiempo. Acá solo se cuentan, que es lo que define la
     // suspensión: a la quinta el jugador se pierde el próximo partido y el
     // contador vuelve a cero. El contador es por torneo (ver limpiarAmarillas),
@@ -5271,7 +5508,7 @@ const Engine = {
     const factorClub = this.factorDeDesarrollo(club);
     // Los que pisaron la cancha en ese partido, con cambios incluidos. El
     // cansancio ya se pagó minuto a minuto mientras se jugaba (ver
-    // jugarUnTramo), así que acá solo se mira quién sumó rodaje.
+    // simularUnMinuto), así que acá solo se mira quién sumó rodaje.
     const jugaron = new Set((s.pendingMatch && s.pendingMatch.jugaron)
       || this.getStartingXI().starters.map((e) => e.id));
     const notas = [];

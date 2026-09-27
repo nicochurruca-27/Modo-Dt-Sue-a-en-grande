@@ -69,14 +69,26 @@ abrir seguís donde quedaste.
   reparte los cupos a las copas y marca los descensos. Antes mostraba la Anual
   recortada a tu zona, y esa tabla no existe. En la Nacional, que juega un
   torneo anual único con dos zonas, sigue siendo la de tu zona.
-- **Los partidos se juegan en dos tiempos, con entretiempo.** Antes un partido
-  era un botón: apretabas y salía el resultado entero. Ahora se juega el primer
-  tiempo y entrás al vestuario: ves cómo viene, **quién hizo cada gol y en qué
-  minuto**, quién quedó amonestado, y decidís qué hacer con el segundo tiempo
-  —ir a buscarlo, aguantar el resultado, no tocar nada o meter un delantero del
-  banco—. Esa decisión se juega de verdad: cambia la fuerza de tu equipo y la
-  exposición de tu defensa en los 45 restantes. Al final, la pantalla de
-  resultado muestra la planilla completa del partido.
+- **Los partidos se juegan minuto a minuto.** Antes un partido era un botón:
+  apretabas y salía el resultado entero. Ahora corre el reloj del 1' al 90',
+  **a la velocidad que elijas** (1x, 2x, 5x o Instantáneo), con la barra de
+  tiempo, el marcador, las estadísticas de los dos (remates, córners, faltas,
+  amarillas) y **el relato en vivo**: cada gol con su autor, los remates, los
+  tiros de esquina, las faltas, las tarjetas y las lesiones, con su minuto.
+  - **Metés mano cuando querés.** Dos pares de botones de ajuste al vuelo
+    —*adelantar líneas* o *autobús atrás*, *jugar de contra* o *posesión
+    paciente*—, el esquema (se puede cambiar en cualquier minuto, y no rearma
+    el equipo: los que están adentro se reacomodan) y los tres cambios, que se
+    pueden hacer en el minuto que quieras y no solo en el descanso.
+  - Todo eso se juega de verdad: el peligro de los dos arcos se vuelve a
+    calcular **en cada minuto** con el planteo que tengas puesto en ese
+    momento, así que adelantar el equipo cuando te empatan a los 75 cambia lo
+    que queda por jugar.
+  - El partido **frena solo** en el entretiempo (el vestuario de siempre: cómo
+    viene, quién está amonestado y qué hacés con el segundo tiempo) y en el
+    minuto de una lesión, para que decidas el cambio vos. El árbitro pita al
+    arrancar cada tiempo y al final. Al terminar, la pantalla de resultado
+    muestra la planilla del partido —goles, tarjetas, lesiones y cambios—.
 - **El presupuesto de sueldos se renegocia cada temporada.** El plantel se
   encarece solo con los años (un jugador en su mejor momento cobra más que el
   mismo pibe hace tres temporadas), así que un presupuesto fijo condenaba a

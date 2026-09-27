@@ -2108,3 +2108,186 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 
 /* El interruptor del sonido, en la misma fila que exportar/importar. */
 .sonido-btn { min-width: 8.5em; }
+
+/* ---------- El partido minuto a minuto ---------- */
+/* La pantalla que corre el reloj: marcador arriba, la barra de los 90
+   minutos, los controles de velocidad, los ajustes al vuelo y abajo el
+   relato en vivo. */
+
+.partido-vivo h3 {
+  margin: 16px 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.partido-reloj {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 12px;
+}
+
+.minuto-grande {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* La barra de los 90 minutos, con la marca del descanso justo en la mitad. */
+.barra-tiempo {
+  position: relative;
+  flex: 1 1 auto;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.barra-jugada {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  border-radius: 999px;
+  transition: width 0.25s linear;
+}
+
+.marca-descanso {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.partido-controles {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.velocidades { display: flex; gap: 6px; flex-wrap: wrap; }
+.velocidades .option-btn.small { padding: 6px 10px; font-size: 0.82rem; }
+
+/* El botón elegido (la velocidad puesta, el ajuste prendido) se ve hundido. */
+.option-btn.ghost.elegida,
+.ajuste-btn.elegida {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Las estadísticas del partido: las tuyas a la izquierda, las de él a la
+   derecha, y en el medio de qué se habla. */
+.partido-stats {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.stat-fila {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.stat-fila .mia { text-align: left; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-fila .suya { text-align: right; font-variant-numeric: tabular-nums; }
+.stat-fila .que { text-align: center; color: var(--muted); font-size: 0.78rem; }
+
+/* Los dos pares de ajustes al vuelo: una fila por par. */
+.ajustes-vivo { display: flex; flex-direction: column; gap: 8px; }
+.ajuste-par { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.ajuste-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  line-height: 1.25;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #cbd5e1;
+}
+
+.ajuste-btn:hover { background: rgba(148, 163, 184, 0.14); }
+.ajuste-btn strong { font-size: 0.86rem; }
+.ajuste-btn span { font-size: 0.74rem; opacity: 0.75; font-weight: 400; }
+
+.formacion-vivo { margin: 12px 0 4px; }
+.formacion-vivo label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.formacion-vivo select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.formacion-vivo p { margin: 6px 0 0; font-size: 0.76rem; }
+
+/* El relato en vivo: lo último arriba. Se le pone un alto máximo para que la
+   lista no empuje los controles fuera de la pantalla en el celular. */
+.feed-vivo {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.feed-vivo li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-left: 2px solid transparent;
+  font-size: 0.88rem;
+}
+
+.feed-vivo li.mio { border-left-color: var(--accent); background: rgba(34, 197, 94, 0.07); }
+.feed-vivo li.suyo { border-left-color: rgba(248, 113, 113, 0.65); }
+.feed-vivo li.neutro { color: var(--muted); }
+.feed-vivo li.ev-gol { font-size: 0.95rem; }
+.feed-vivo li.ev-remate, .feed-vivo li.ev-corner, .feed-vivo li.ev-falta { opacity: 0.72; }
+
+.feed-vivo .minuto { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 32px; }
+.feed-vivo .icono { flex: 0 0 auto; }
+.feed-vivo .que { min-width: 0; }
+
+/* Lo que acaba de entrar se enciende un segundo. */
+@keyframes destello-evento {
+  from { background: rgba(34, 197, 94, 0.28); }
+  to { background: transparent; }
+}
+
+.feed-vivo li.recien { animation: destello-evento 1s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-vivo li.recien { animation: none; }
+  .barra-jugada { transition: none; }
+}
+
+@media (max-width: 520px) {
+  .ajuste-par { grid-template-columns: 1fr; }
+}

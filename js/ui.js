@@ -115,6 +115,9 @@ function render() {
   // El almanaque corriendo también se apaga acá: si se dejara prendido, seguiría
   // pasando días contra una pantalla que ya no existe.
   detenerLosDias();
+  // Y el reloj del partido: si se dejara prendido seguiría jugando minutos
+  // contra una pantalla que ya no está.
+  detenerElPartido();
   document.body.dataset.fase = faseDeLaPantalla();
   if (pantallaDeInicio) { renderInicio(); return; }
   if (s.screen === 'dt-create') renderDTCreate();
@@ -122,6 +125,7 @@ function render() {
   else if (s.screen === 'presentation') renderPresentation();
   else if (s.screen === 'calendar') renderCalendar();
   else if (s.screen === 'pre-match') renderPreMatch();
+  else if (s.screen === 'partido') renderPartido();
   else if (s.screen === 'entretiempo') renderEntretiempo();
   else if (s.screen === 'lesion') renderLesion();
   else if (s.screen === 'penalty') renderPenalty();
@@ -2122,12 +2126,11 @@ function sonarSegunLaPantalla() {
   const antes = ultimoSonido.pantalla;
   const goles = golesMiosAhora(s);
 
-  if (pantalla !== antes) {
-    // Arranca el partido: los dos pitidos del árbitro.
-    if (antes === 'pre-match' && (pantalla === 'entretiempo' || pantalla === 'lesion')) Sonido.playWhistle();
-    // Y el pitido largo del final.
-    else if (pantalla === 'match-result' && antes && antes !== 'match-result') Sonido.playWhistle(true);
-  }
+  // Los silbatos (el del arranque de cada tiempo y el largo del final) los
+  // toca el reloj del partido, que es el que sabe en qué minuto va (ver
+  // silbatosDelMinuto). Acá queda solo el del final por penales, que pasa
+  // fuera del reloj.
+  if (pantalla !== antes && pantalla === 'match-result' && antes === 'penalty') Sonido.playWhistle(true);
   // Un gol es un gol: en el primer tiempo, en el segundo o de penal.
   if (goles > ultimoSonido.goles) Sonido.playGoal();
 
@@ -3152,7 +3155,14 @@ function renderPreMatch() {
     </div>
   `;
   app.querySelectorAll('.options .option-btn').forEach((btn) => {
-    btn.addEventListener('click', () => { Engine.chooseDecision(Number(btn.dataset.i)); render(); });
+    btn.addEventListener('click', () => {
+      Engine.chooseDecision(Number(btn.dataset.i));
+      // Empieza el partido y el reloj arranca solo, con el relato en vivo.
+      partidoPausado = false;
+      eventosDibujados = 0;
+      panelDeCambiosAbierto = false;
+      render();
+    });
   });
 }
 
@@ -3315,10 +3325,18 @@ let penaltyShooterId = null;
 // Antes el partido era un solo botón y el resultado salía entero.
 
 // La lista de lo que pasó, minuto por minuto.
+// El resumen (el vestuario, la lesión, el final del partido) se queda con lo
+// que se cuenta después: goles, amarillas, lesiones y cambios. Los remates,
+// los córners y las faltas son del relato en vivo, y acá serían cincuenta
+// renglones de ruido.
+const EVENTOS_QUE_QUEDAN = ['gol', 'amarilla', 'roja', 'lesion', 'cambio'];
+
 function eventosDelPartidoHtml(eventos, hasta) {
-  const lista = (eventos || []).filter((e) => !hasta || e.minuto <= hasta);
+  const lista = (eventos || [])
+    .filter((e) => EVENTOS_QUE_QUEDAN.includes(e.tipo))
+    .filter((e) => !hasta || e.minuto <= hasta);
   if (!lista.length) return '<p class="muted">Todavía no pasó nada para contar.</p>';
-  const icono = { gol: '⚽', amarilla: '🟨', lesion: '🏥' };
+  const icono = { gol: '⚽', amarilla: '🟨', lesion: '🏥', cambio: '🔁' };
   return `<ul class="partido-eventos">${lista.map((e) => `
     <li class="${e.mio ? 'mio' : ''}">
       <span class="minuto">${e.minuto}'</span>
@@ -3421,6 +3439,328 @@ function tocarFichaDeCambio(id, grupo) {
   render();
 }
 
+// ---------- El partido, minuto a minuto ----------
+//
+// La pantalla que corre el reloj. El motor no sabe de tiempo: le pide un
+// minuto por vez (Engine.simularUnMinuto) y acá se dibuja lo que pasó. Por
+// eso la velocidad es cosa de la pantalla —cuántos milisegundos hay entre un
+// minuto y el otro— y "Instantáneo" es simplemente no esperar nada.
+//
+// El reloj se apaga solo en cada corte: el entretiempo, una lesión y el
+// final. También se apaga si se cambia de pantalla (ver render()), para que
+// no siga corriendo contra un HTML que ya no existe.
+
+let relojDelPartido = null;
+// Lo puso en pausa el usuario (o el juego, al abrir el panel de cambios).
+let partidoPausado = false;
+// Cuántos eventos ya están dibujados en el feed: lo que venga después se
+// agrega arriba sin volver a dibujar la lista entera.
+let eventosDibujados = 0;
+
+function detenerElPartido() {
+  if (relojDelPartido) clearTimeout(relojDelPartido);
+  relojDelPartido = null;
+}
+
+function elPartidoEstaCorriendo() {
+  return !!relojDelPartido;
+}
+
+function renderPartido() {
+  const s = Engine.state;
+  const p = s.partido;
+  const ctx = s.matchContext;
+  if (!p || !ctx) { s.screen = 'calendar'; render(); return; }
+  const club = Engine.getClub(s.clubId);
+  const rival = Engine.getClub(ctx.opponentId);
+  const dif = p.mios - p.suyos;
+  const minuto = p.minuto || 0;
+
+  app.innerHTML = `
+    ${header()}
+    <div class="card partido-vivo">
+      <p class="muted entretiempo-donde">${dondeSeJuega(ctx)}</p>
+      <div class="entretiempo-marcador">
+        <span class="lado">${clubCrest(club, 44)}<strong>${club.name}</strong></span>
+        <span class="cifras ${dif > 0 ? 'gana' : dif < 0 ? 'pierde' : ''}" id="partido-cifras">${p.mios} - ${p.suyos}</span>
+        <span class="lado">${clubCrest(rival, 44)}<strong>${rival.name}</strong></span>
+      </div>
+
+      <div class="partido-reloj">
+        <span class="minuto-grande" id="partido-minuto">${minuto}'</span>
+        <div class="barra-tiempo">
+          <div class="barra-jugada" id="barra-jugada" style="width:${Math.round((minuto / Engine.MINUTOS_DE_PARTIDO) * 100)}%"></div>
+          <span class="marca-descanso"></span>
+        </div>
+      </div>
+
+      <div class="partido-controles">
+        <button class="option-btn small" id="partido-play">${partidoPausado ? '▶ Seguir' : '⏸ Pausar'}</button>
+        <div class="velocidades" id="partido-velocidades">
+          ${Engine.VELOCIDADES.map((v) => `
+            <button class="option-btn small ghost${Engine.velocidadDelPartido().id === v.id ? ' elegida' : ''}" data-vel="${v.id}">${v.label}</button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="partido-stats" id="partido-stats">${estadisticasHtml()}</div>
+
+      <h3>Lo que va pasando</h3>
+      <ul class="feed-vivo" id="feed-vivo">${feedHtml(p.eventos)}</ul>
+
+      <h3>Ajuste táctico al vuelo</h3>
+      <div class="ajustes-vivo" id="ajustes-vivo">${ajustesEnVivoHtml()}</div>
+
+      ${selectorDeEsquemaHtml()}
+
+      ${panelDeCambiosHtml(p)}
+
+    </div>
+  `;
+  eventosDibujados = (p.eventos || []).length;
+
+  document.getElementById('partido-play').addEventListener('click', () => {
+    partidoPausado = !partidoPausado;
+    if (partidoPausado) detenerElPartido(); else arrancarElReloj();
+    pintarBotonDelReloj();
+  });
+  app.querySelectorAll('#partido-velocidades [data-vel]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Sonido.playClick();
+      Engine.setVelocidadDelPartido(btn.dataset.vel);
+      app.querySelectorAll('#partido-velocidades [data-vel]').forEach((b) => {
+        b.classList.toggle('elegida', b.dataset.vel === btn.dataset.vel);
+      });
+      // El cambio de velocidad se siente en el acto: se rearma el reloj con
+      // el nuevo ritmo en vez de esperar al minuto que viene.
+      if (!partidoPausado) arrancarElReloj();
+    });
+  });
+  cablearLosAjustes();
+  cablearElEsquema();
+
+  // El panel de cambios, igual que en el vestuario. Abrirlo pausa el partido:
+  // nadie puede elegir un cambio con el reloj corriendo a 5x.
+  const panel = document.getElementById('panel-cambios');
+  if (panel) {
+    panel.addEventListener('toggle', () => {
+      panelDeCambiosAbierto = panel.open;
+      if (panel.open) { partidoPausado = true; detenerElPartido(); pintarBotonDelReloj(); }
+    });
+  }
+  app.querySelectorAll('.cambio-ficha').forEach((btn) => {
+    btn.addEventListener('click', () => tocarFichaDeCambio(btn.dataset.cambio, btn.dataset.grupo));
+  });
+  if (Engine.cambiosQueQuedan() > 0) {
+    app.querySelectorAll('.cambio-cancha .player-marker').forEach((el) => {
+      el.addEventListener('click', () => tocarFichaDeCambio(el.getAttribute('data-player'), 'cancha'));
+    });
+  }
+
+  if (!partidoPausado) arrancarElReloj();
+}
+
+// El esquema, para cambiarlo sin salir del partido: en el vestuario o con el
+// reloj corriendo. Cambiar de esquema NO rearma el equipo (ver setFormation):
+// los que están adentro se reacomodan y listo.
+function selectorDeEsquemaHtml() {
+  const s = Engine.state;
+  return `
+    <div class="formacion-vivo">
+      <label for="formacion-en-vivo">Esquema</label>
+      <select id="formacion-en-vivo">
+        ${FORMATIONS.map((f) => `<option value="${f.id}" ${s.formation === f.id ? 'selected' : ''}>${f.name} · ${f.style}</option>`).join('')}
+      </select>
+      <p class="muted">Cambiar el esquema no toca quién está adentro: los que están se reacomodan.</p>
+    </div>
+  `;
+}
+
+function cablearElEsquema() {
+  const sel = document.getElementById('formacion-en-vivo');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    Sonido.playClick();
+    Engine.setFormation(sel.value);
+    render();
+  });
+}
+
+// Las cuatro estadísticas de arriba, tuyas contra las de él.
+function estadisticasHtml() {
+  const e = Engine.estadisticasDelPartido();
+  const filas = [
+    ['Remates', 'remates'],
+    ['Córners', 'corners'],
+    ['Faltas', 'faltas'],
+    ['Amarillas', 'amarillas'],
+  ];
+  return filas.map(([label, clave]) => `
+    <div class="stat-fila">
+      <span class="mia">${e.mias[clave]}</span>
+      <span class="que">${label}</span>
+      <span class="suya">${e.suyas[clave]}</span>
+    </div>
+  `).join('');
+}
+
+// Los dos pares de botones. Dentro de cada par solo puede haber uno prendido,
+// y volver a tocar el que está prendido lo apaga.
+function ajustesEnVivoHtml() {
+  const p = Engine.state.partido;
+  const puestos = (p && p.ajustes) || {};
+  return Object.keys(Engine.AJUSTES_EN_VIVO).map((grupo) => `
+    <div class="ajuste-par">
+      ${Engine.AJUSTES_EN_VIVO[grupo].map((a) => `
+        <button class="option-btn small ajuste-btn${puestos[grupo] === a.id ? ' elegida' : ''}"
+          data-grupo="${grupo}" data-ajuste="${a.id}" title="${a.nota}">
+          <strong>${a.label}</strong>
+          <span>${a.nota}</span>
+        </button>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+// Los botones de ajuste se vuelven a dibujar solos al tocarlos (se prenden y
+// se apagan), así que el cableado se hace aparte para poder repetirlo sin
+// redibujar la pantalla entera: el reloj sigue corriendo mientras tanto.
+function cablearLosAjustes() {
+  app.querySelectorAll('#ajustes-vivo [data-ajuste]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Sonido.playClick();
+      Engine.ajustarEnVivo(btn.dataset.grupo, btn.dataset.ajuste);
+      const cont = document.getElementById('ajustes-vivo');
+      if (cont) cont.innerHTML = ajustesEnVivoHtml();
+      cablearLosAjustes();
+    });
+  });
+}
+
+const ICONO_DEL_EVENTO = {
+  gol: '⚽', amarilla: '🟨', lesion: '🏥', remate: '🎯',
+  corner: '🚩', falta: '✋', cambio: '🔁', silbato: '⏱️',
+};
+
+function textoDelEvento(e) {
+  const quien = e.nombre;
+  switch (e.tipo) {
+    case 'gol': return e.mio
+      ? `<strong>¡Gol!</strong> ${quien || 'Lo empujó cualquiera'}`
+      : `Gol del rival${quien ? ` — ${quien}` : ''}`;
+    case 'remate': return `Remate ${e.detalle || 'al arco'}${quien ? ` de ${quien}` : ''}`;
+    case 'corner': return `Tiro de esquina ${e.mio ? 'a favor' : 'para el rival'}`;
+    case 'falta': return `Falta${quien ? ` de ${quien}` : e.mio ? ' tuya' : ' del rival'}`;
+    case 'amarilla': return `Amarilla${quien ? ` para ${quien}` : ''}`;
+    case 'lesion': return `${quien} quedó tendido en el piso`;
+    case 'cambio': return quien;
+    case 'silbato': return quien;
+    default: return quien || '';
+  }
+}
+
+function feedItemHtml(e) {
+  const lado = e.mio === true ? 'mio' : e.mio === false ? 'suyo' : 'neutro';
+  return `<li class="${lado} ev-${e.tipo}">
+    <span class="minuto">${e.minuto}'</span>
+    <span class="icono">${ICONO_DEL_EVENTO[e.tipo] || '·'}</span>
+    <span class="que">${textoDelEvento(e)}</span>
+  </li>`;
+}
+
+// El relato va al revés que el resumen del partido: lo último arriba, que es
+// lo que estás mirando mientras corre el reloj.
+function feedHtml(eventos) {
+  const lista = [...(eventos || [])].reverse();
+  if (!lista.length) return '<li class="neutro"><span class="que muted">Rueda la pelota…</span></li>';
+  return lista.map(feedItemHtml).join('');
+}
+
+function pintarBotonDelReloj() {
+  const btn = document.getElementById('partido-play');
+  if (!btn) return;
+  btn.textContent = partidoPausado ? '▶ Seguir' : '⏸ Pausar';
+  btn.classList.toggle('danger', !partidoPausado);
+}
+
+// Dibuja lo que pasó en un minuto sin rehacer la pantalla entera: mover el
+// reloj y agregar dos renglones al feed no tiene por qué cerrar el panel de
+// cambios ni volver a dibujar la cancha.
+function pintarElMinuto(paso) {
+  const s = Engine.state;
+  const p = s.partido;
+  if (!p) return;
+  const minuto = document.getElementById('partido-minuto');
+  if (minuto) minuto.textContent = `${p.minuto}'`;
+  const barra = document.getElementById('barra-jugada');
+  if (barra) barra.style.width = `${Math.round((p.minuto / Engine.MINUTOS_DE_PARTIDO) * 100)}%`;
+  const cifras = document.getElementById('partido-cifras');
+  if (cifras) {
+    const dif = p.mios - p.suyos;
+    cifras.textContent = `${p.mios} - ${p.suyos}`;
+    cifras.className = `cifras ${dif > 0 ? 'gana' : dif < 0 ? 'pierde' : ''}`;
+  }
+  const stats = document.getElementById('partido-stats');
+  if (stats) stats.innerHTML = estadisticasHtml();
+
+  const feed = document.getElementById('feed-vivo');
+  if (feed && (paso.eventos || []).length) {
+    // Los de este minuto van arriba de todo, el último primero.
+    const nuevos = [...paso.eventos].reverse().map(feedItemHtml).join('');
+    if (eventosDibujados === 0) feed.innerHTML = nuevos;
+    else feed.insertAdjacentHTML('afterbegin', nuevos);
+    eventosDibujados += paso.eventos.length;
+    // Un destello en lo que acaba de entrar, para que se note.
+    Array.from(feed.children).slice(0, paso.eventos.length).forEach((li) => li.classList.add('recien'));
+  }
+}
+
+// Los silbatos: dos cortos al arrancar cada tiempo, uno largo al final.
+function silbatosDelMinuto(paso) {
+  const p = Engine.state.partido;
+  if (p && (p.minuto === 1 || p.minuto === Engine.MINUTO_DEL_DESCANSO + 1)) Sonido.playWhistle();
+  if (paso.corte === 'entretiempo') Sonido.playWhistle();
+  if (paso.corte === 'final') Sonido.playWhistle(true);
+  if ((paso.eventos || []).some((e) => e.tipo === 'gol' && e.mio)) Sonido.playGoal();
+  // El marcador queda anotado para que el render que viene no vuelva a sonar
+  // el gol que ya sonó acá.
+  ultimoSonido.goles = golesMiosAhora(Engine.state);
+}
+
+// El reloj. Cada tic juega un minuto; en "Instantáneo" no hay tic: se juega
+// de corrido hasta el próximo corte.
+function arrancarElReloj() {
+  detenerElPartido();
+  const enInstantaneo = Engine.velocidadDelPartido().ms === 0;
+  if (enInstantaneo) { jugarDeCorrido(); return; }
+
+  const tic = () => {
+    relojDelPartido = null;
+    if (!Engine.state || Engine.state.screen !== 'partido') { render(); return; }
+    const paso = Engine.simularUnMinuto();
+    pintarElMinuto(paso);
+    silbatosDelMinuto(paso);
+    if (paso.corte) { render(); return; }
+    relojDelPartido = setTimeout(tic, Engine.velocidadDelPartido().ms);
+  };
+  relojDelPartido = setTimeout(tic, 80);
+  pintarBotonDelReloj();
+}
+
+// Instantáneo: se juegan los minutos que queden hasta el próximo corte de un
+// saque, sin dibujar nada en el medio (el feed queda completo igual, con
+// todos los minutos, para poder leerlo después).
+function jugarDeCorrido() {
+  let paso = { corte: null };
+  let vueltas = 0;
+  while (!paso.corte && vueltas < Engine.MINUTOS_DE_PARTIDO + 5) {
+    paso = Engine.simularUnMinuto();
+    vueltas++;
+  }
+  silbatosDelMinuto(paso);
+  render();
+}
+
 // ---------- La lesión que frena el partido ----------
 //
 // El partido se detiene en el minuto de la lesión: el jugador ya salió y el
@@ -3480,6 +3820,7 @@ function renderLesion() {
   });
   document.getElementById('seguir-lesion').addEventListener('click', () => {
     Engine.seguirDespuesDeLaLesion();
+    partidoPausado = false;
     render();
   });
 }
@@ -3505,6 +3846,7 @@ function renderEntretiempo() {
       </div>
       <h2>${titular}</h2>
       ${eventosDelPartidoHtml(p.eventos)}
+      ${selectorDeEsquemaHtml()}
       ${panelDeCambiosHtml(p)}
       <h3>¿Qué hacés en el vestuario?</h3>
       <div class="options" id="entretiempo-opciones">
@@ -3519,6 +3861,7 @@ function renderEntretiempo() {
   `;
   const panel = document.getElementById('panel-cambios');
   if (panel) panel.addEventListener('toggle', () => { panelDeCambiosAbierto = panel.open; });
+  cablearElEsquema();
   app.querySelectorAll('.cambio-ficha').forEach((btn) => {
     btn.addEventListener('click', () => tocarFichaDeCambio(btn.dataset.cambio, btn.dataset.grupo));
   });
@@ -3532,6 +3875,9 @@ function renderEntretiempo() {
       cambioSeleccion = null;
       panelDeCambiosAbierto = false;
       Engine.resolverEntretiempo(Number(btn.dataset.i));
+      // Se vuelve a la cancha con el reloj andando: el segundo tiempo
+      // arranca solo.
+      partidoPausado = false;
       render();
     });
   });
