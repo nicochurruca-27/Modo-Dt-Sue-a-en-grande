@@ -66,13 +66,16 @@ abrir seguís donde quedaste.
   genérico de iniciales **pintado con los colores del club**, así el cuadro
   de la Libertadores no queda mitad escudos y mitad círculos grises.
 - **La camiseta de cada club**: en el panel de plantel, el banco, la reserva y
-  el entretiempo cada club juega con lo suyo. Los colores salen del escudo
-  real (los cuenta `tools/generar-colores.py`), así que no hay una lista de
-  colores escrita a ojo; el diseño —rayas, franja, banda cruzada, banda
-  vertical, mitades— sí está a mano (`CAMISETAS` en `js/ui.js`), porque eso
-  no se puede sacar de una imagen: hoy lo tienen 46 de los 66 y el resto
-  juega de liso con el color del club. El dorsal va sobre una pastilla del
-  color de la camiseta para que se lea también sobre las rayas.
+  el entretiempo cada club juega con la suya, con su diseño —lisa, a rayas,
+  con franja horizontal (Boca), con banda cruzada (River), con la V al pecho
+  (Vélez), con mitades (Newell's)—. Está en `CAMISETAS_CLUBES` (`js/ui.js`),
+  un renglón por club: el tipo y los dos colores. Los 30 de Primera tienen
+  sus colores de camiseta escritos a mano, que no siempre son los del escudo
+  (el de Huracán es rojo y la camiseta es blanca); los 36 de la Nacional
+  arrancan con los colores sacados de su escudo. El diseño se recorta contra
+  el contorno de la camiseta, así una banda diagonal llega hasta el borde y
+  se corta ahí, y el dorsal va sobre una pastilla del color de la camiseta
+  para que se lea también sobre las rayas.
 - **Cambiar de formación mueve un jugador, no once.** El que pusiste de
   lateral derecho sigue de lateral derecho: cada uno se queda en su
   casillero y solo se mueven los que no tienen dónde quedarse (la línea que

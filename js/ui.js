@@ -1361,134 +1361,167 @@ function clubInitials(name) {
 // ---------- La camiseta de cada club ----------
 //
 // Antes todas las camisetas del juego eran verdes: el mismo verde para el
-// plantel de Boca, el de Ferro y el de Colón. Ahora cada club juega con lo
-// suyo, y los colores no están escritos a mano: son los que sacó
-// tools/generar-colores.py contando los píxeles del escudo real (los 66 del
-// fútbol argentino) más los que traen cargados los del continente.
+// plantel de Boca, el de Ferro y el de Colón. Acá está la de cada uno.
 //
-// Del escudo salen los COLORES, no el diseño: eso no se puede deducir de una
-// imagen. El diseño va en CAMISETAS, abajo, y solo está puesto donde no hay
-// ninguna duda (la franja de Boca, la banda de River, las rayas de Racing).
-// El que no está en la lista juega de liso con el color del club, que es lo
-// que pasa con la mayoría.
+// Los COLORES de los 30 de Primera y el diseño de todos vienen escritos a
+// mano: el color de una camiseta no siempre es el que manda en el escudo
+// (el de Huracán es rojo y la camiseta es blanca) y el diseño —rayas,
+// franja, banda— no se puede deducir de una imagen. Los 36 de la Nacional
+// arrancan con los colores sacados de su escudo (js/colores.js) y el diseño
+// puesto a ojo; corregir cualquiera es cambiar un renglón de acá.
 //
-//   patron    'liso' | 'rayas' (verticales) | 'franja' (horizontal)
-//             | 'banda' (cruzada) | 'vertical' (una banda al medio)
-//             | 'mitades'
-//   invertida el escudo manda un color y la camiseta es al revés: el escudo
-//             de Huracán es rojo pero la camiseta es blanca con vivos rojos.
-const CAMISETAS = {
-  // Primera División
-  boca: { patron: 'franja' },
-  river: { patron: 'banda', invertida: true },
-  racing: { patron: 'rayas' },
-  independiente: { patron: 'liso' },
-  sanlorenzo: { patron: 'rayas' },
-  velez: { patron: 'vertical', invertida: true },
-  huracan: { patron: 'liso', invertida: true },
-  estudianteslp: { patron: 'rayas', invertida: true },
-  newells: { patron: 'mitades' },
-  rosariocentral: { patron: 'rayas' },
-  talleres: { patron: 'rayas' },
-  belgrano: { patron: 'liso' },
-  instituto: { patron: 'rayas' },
-  lanus: { patron: 'liso' },
-  banfield: { patron: 'rayas' },
-  defensayjusticia: { patron: 'rayas' },
-  argentinos: { patron: 'liso', invertida: true },
-  atleticotucuman: { patron: 'rayas' },
-  union: { patron: 'rayas' },
-  tigre: { patron: 'rayas' },
-  platense: { patron: 'rayas' },
-  gimnasiamendoza: { patron: 'rayas' },
-  sarmientojunin: { patron: 'rayas' },
-  aldosivi: { patron: 'rayas' },
-  riestra: { patron: 'rayas' },
-  // Primera Nacional
-  colon: { patron: 'rayas' },
-  quilmes: { patron: 'liso', invertida: true },
-  ferro: { patron: 'liso' },
-  chacarita: { patron: 'liso' },
-  allboys: { patron: 'liso', invertida: true },
-  almagro: { patron: 'rayas' },
-  atlanta: { patron: 'rayas' },
-  temperley: { patron: 'rayas' },
-  atleticorafaela: { patron: 'rayas' },
-  gimnasiajujuy: { patron: 'rayas' },
-  gimnasiaytiro: { patron: 'rayas' },
-  estudiantesba: { patron: 'rayas' },
-  chacoforever: { patron: 'rayas' },
-  centralnorte: { patron: 'rayas' },
-  nuevachicago: { patron: 'rayas' },
-  defensoresbelgrano: { patron: 'rayas' },
-  patronato: { patron: 'rayas' },
-  sanmartintuc: { patron: 'liso' },
-  sanmartinsj: { patron: 'rayas' },
-  sanmiguel: { patron: 'rayas' },
-  godoycruz: { patron: 'rayas' },
-  mitresgo: { patron: 'rayas' },
-  almirantebrown: { patron: 'rayas' },
-  madryn: { patron: 'rayas' },
-  losandes: { patron: 'liso' },
-  santelmo: { patron: 'rayas' },
-  tristansuarez: { patron: 'rayas' },
-  midland: { patron: 'rayas' },
-  colegiales: { patron: 'rayas' },
-  guemessgo: { patron: 'rayas' },
-  maipu: { patron: 'liso' },
-  moron: { patron: 'liso' },
-  racingcordoba: { patron: 'rayas' },
-  acassuso: { patron: 'rayas' },
-  agropecuario: { patron: 'liso' },
-  ciudaddebolivar: { patron: 'liso' },
+//   tipo        'liso' | 'rayas_verticales' | 'banda_horizontal' (Boca)
+//               | 'banda_diagonal' (River) | 'mitad_vertical' (Newell's)
+//               | 'v_pecho' (Vélez)
+//   principal   el color del cuerpo de la camiseta
+//   secundario  el del diseño (y el del contorno y el dorsal si hace falta)
+const CAMISETAS_CLUBES = {
+  // ---- Primera División ----
+  boca: { tipo: 'banda_horizontal', principal: '#002b66', secundario: '#fcb034' },
+  river: { tipo: 'banda_diagonal', principal: '#ffffff', secundario: '#e20613' },
+  racing: { tipo: 'rayas_verticales', principal: '#ffffff', secundario: '#60a5fa' },
+  sanlorenzo: { tipo: 'rayas_verticales', principal: '#0f172a', secundario: '#dc2626' },
+  newells: { tipo: 'mitad_vertical', principal: '#e20613', secundario: '#000000' },
+  velez: { tipo: 'v_pecho', principal: '#ffffff', secundario: '#1d4ed8' },
+  huracan: { tipo: 'liso', principal: '#ffffff', secundario: '#dc2626' },
+  independiente: { tipo: 'liso', principal: '#e20613', secundario: '#ffffff' },
+  lanus: { tipo: 'liso', principal: '#7f1d1d', secundario: '#ffffff' },
+  belgrano: { tipo: 'liso', principal: '#38bdf8', secundario: '#ffffff' },
+  argentinos: { tipo: 'banda_diagonal', principal: '#e20613', secundario: '#ffffff' },
+  rosariocentral: { tipo: 'rayas_verticales', principal: '#002b66', secundario: '#facc15' },
+  talleres: { tipo: 'rayas_verticales', principal: '#0f172a', secundario: '#ffffff' },
+  estudianteslp: { tipo: 'rayas_verticales', principal: '#dc2626', secundario: '#ffffff' },
+  instituto: { tipo: 'rayas_verticales', principal: '#dc2626', secundario: '#ffffff' },
+  banfield: { tipo: 'banda_diagonal', principal: '#ffffff', secundario: '#15803d' },
+  defensayjusticia: { tipo: 'liso', principal: '#facc15', secundario: '#15803d' },
+  atleticotucuman: { tipo: 'rayas_verticales', principal: '#ffffff', secundario: '#38bdf8' },
+  union: { tipo: 'rayas_verticales', principal: '#dc2626', secundario: '#ffffff' },
+  tigre: { tipo: 'banda_horizontal', principal: '#1d4ed8', secundario: '#dc2626' },
+  platense: { tipo: 'banda_horizontal', principal: '#ffffff', secundario: '#78350f' },
+  aldosivi: { tipo: 'rayas_verticales', principal: '#facc15', secundario: '#15803d' },
+  sarmientojunin: { tipo: 'liso', principal: '#15803d', secundario: '#ffffff' },
+  riestra: { tipo: 'liso', principal: '#000000', secundario: '#ffffff' },
+  gimnasiamendoza: { tipo: 'rayas_verticales', principal: '#000000', secundario: '#ffffff' },
+  centralcordoba: { tipo: 'rayas_verticales', principal: '#000000', secundario: '#ffffff' },
+  barracascentral: { tipo: 'rayas_verticales', principal: '#dc2626', secundario: '#ffffff' },
+  gimnasialp: { tipo: 'banda_horizontal', principal: '#ffffff', secundario: '#0f172a' },
+  riocuarto: { tipo: 'liso', principal: '#38bdf8', secundario: '#ffffff' },
+  independienterivadavia: { tipo: 'liso', principal: '#0f172a', secundario: '#ffffff' },
+
+  // ---- Primera Nacional ----
+  // Los colores salen del escudo y el diseño está puesto a ojo: son los que
+  // faltan confirmar.
+  allboys:             { tipo: 'liso', principal: '#f4f4f6', secundario: '#18181c' },  // All Boys
+  ferro:               { tipo: 'liso', principal: '#03642e', secundario: '#f4f4f6' },  // Ferro Carril Oeste
+  madryn:              { tipo: 'rayas_verticales', principal: '#fdd100', secundario: '#18181c' },  // Deportivo Madryn
+  chacoforever:        { tipo: 'rayas_verticales', principal: '#18181c', secundario: '#f4f4f6' },  // Chaco For Ever
+  moron:               { tipo: 'liso', principal: '#c1122c', secundario: '#f4f4f6' },  // Deportivo Morón
+  estudiantesba:       { tipo: 'rayas_verticales', principal: '#18181c', secundario: '#f4f4f6' },  // Estudiantes (BA)
+  racingcordoba:       { tipo: 'rayas_verticales', principal: '#0099de', secundario: '#f4f4f6' },  // Racing de Córdoba
+  losandes:            { tipo: 'liso', principal: '#fd090c', secundario: '#f4f4f6' },  // Los Andes
+  mitresgo:            { tipo: 'rayas_verticales', principal: '#fdcf00', secundario: '#18181c' },  // Mitre de Santiago del Estero
+  almirantebrown:      { tipo: 'rayas_verticales', principal: '#f8e335', secundario: '#18181c' },  // Almirante Brown
+  ciudaddebolivar:     { tipo: 'liso', principal: '#0111fb', secundario: '#f4f4f6' },  // Ciudad de Bolívar
+  colon:               { tipo: 'rayas_verticales', principal: '#be111c', secundario: '#18181c' },  // Colón
+  centralnorte:        { tipo: 'rayas_verticales', principal: '#18181c', secundario: '#f4f4f6' },  // Central Norte (Salta)
+  godoycruz:           { tipo: 'rayas_verticales', principal: '#036bcd', secundario: '#f4f4f6' },  // Godoy Cruz
+  santelmo:            { tipo: 'rayas_verticales', principal: '#1a4283', secundario: '#0d2141' },  // San Telmo
+  sanmiguel:           { tipo: 'rayas_verticales', principal: '#01903d', secundario: '#f4f4f6' },  // San Miguel
+  defensoresbelgrano:  { tipo: 'rayas_verticales', principal: '#d72326', secundario: '#18181c' },  // Defensores de Belgrano
+  acassuso:            { tipo: 'rayas_verticales', principal: '#042b5b', secundario: '#f4f4f6' },  // Acassuso
+  nuevachicago:        { tipo: 'rayas_verticales', principal: '#07913a', secundario: '#18181c' },  // Nueva Chicago
+  atlanta:             { tipo: 'rayas_verticales', principal: '#03176e', secundario: '#e5a902' },  // Atlanta
+  sanmartintuc:        { tipo: 'liso', principal: '#fb0505', secundario: '#f4f4f6' },  // San Martín de Tucumán
+  gimnasiajujuy:       { tipo: 'rayas_verticales', principal: '#69a9db', secundario: '#18181c' },  // Gimnasia de Jujuy
+  almagro:             { tipo: 'rayas_verticales', principal: '#467cba', secundario: '#18181c' },  // Almagro
+  chacarita:           { tipo: 'liso', principal: '#af121e', secundario: '#18181c' },  // Chacarita Juniors
+  sanmartinsj:         { tipo: 'rayas_verticales', principal: '#007436', secundario: '#18181c' },  // San Martín de San Juan
+  temperley:           { tipo: 'rayas_verticales', principal: '#63abd7', secundario: '#f4f4f6' },  // Temperley
+  guemessgo:           { tipo: 'rayas_verticales', principal: '#00458b', secundario: '#fb0204' },  // Güemes de Santiago del Estero
+  tristansuarez:       { tipo: 'rayas_verticales', principal: '#15173e', secundario: '#f4f4f6' },  // Tristán Suárez
+  agropecuario:        { tipo: 'liso', principal: '#028d37', secundario: '#e31c22' },  // Agropecuario
+  patronato:           { tipo: 'rayas_verticales', principal: '#d31115', secundario: '#18181c' },  // Patronato (Paraná)
+  gimnasiaytiro:       { tipo: 'rayas_verticales', principal: '#b4d8f2', secundario: '#f4f4f6' },  // Gimnasia y Tiro (Salta)
+  maipu:               { tipo: 'liso', principal: '#e20512', secundario: '#18181c' },  // Deportivo Maipú
+  quilmes:             { tipo: 'liso', principal: '#f4f4f6', secundario: '#0e1b53' },  // Quilmes
+  colegiales:          { tipo: 'rayas_verticales', principal: '#132a8d', secundario: '#fd0300' },  // Colegiales
+  atleticorafaela:     { tipo: 'rayas_verticales', principal: '#d28b03', secundario: '#0196d3' },  // Atlético de Rafaela
+  midland:             { tipo: 'rayas_verticales', principal: '#003297', secundario: '#f4f4f6' },  // Ferrocarril Midland
 };
 
+// Un club sin camiseta cargada juega con los colores de su escudo, liso.
+function kitDelEscudo(clubId) {
+  const par = paresDeColores(clubId);
+  if (!par) return { tipo: 'liso', principal: '#22c55e', secundario: '#04220f' };
+  return { tipo: 'liso', principal: par[0], secundario: par[1] };
+}
+
 function clubKit(club) {
-  if (!club) return KIT_GENERICO;
-  const par = paresDeColores(club.id);
-  if (!par) return KIT_GENERICO;
-  const diseño = CAMISETAS[club.id] || { patron: 'liso' };
-  const [uno, dos] = diseño.invertida ? [par[1], par[0]] : par;
-  const claro = luz(aRgb(uno)) > 0.55;
+  if (!club) return kitDelEscudo(null);
+  const d = CAMISETAS_CLUBES[club.id] || kitDelEscudo(club.id);
+  const claro = luz(aRgb(d.principal)) > 0.55;
   return {
-    shirt: uno,
-    segundo: dos,
-    patron: diseño.patron || 'liso',
+    shirt: d.principal,
+    segundo: d.secundario,
+    tipo: d.tipo || 'liso',
     // El contorno tiene que verse contra el fondo de la cancha y contra la
     // camiseta: una línea oscura sobre una camiseta clara y al revés.
     trim: claro ? '#18181c' : '#f4f4f6',
     // El dorsal va del color que se lea encima del cuerpo de la camiseta.
     numero: claro ? '#18181c' : '#f4f4f6',
+    claro,
   };
 }
 
-const KIT_GENERICO = { shirt: 'var(--accent)', segundo: null, patron: 'liso', trim: '#04220f', numero: '#04220f' };
+// ---------- Cómo se dibuja ----------
+//
+// El contorno de la camiseta (hombros, mangas y cuerpo) en un cuadrado de
+// 36x36, y el diseño recortado adentro de ese contorno con un clipPath. El
+// recorte es lo que permite que una banda diagonal o la V del pecho lleguen
+// hasta el borde y se corten ahí, en vez de tener que dibujarlas "a ojo"
+// para que no se salgan.
+const SILUETA_CAMISETA = 'M9 4 L14 0 L22 0 L27 4 L34 8 L30 16 L26 14 L26 34 L10 34 L10 14 L6 16 L2 8 Z';
 
-// El diseño de la camiseta, dibujado adentro del cuerpo (el torso va de x=14
-// a x=30 y de y=4 a y=40 en las coordenadas de la camiseta). Se queda
-// adentro por geometría y no con un clip, así no hay que inventar un id
-// único por jugador para cada <clipPath>.
+// Cada recorte necesita su propio id: dos elementos con el mismo id en la
+// página es HTML inválido, y en una cancha hay once camisetas.
+let nCamiseta = 0;
+
 function patronDeCamisetaSvg(kit) {
-  if (!kit.segundo || kit.patron === 'liso') return '';
   const c = kit.segundo;
-  switch (kit.patron) {
-    case 'rayas':
-      // Tres rayas anchas: a este tamaño más rayas se convierten en una
-      // mancha gris.
-      return [15.6, 20.4, 25.2]
-        .map((x) => `<rect x="${x}" y="8" width="3.2" height="32" fill="${c}" />`)
-        .join('');
-    case 'franja':
-      return `<rect x="14" y="19" width="16" height="8" fill="${c}" />`;
-    case 'banda':
-      return `<polygon points="14,9 19,9 30,31 30,40 25,40 14,17" fill="${c}" />`;
-    case 'vertical':
-      return `<rect x="19.5" y="8" width="5" height="32" fill="${c}" />`;
-    case 'mitades':
-      return `<rect x="22" y="8" width="8" height="32" fill="${c}" />`;
+  switch (kit.tipo) {
+    case 'banda_horizontal':
+      return `<rect x="0" y="14" width="36" height="8" fill="${c}" />`;
+    case 'banda_diagonal':
+      return `<polygon points="0,6 8,0 36,28 28,34" fill="${c}" />`;
+    case 'rayas_verticales':
+      return `<rect x="7" y="0" width="7" height="36" fill="${c}" />`
+        + `<rect x="21" y="0" width="7" height="36" fill="${c}" />`;
+    case 'mitad_vertical':
+      return `<rect x="18" y="0" width="18" height="36" fill="${c}" />`;
+    case 'v_pecho':
+      return `<polygon points="0,0 18,16 36,0 28,0 18,9 8,0" fill="${c}" />`;
+    case 'liso':
     default:
       return '';
   }
+}
+
+// La camiseta entera (contorno + diseño + dorsal) en coordenadas de 0 a 36,
+// para meter adentro de cualquier SVG.
+function camisetaSvgInterna(kit, label) {
+  const id = `corte-camiseta-${nCamiseta++}`;
+  const diseño = patronDeCamisetaSvg(kit);
+  return `
+    ${diseño ? `<defs><clipPath id="${id}"><path d="${SILUETA_CAMISETA}" /></clipPath></defs>` : ''}
+    <path d="${SILUETA_CAMISETA}" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.2" stroke-linejoin="round" />
+    ${diseño ? `<g clip-path="url(#${id})">${diseño}</g>` : ''}
+    <path d="${SILUETA_CAMISETA}" fill="none" stroke="${kit.trim}" stroke-width="1.2" stroke-linejoin="round" />
+    <!-- El dorsal va sobre una pastilla del color de la camiseta: con rayas o
+         con una banda atrás, el número solo se perdía. Va opaca del todo, si
+         no una raya clara por debajo se lo come igual. -->
+    <rect x="12" y="19" width="12" height="11" rx="2.5" fill="${kit.shirt}" />
+    <text x="18" y="27.5" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.numero}">${label}</text>
+  `;
 }
 
 // ---------- Cancha: un solo SVG con todo calculado a mano ----------
@@ -1560,7 +1593,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   // más ancha que la camiseta y el icono terminaba flotando al costado.
   const baja = Engine.outIcono(p);
   const label = p.number != null ? p.number : p.rating;
-  const diseño = patronDeCamisetaSvg(kit);
+
   // El puesto se marcaba con un marco de color alrededor de la camiseta, y
   // con once marcos encendidos la cancha era un arcoíris que tapaba a los
   // jugadores. Ahora: si está en su posición no se marca nada (que es lo
@@ -1572,7 +1605,8 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   const title = p.fit && p.fit !== 'green' ? `<title>Valoración natural ${p.rating}${roleNote}, jugando ahí rinde ${p.effectiveRating}</title>` : '';
   const w = PITCH_JERSEY_W;
   const h = PITCH_JERSEY_H;
-  const scale = w / 44;
+  // La camiseta se dibuja en un cuadrado de 36 (ver camisetaSvgInterna).
+  const scale = w / 36;
   // Placa chica debajo del nombre: posición detallada (si la tenemos
   // investigada) + valoración, ej. "LD · 78". Sin posDetail se muestra
   // solo la valoración, para que siempre se vea ese dato en la cancha
@@ -1588,14 +1622,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
            nombre no responde y el toque se lo come el fondo de la cancha. -->
       <rect x="-4" y="-2" width="${w + 8}" height="${h + PITCH_LABEL_H + PITCH_LABEL2_H + PITCH_ENERGIA_H + 4}" rx="8" fill="transparent" />
 
-      <g transform="scale(${scale})">
-        <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
-        ${diseño}
-        <!-- El dorsal va sobre una pastilla del color de la camiseta: con
-             rayas o con una banda atrás, el número solo se perdía. -->
-        <rect x="16" y="21" width="12" height="11" rx="2.5" fill="${kit.shirt}" opacity="0.92" />
-        <text x="22" y="29.5" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.numero}">${label}</text>
-      </g>
+      <g transform="scale(${scale})">${camisetaSvgInterna(kit, label)}</g>
       <rect x="-3" y="${h + 3}" width="${w + 6}" height="${PITCH_LABEL_H}" rx="3" fill="rgba(0,0,0,0.6)" />
       <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>
       <rect x="-3" y="${label2Y}" width="${w + 6}" height="${PITCH_LABEL2_H}" rx="3" fill="rgba(0,0,0,0.4)" />
@@ -2169,12 +2196,7 @@ function cartaDeJugadorHtml(p, club, ancho) {
 
 // La misma camiseta de la cancha, suelta, para meterla adentro de la carta.
 function camisetaDeCartaSvg(kit, label, tam) {
-  return `<svg width="${tam}" height="${tam}" viewBox="0 0 44 44" aria-hidden="true">
-    <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
-    ${patronDeCamisetaSvg(kit)}
-    <rect x="16" y="21" width="12" height="11" rx="2.5" fill="${kit.shirt}" opacity="0.92" />
-    <text x="22" y="29.5" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.numero}">${label}</text>
-  </svg>`;
+  return `<svg width="${tam}" height="${tam}" viewBox="0 0 36 36" aria-hidden="true">${camisetaSvgInterna(kit, label)}</svg>`;
 }
 
 // La ficha del jugador que tocaste: la carta y, al lado, todo lo que hace

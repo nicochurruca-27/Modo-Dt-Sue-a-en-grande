@@ -124,19 +124,18 @@ que te miden). Falta:
 
 ---
 
-## 6. Camisetas: falta confirmar los diseños
+## 6. Camisetas: faltan confirmar las de la Nacional
 
-Ya no hay camisetas verdes: en el plantel, el banco, la reserva y el
-entretiempo cada club juega con sus colores, que salen del escudo real
-(`js/colores.js`), y 46 de los 66 tienen además su diseño —rayas, franja,
-banda cruzada, banda vertical, mitades— en `CAMISETAS` (`js/ui.js`).
+Ya no hay camisetas verdes: cada club juega con la suya en el plantel, el
+banco, la reserva y el entretiempo (`CAMISETAS_CLUBES` en `js/ui.js`). Los
+30 de Primera están confirmados uno por uno, con sus colores de camiseta
+—que no siempre son los del escudo— y su diseño.
 
 Lo que queda:
 
-- **Confirmar los diseños uno por uno.** Los colores salen del escudo, pero
-  el diseño no se puede deducir de una imagen: está escrito a mano y solo
-  donde no había duda. Los 20 que quedaron lisos son los que no estaban
-  claros, y alguno de los 46 puede estar mal.
+- **Los 36 de la Primera Nacional** arrancan con los colores sacados de su
+  escudo y el diseño puesto a ojo. Hay que confirmarlos club por club, igual
+  que se hizo con los de Primera.
 - **La camiseta del rival** no se muestra en ningún lado todavía (el partido
   no dibuja los once del otro).
 - **Los 103 clubes del continente** tienen colores pero ningún diseño.
