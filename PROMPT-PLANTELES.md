@@ -212,9 +212,9 @@ Cambiá el nombre del club en la primera línea y copiá de acá para abajo.
 
 ## 4. Prompt B — sólo los cumpleaños de los que ya están cargados
 
-Este es el hueco concreto que tiene el juego hoy: 58 jugadores cargados,
-ninguno con fecha de nacimiento. Con este prompt se completa sin tocar
-nada más.
+**Ya se usó: los 58 jugadores de Boca y River tienen su fecha cargada.** Queda
+acá porque sirve igual para el próximo club que se cargue sin fechas, o para
+volver a controlar las que ya están.
 
 > Necesito la **fecha de nacimiento exacta** de estos futbolistas de Boca
 > Juniors y River Plate (plantel 2026). **Buscá en internet, no contestes

@@ -12,17 +12,12 @@ que no se pierda entre una charla y la otra.
 Nada de esto se puede inventar: son datos reales que hay que pasar a mano. Es
 lo único que no depende de programar.
 
-### Fechas de nacimiento de los jugadores investigados
+### Fechas de nacimiento — hecho
 
-El juego ya calcula la edad con la fecha de nacimiento (`birthDate`), que sube
-sola el día del cumpleaños. Pero **ninguno de los 58 jugadores investigados de
-Boca y River la tiene**: de ellos sabemos la edad, no el día que nacieron, y no
-se inventa. Mientras falte, la edad de esos jugadores sale del reloj grueso (la
-edad con la que entraron más las temporadas que pasaron), que es lo que hacía
-el juego antes.
-
-Cargarla es agregar `birthDate: 'AAAA-MM-DD'` al jugador en `js/players.js`:
-ese jugador pasa solo al reloj fino, sin tocar código.
+Los 58 jugadores de Boca y River ya tienen su `birthDate` cargada, así que la
+edad sale del almanaque y sube sola el día del cumpleaños. El que falta es el
+club que se cargue de acá en adelante: el pedido ya está escrito en
+`PROMPT-PLANTELES.md` y la fecha va en el mismo renglón del jugador.
 
 ### Jugadores de todos los clubes
 
