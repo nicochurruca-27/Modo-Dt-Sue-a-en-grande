@@ -708,19 +708,98 @@ const Engine = {
     const casilleros = this.slotOrderForFormation(formation).map((slot) => ({ slot, indice: vistos[slot]++ }));
     const jugadores = ids.map((id) => s.squad.find((p) => p.id === id)).filter(Boolean);
 
-    const pares = [];
-    casilleros.forEach((c, ci) => jugadores.forEach((p, pi) => {
-      pares.push({ ci, pi, valor: this.effectiveRating(p, c.slot, formation, c.indice, slotCounts[c.slot]) });
-    }));
-    pares.sort((a, b) => b.valor - a.valor);
+    // Dónde estaba parado cada uno ANTES del cambio de formación. Es el dato
+    // que hace que el equipo no se dé vuelta entero.
+    const vistosAntes = { POR: 0, DEF: 0, MED: 0, OFF: 0, DEL: 0 };
+    const donde = {};
+    (s.startingSlots || []).forEach((e) => {
+      const indice = vistosAntes[e.slot]++;
+      if (e.playerId) donde[e.playerId] = { slot: e.slot, indice };
+    });
+
+    // Lo que rinde un jugador en un casillero, PARA ORDENAR. A diferencia de
+    // effectiveRating no mira la energía: que alguien venga cansado no puede
+    // cambiarle el puesto a nadie.
+    const rinde = (p, c) => Math.round(p.rating * this.positionFit(p, c.slot, formation, c.indice, slotCounts[c.slot]).mult);
 
     const puestos = new Array(casilleros.length).fill(null);
     const usados = new Set();
+    const poner = (ci, pi) => { puestos[ci] = jugadores[pi].id; usados.add(pi); };
+
+    // 1. El que ya estaba en ESE casillero se queda. Cambiar de 4-3-3 a
+    //    4-4-2 mueve un jugador, no once: el que pusiste vos de lateral
+    //    derecho sigue siendo el lateral derecho.
+    casilleros.forEach((c, ci) => {
+      const pi = jugadores.findIndex((p, i) => !usados.has(i)
+        && donde[p.id] && donde[p.id].slot === c.slot && donde[p.id].indice === c.indice);
+      if (pi >= 0) poner(ci, pi);
+    });
+
+    // 2. Los de la misma línea que perdieron su lugar exacto (la línea se
+    //    corrió de tamaño) se quedan en la línea, en el casillero que mejor
+    //    les venga de los que quedaron.
+    casilleros.forEach((c, ci) => {
+      if (puestos[ci]) return;
+      let mejor = -1;
+      let mejorValor = -1;
+      jugadores.forEach((p, pi) => {
+        if (usados.has(pi) || !donde[p.id] || donde[p.id].slot !== c.slot) return;
+        const v = rinde(p, c);
+        if (v > mejorValor) { mejorValor = v; mejor = pi; }
+      });
+      if (mejor >= 0) poner(ci, mejor);
+    });
+
+    // 3. Los que sobraron (su línea se achicó, o entraron de cero) van a los
+    //    casilleros que quedaron, con el mejor reparto posible: se miran
+    //    todas las combinaciones y se toma siempre la que más rinde.
+    const pares = [];
+    casilleros.forEach((c, ci) => {
+      if (puestos[ci]) return;
+      jugadores.forEach((p, pi) => {
+        if (usados.has(pi)) return;
+        pares.push({ ci, pi, valor: rinde(p, c) });
+      });
+    });
+    pares.sort((a, b) => b.valor - a.valor);
     pares.forEach(({ ci, pi }) => {
       if (puestos[ci] || usados.has(pi)) return;
-      puestos[ci] = jugadores[pi].id;
-      usados.add(pi);
+      poner(ci, pi);
     });
+
+    // 4. Un último repaso a los que quedaron MUY fuera de lugar (rojo). Se
+    //    busca con quién intercambiarlos para que los dos queden mejor. Es lo
+    //    que arregla el caso de manual: al pasar a cinco defensores, el
+    //    casillero que sobra atrás se lo llevaba un extremo (rojo) mientras
+    //    un volante se quedaba en el medio; ahora baja el volante (amarillo)
+    //    y el extremo se va al mediocampo (amarillo). Solo se tocan los
+    //    rojos: el resto del equipo se queda donde lo pusiste.
+    for (let vuelta = 0; vuelta < 3; vuelta++) {
+      let hubo = false;
+      casilleros.forEach((c, ci) => {
+        const jugador = jugadores.find((p) => p.id === puestos[ci]);
+        if (!jugador) return;
+        if (this.positionFit(jugador, c.slot, formation, c.indice, slotCounts[c.slot]).color !== 'red') return;
+        let mejorCi = -1;
+        let mejorGanancia = 0;
+        casilleros.forEach((otro, oi) => {
+          if (oi === ci) return;
+          const suyo = jugadores.find((p) => p.id === puestos[oi]);
+          if (!suyo) return;
+          const ahora = rinde(jugador, c) + rinde(suyo, otro);
+          const cambiado = rinde(suyo, c) + rinde(jugador, otro);
+          if (cambiado - ahora > mejorGanancia) { mejorGanancia = cambiado - ahora; mejorCi = oi; }
+        });
+        if (mejorCi >= 0) {
+          const tmp = puestos[ci];
+          puestos[ci] = puestos[mejorCi];
+          puestos[mejorCi] = tmp;
+          hubo = true;
+        }
+      });
+      if (!hubo) break;
+    }
+
     s.startingSlots = casilleros.map((c, ci) => ({ slot: c.slot, playerId: puestos[ci] }));
     if (!sinRellenar) this.repairStartingSlots();
   },
@@ -755,7 +834,7 @@ const Engine = {
     if (slotIndex === undefined || slotCount === undefined) return true;
     const side = this.WIDTH_BY_POS_DETAIL[player.posDetail];
     if (!side) return true;
-    return side === this.slotWidthCategory(slotIndex, slotCount);
+    return side === this.slotWidthCategory(slotIndex, slotCount, slot);
   },
 
   // El mejor de una lista para un casillero puntual. Primero se queda con
@@ -890,8 +969,13 @@ const Engine = {
   // más casilleros, los de las puntas son de banda y el resto del medio.
   // Con 1 o 2 (un delantero solo, o una dupla de delanteros centrales, que
   // es lo más común en el fútbol argentino) no hay banda: todos del medio.
-  slotWidthCategory(index, count) {
+  slotWidthCategory(index, count, slot) {
     if (count <= 2) return 'center';
+    // Una línea de TRES defensores son tres centrales, no un lateral a cada
+    // lado: en una defensa de tres el de la punta sigue siendo central (y
+    // los carriles los corren los volantes). Con cuatro o con cinco sí hay
+    // laterales en los bordes.
+    if (slot === 'DEF' && count === 3) return 'center';
     if (index === 0) return 'left';
     if (index === count - 1) return 'right';
     return 'center';
@@ -932,7 +1016,7 @@ const Engine = {
     if (!player.altPosDetail || !player.altPosDetail.length || fit.color === 'green') return fit;
     const slotBuckets = slot === 'OFF' ? ['MED', 'DEL'] : [slot];
     const hasWidthInfo = (slot === 'DEF' || slot === 'DEL') && slotIndex !== undefined && slotCount !== undefined;
-    const slotSide = hasWidthInfo ? this.slotWidthCategory(slotIndex, slotCount) : null;
+    const slotSide = hasWidthInfo ? this.slotWidthCategory(slotIndex, slotCount, slot) : null;
     const matches = player.altPosDetail.some((pd) => {
       const bucket = this.BUCKET_BY_POS_DETAIL[pd];
       if (!bucket || !slotBuckets.includes(bucket)) return false;
@@ -994,7 +1078,7 @@ const Engine = {
     if (playerPos === slot) {
       if ((slot === 'DEF' || slot === 'DEL') && player.posDetail && slotIndex !== undefined && slotCount !== undefined) {
         const playerSide = this.WIDTH_BY_POS_DETAIL[player.posDetail];
-        const slotSide = this.slotWidthCategory(slotIndex, slotCount);
+        const slotSide = this.slotWidthCategory(slotIndex, slotCount, slot);
         if (playerSide && playerSide !== slotSide) return this.applyAltPositionBonus(player, slot, { color: 'yellow', mult: 0.9 }, slotIndex, slotCount);
       }
       return { color: 'green', mult: 1 };
@@ -3737,8 +3821,46 @@ const Engine = {
       usados.add(jugador.id);
       return { slot, playerId: jugador.id };
     });
+    // Un once se escribe "Montero; Lozano, Di Lollo, Pellegrino, Blanco":
+    // el lateral DERECHO primero, como se lee una formación en el diario. En
+    // la cancha del juego el casillero 0 es el de la IZQUIERDA (ver
+    // slotWidthCategory), así que tomar la lista en orden dejaba a los dos
+    // laterales cruzados y al equipo arrancando con dos amarillos que nadie
+    // había elegido. Se acomoda cada línea por el lado de la cancha al que
+    // pertenece cada uno.
+    this.acomodarLineasPorLado();
     // repairStartingSlots rellena los casilleros que hayan quedado vacíos.
     this.repairStartingSlots();
+  },
+
+  // Ordena cada línea de izquierda a derecha según la posición detallada de
+  // sus jugadores: los de la izquierda a la izquierda, los del medio en el
+  // medio y los de la derecha a la derecha. No cambia QUIÉNES juegan ni en
+  // qué línea: solo el orden adentro de la línea.
+  acomodarLineasPorLado() {
+    const s = this.state;
+    if (!s.startingSlots) return;
+    const peso = { left: 0, center: 1, right: 2 };
+    const porLinea = {};
+    s.startingSlots.forEach((e, i) => {
+      if (!porLinea[e.slot]) porLinea[e.slot] = [];
+      porLinea[e.slot].push(i);
+    });
+    Object.values(porLinea).forEach((indices) => {
+      if (indices.length < 3) return; // con uno o dos no hay lados que ordenar
+      const jugadores = indices.map((i) => s.startingSlots[i].playerId);
+      const lado = (id) => {
+        const p = s.squad.find((x) => x.id === id);
+        const l = p && this.WIDTH_BY_POS_DETAIL[p.posDetail];
+        return l ? peso[l] : 1;
+      };
+      // Estable: entre dos del mismo lado se respeta el orden que ya tenían.
+      const ordenados = jugadores
+        .map((id, orden) => ({ id, orden, lado: lado(id) }))
+        .sort((a, b) => a.lado - b.lado || a.orden - b.orden)
+        .map((x) => x.id);
+      indices.forEach((i, k) => { s.startingSlots[i].playerId = ordenados[k]; });
+    });
   },
 
   // Qué le pide la dirigencia para esta temporada, según el nivel del club.

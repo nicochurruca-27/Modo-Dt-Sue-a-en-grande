@@ -73,6 +73,12 @@ abrir seguís donde quedaste.
   no se puede sacar de una imagen: hoy lo tienen 46 de los 66 y el resto
   juega de liso con el color del club. El dorsal va sobre una pastilla del
   color de la camiseta para que se lea también sobre las rayas.
+- **Cambiar de formación mueve un jugador, no once.** El que pusiste de
+  lateral derecho sigue de lateral derecho: cada uno se queda en su
+  casillero y solo se mueven los que no tienen dónde quedarse (la línea que
+  se achicó o la que se agrandó). Medido sobre las 18 formaciones: se quedan
+  en el mismo lugar 9 de los 11, ninguno termina en un puesto disparatado y
+  el arquero nunca sale del arco.
 - **La ficha del jugador es una carta**: tocás a cualquiera —de la cancha, del
   banco o de la reserva— y abajo aparece su carta con los colores del club,
   la valoración, el puesto, el escudo, la bandera y la camiseta con su

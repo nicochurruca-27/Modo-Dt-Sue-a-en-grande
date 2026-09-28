@@ -2008,6 +2008,32 @@ function handlePlayerTap(id) {
   // cambian entre ellos, y el motor lo sabe hacer. El atajo hacía imposible
   // mandar a alguien del banco a la reserva y subir a otro en su lugar.
   //
+  // Con un partido en juego las reglas son otras: mover a dos que están en la
+  // cancha es gratis (es acomodar el equipo), pero meter a uno del banco es
+  // un CAMBIO, y de esos hay tres. Sin esto el panel de la derecha era una
+  // puerta de atrás: se podía ir metiendo gente sin que contara ninguno.
+  if (s.partido) {
+    const enCancha = (otro) => (s.startingSlots || []).some((e) => e.playerId === otro);
+    const aDentro = enCancha(selectedPlayerId);
+    const bDentro = enCancha(id);
+    if (aDentro !== bDentro) {
+      const sale = aDentro ? selectedPlayerId : id;
+      const entra = aDentro ? id : selectedPlayerId;
+      if (!Engine.hacerUnCambio(sale, entra)) {
+        const quedan = Engine.cambiosQueQuedan();
+        const entraJug = s.squad.find((p) => p.id === entra);
+        alert(quedan <= 0
+          ? 'Ya usaste los tres cambios del partido.'
+          : entraJug && !Engine.isAvailable(entraJug)
+            ? `${entraJug.name} no está disponible: ${Engine.outLabel(entraJug)}.`
+            : 'Ese cambio no se puede hacer: al que ya sacaste del partido no lo podés volver a meter.');
+      }
+      selectedPlayerId = null;
+      render();
+      return;
+    }
+  }
+
   // Ahora decide el motor, que es el que conoce las reglas.
   const ok = Engine.swapPlayers(selectedPlayerId, id);
   if (ok) {
@@ -2216,7 +2242,8 @@ function renderSquadPanel() {
         ${buildPitchSvg(xi, club)}
       </div>
       ${fichaDelSeleccionadoHtml()}
-      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.</p>
+      <p class="muted">Tocá un jugador de la cancha y después uno del banco (o al revés) para cambiarlos. Podés poner a cualquiera en cualquier puesto, pero fuera de su posición natural rinde menos. Si la cancha no entra completa, deslizala para el costado.${
+        s.partido ? ' <strong>Con el partido en juego</strong>: mover de puesto a dos que están en la cancha es gratis, pero meter a uno del banco gasta uno de los tres cambios.' : ''}</p>
       <p class="muted fit-legend">Sin marca: está en su posición &nbsp; <span class="fit-dot fit-yellow"></span>posición cercana &nbsp; <span class="fit-dot fit-red"></span>fuera de lugar</p>
       ${xi.formation.off ? '<p class="muted">Esta formación distingue el mediocampista de marca (el 5) del enganche: fijate el rol de cada uno en la lista de suplentes.</p>' : ''}
       ${alBordeDeLaSuspension(s.squad)}
@@ -3684,12 +3711,12 @@ function panelDeCambiosHtml(p) {
           <li><span class="sale">↓ ${c.saleNombre}</span><span class="entra">↑ ${c.entraNombre}</span></li>
         `).join('')}</ul>` : ''}
         <p class="muted">${!quedan
-          ? 'Ya usaste los tres cambios del partido. Así está parado el equipo para el segundo tiempo.'
+          ? 'Ya usaste los tres cambios del partido. Podés seguir moviendo de puesto a los que están en la cancha: eso no gasta cambios.'
           : cambioSeleccion
             ? (cambioSeleccion.grupo === 'cancha'
-              ? 'Ahora elegí al que entra desde el banco.'
+              ? 'Ahora tocá al que entra del banco, o a otro de la cancha para que cambien de puesto entre ellos.'
               : 'Ahora tocá al que sale de la cancha.')
-            : 'Tocá al que sale de la cancha y después al que entra del banco (o al revés).'}</p>
+            : 'Tocá al que sale de la cancha y después al que entra del banco (o al revés). Si tocás dos de la cancha, cambian de puesto entre ellos y no gastás ningún cambio.'}</p>
         <div class="pitch-scroll cambio-cancha${quedan ? '' : ' sin-cambios'}">
           ${buildPitchSvg(Engine.getStartingXI(), club, { resaltado: enCancha, amonestados })}
         </div>
@@ -3707,7 +3734,8 @@ function panelDeCambiosHtml(p) {
 }
 
 // Un toque en una ficha: si no había nadie marcado, la marca; si el marcado
-// era del otro grupo, ese es el cambio; si era del mismo, cambia la marca.
+// era del banco, ese es el cambio; si los dos son de la cancha, se cambian de
+// puesto entre ellos.
 function tocarFichaDeCambio(id, grupo) {
   if (arrastroRecien) return;
   if (cambioSeleccion && cambioSeleccion.id === id) { cambioSeleccion = null; render(); return; }
@@ -3715,6 +3743,15 @@ function tocarFichaDeCambio(id, grupo) {
     const sale = grupo === 'cancha' ? id : cambioSeleccion.id;
     const entra = grupo === 'cancha' ? cambioSeleccion.id : id;
     Engine.hacerUnCambio(sale, entra);
+    cambioSeleccion = null;
+    render();
+    return;
+  }
+  // Dos de la cancha: no es un cambio, es mover el equipo. Mandar al 9 al
+  // costado y al extremo al medio no gasta ninguno de los tres cambios,
+  // igual que en la realidad.
+  if (cambioSeleccion && grupo === 'cancha') {
+    Engine.swapPlayers(cambioSeleccion.id, id);
     cambioSeleccion = null;
     render();
     return;
