@@ -50,6 +50,21 @@
 // `loanFrom` / `loanUntil` (opcional): si el jugador está a préstamo, de qué
 // club es dueño y hasta cuándo. Es solo información — el juego todavía no
 // simula que el préstamo termine y el jugador vuelva a su club dueño.
+// ---------- La fecha de nacimiento ----------
+//
+// Cada jugador puede llevar `birthDate: 'AAAA-MM-DD'`. Cuando está, es la
+// fuente de verdad de su edad: el juego la calcula contra el almanaque y sube
+// sola el día del cumpleaños (ver Engine.edadDe).
+//
+// Hoy NINGUNO de los jugadores investigados la tiene, y no se inventa: para
+// esos la edad sale del reloj grueso —la edad con la que entraron más las
+// temporadas que pasaron—, que es exactamente lo que hacía el juego antes.
+// Agregarle la fecha a un jugador es cambiar un renglón y no rompe nada:
+//
+//   { name: 'Álvaro Montero', pos: 'POR', ..., age: 31, birthDate: '1994-07-09' },
+//
+// El `age` conviene dejarlo igual: se usa para la curva de valoración y como
+// respaldo mientras falte la fecha.
 const REAL_ROSTERS = {
   river: [
     { name: 'Ezequiel Centurión', pos: 'POR', posDetail: 'arquero', age: 29, nation: 'ARG', contractYears: 1, rating: 68, number: 33 },

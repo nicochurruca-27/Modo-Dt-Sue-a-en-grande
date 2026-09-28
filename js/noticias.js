@@ -26,10 +26,11 @@ const NOTICIA_CATEGORIAS = {
   mercado: { label: 'Mercado de pases', color: '#38bdf8' },
   premios: { label: 'Premios', color: '#a78bfa' },
   internacional: { label: 'Internacional', color: '#f472b6' },
+  retiros: { label: 'Retiros', color: '#cbd5e1' },
 };
 
 // Orden en el que se muestran las pestañas del feed.
-const NOTICIA_ORDEN_CATEGORIAS = ['ultimahora', 'resultados', 'lesiones', 'mercado', 'premios', 'internacional'];
+const NOTICIA_ORDEN_CATEGORIAS = ['ultimahora', 'resultados', 'lesiones', 'mercado', 'premios', 'retiros', 'internacional'];
 
 const Noticias = {
   // Cuántas noticias se guardan. Más que esto no sirve: el feed muestra las
@@ -83,6 +84,22 @@ const Noticias = {
   //
   // Cada uno de estos se llama desde engine.js justo después de que pasó la
   // cosa real que la noticia cuenta.
+
+  // Un jugador colgó los botines. Lo llama Engine.procesarRetiros() al
+  // cerrar la temporada, una sola vez por jugador: el retiro queda anotado
+  // en s.retirados y el plantel ya no lo tiene, así que no hay forma de que
+  // la noticia se publique dos veces ni de que vuelva a aparecer al recargar
+  // la pantalla (el feed vive en la partida guardada, como todo lo demás).
+  retiro(engine, nombre, edad, clubId) {
+    const club = clubId ? engine.getClub(clubId) : null;
+    this.push(
+      engine.state,
+      'retiros',
+      `${nombre} se retiró del fútbol profesional`,
+      `Colgó los botines a los ${edad} años${club ? `. Su último club fue ${club.name}` : ''}.`,
+      { clubId: club ? clubId : null, sobre: nombre },
+    );
+  },
 
   // Después de jugarse una fecha completa de la liga.
   trasLaFecha(engine) {

@@ -65,6 +65,16 @@ abrir seguís donde quedaste.
   continente todavía no tienen escudo: esos se dibujan con un escudo
   genérico de iniciales **pintado con los colores del club**, así el cuadro
   de la Libertadores no queda mitad escudos y mitad círculos grises.
+- **La edad sale de la fecha de nacimiento, y los jugadores se retiran.** Cada
+  jugador lleva `birthDate` y su edad se calcula contra el almanaque del juego:
+  sube exactamente el día del cumpleaños, no al cambiar de temporada. Al cerrar
+  el año, el que pasó los 39 cuelga los botines: sale del plantel, queda
+  anotado en el historial y sale en el diario ("Fulano se retiró del fútbol
+  profesional"). **Y no se reemplaza con nadie**: un club con plantel real
+  investigado (hoy Boca y River) nunca recibe un jugador inventado para tapar
+  el hueco — ese lugar lo llena el mercado de pases, y más adelante las
+  inferiores. Los clubes que todavía no tienen plantel real siguen completando
+  el suyo con jugadores generados, hasta que les carguemos el de verdad.
 - **La camiseta de cada club**: en el panel de plantel, el banco, la reserva y
   el entretiempo cada club juega con la suya, con su diseño —lisa, a rayas,
   con franja horizontal (Boca), con banda cruzada (River), con la V al pecho

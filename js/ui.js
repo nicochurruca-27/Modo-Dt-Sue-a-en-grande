@@ -4666,6 +4666,13 @@ function renderSeasonEnd() {
         ${copasDeTuClub.map((t) => `<p class="muted">${t}</p>`).join('')}
         <p class="season-movement">${movementText}</p>
         <p class="muted">${sum.economyNote}</p>
+        ${(sum.retiros || []).length ? `
+          <div class="avisos-partido avisos-neutros">
+            <h3>Colgaron los botines</h3>
+            ${sum.retiros.map((t) => `<p>${t}</p>`).join('')}
+            <p class="muted">El plantel queda con esos jugadores menos: los reemplazos salen del mercado de pases.</p>
+          </div>
+        ` : ''}
       </div>
 
       ${bloque(tituloDeLaTabla, `

@@ -599,6 +599,9 @@ const Mercado = {
         projection: candidato.projection,
         ratingBase: candidato.rating,
         edadBase: candidato.age,
+        birthDate: candidato.birthDate,
+        edadAlLlegar: candidato.edadAlLlegar,
+        temporadaAlLlegar: candidato.temporadaAlLlegar,
         contractYears: 1,
         desdeAnio: anio,
         desdeClub: club.id,
@@ -633,6 +636,14 @@ const Mercado = {
   // fichaje quedaría congelado para siempre.
   jugadorFichado(engine, j, anio) {
     const anios = Math.max(0, anio - (j.desdeAnio || anio));
+    // La fecha de nacimiento es del JUGADOR, no del club: viaja con él en
+    // cada pase. Si no la tiene (un jugador de plantel real), viaja el reloj
+    // grueso: la edad que tenía el año que se movió.
+    const edad = {
+      birthDate: j.birthDate,
+      edadAlLlegar: j.edadAlLlegar != null ? j.edadAlLlegar : j.edadBase,
+      temporadaAlLlegar: j.temporadaAlLlegar != null ? j.temporadaAlLlegar : (j.desdeAnio || 1),
+    };
     return {
       id: j.id,
       name: j.name,
@@ -641,7 +652,10 @@ const Mercado = {
       nation: j.nation,
       role: j.role,
       projection: j.projection,
-      age: j.edadBase + anios,
+      birthDate: j.birthDate,
+      edadAlLlegar: edad.edadAlLlegar,
+      temporadaAlLlegar: edad.temporadaAlLlegar,
+      age: engine.edadDe(edad),
       rating: this.ratingConLosAnios(j.ratingBase, j.edadBase, j.projection || j.ratingBase, anios),
       contractYears: Math.max(1, (j.contractYears || 3) - anios),
     };
@@ -661,6 +675,11 @@ const Mercado = {
       projection: jugador.projection,
       ratingBase: jugador.rating,
       edadBase: jugador.age,
+      // Lo que hace falta para saber su edad en cualquier momento. La fecha
+      // de nacimiento no cambia de dueño con el pase.
+      birthDate: jugador.birthDate,
+      edadAlLlegar: jugador.edadAlLlegar,
+      temporadaAlLlegar: jugador.temporadaAlLlegar,
       contractYears: 3,
       desdeAnio: anio,
     });
@@ -693,7 +712,16 @@ const Mercado = {
       ? real.map((p, i) => ({
         id: `${clubId}-r${i}`,
         name: p.name, pos: p.pos, posDetail: p.posDetail, altPosDetail: p.altPosDetail,
-        age: p.age + aniosPasados,
+        // La edad la calcula el motor contra el almanaque (ver Engine.edadDe).
+        // De estos jugadores todavía no tenemos la fecha de nacimiento real
+        // —y no se inventa—, así que se les anota con qué edad entraron y en
+        // qué temporada, que es el reloj grueso del que habla ese comentario.
+        // `aniosPasados` sigue usándose para la valoración, que sí depende de
+        // los años que corrieron, pero ya no para la edad.
+        birthDate: p.birthDate,
+        edadAlLlegar: p.age,
+        temporadaAlLlegar: 1,
+        age: engine.edadDe({ birthDate: p.birthDate, edadAlLlegar: p.age, temporadaAlLlegar: 1 }),
         rating: this.ratingConLosAnios(p.rating, p.age, p.projection ?? p.rating, aniosPasados),
         projection: p.projection,
         nation: p.nation,
@@ -738,11 +766,18 @@ const Mercado = {
         const nation = this.nacionSembrada(rnd);
         const techo = engine.computePotential(ratingBase, edadBase, club, rnd);
         const contratoBase = 1 + Math.floor(rnd() * 4);
+        // Este jugador no existe, así que su fecha de nacimiento sí se
+        // inventa: sale del id (no del sorteo sembrado, para no correr la
+        // secuencia y cambiar los planteles de las partidas ya empezadas) y
+        // de la edad que tenía en la temporada 1.
+        const id = `${clubId}-g${i}`;
+        const nacimiento = engine.fechaDeNacimientoSembrada(id, edadBase, engine.fechaDeJuegoDeLaTemporada(1));
         return {
-          id: `${clubId}-g${i}`,
+          id,
           name: this.nombreSembrado(rnd, nation),
           pos, nation,
-          age: edadBase + aniosPasados,
+          birthDate: nacimiento,
+          age: engine.edadDe({ birthDate: nacimiento }),
           rating: this.ratingConLosAnios(ratingBase, edadBase, techo, aniosPasados),
           projection: techo,
           // El contrato corre: si ya venció, se le renueva por otras tantas.
@@ -762,23 +797,28 @@ const Mercado = {
     // semilla, así que el guardado no engorda por más años que pasen.
     const movimientos = this.movimientosDe(s, clubId);
     const vivos = base
-      .filter((p) => p.age <= 39 && !movimientos.fuera.includes(p.id))
+      .filter((p) => !engine.seRetira(p) && !movimientos.fuera.includes(p.id))
       .concat(movimientos.dentro.map((j) => this.jugadorFichado(engine, j, anio)));
 
-    // Y el club repone. Sin esto los planteles se vaciaban solos: como nadie
-    // reemplaza a los que se retiran, River llegaba a la temporada 12 con 17
-    // jugadores y seguía bajando, hasta quedar por debajo de un once.
+    // ---------- El relleno, y por qué NO se hace en los clubes con plantel
+    // real ----------
     //
-    // Los que entran son pibes, como si subieran de inferiores: es el
-    // reemplazo más barato de modelar y el más parecido a lo que hace un club
-    // que perdió un veterano. Salen del mismo generador sembrado, así que son
-    // siempre los mismos para ese club en esa temporada.
+    // Un club al que le cargamos su plantel de verdad NO recibe jugadores
+    // inventados para tapar los huecos que dejan los retiros. Si a Boca se le
+    // retiran dos, Boca queda con dos menos, y punto: el juego no inventa un
+    // pibe de 18 con nombre sorteado para que la cuenta cierre. Eso va a
+    // llegar por donde corresponde —el mercado y, más adelante, las
+    // inferiores—, no por un relleno automático.
     //
-    // Esto NO es todavía un mercado entre clubes rivales: nadie compra ni
-    // vende, solo se tapa el agujero para que un plantel no se desarme en una
-    // carrera larga.
+    // En los clubes que TODAVÍA no tienen plantel real el relleno sigue,
+    // porque ahí el plantel entero es generado igual y sin esto se vacían
+    // solos: sin reponer, un club llegaba a la temporada 12 con 17 jugadores
+    // y seguía bajando hasta quedar por debajo de un once. El día que a ese
+    // club se le cargue su REAL_ROSTERS pasa solo al otro comportamiento,
+    // sin tocar una línea de acá.
+    const tienePlantelReal = !!(real && real.length >= 11);
     const nivel = 44 + club.reputation * 6;
-    while (vivos.length < PLANTEL_MINIMO) {
+    while (!tienePlantelReal && vivos.length < PLANTEL_MINIMO) {
       const pos = SQUAD_POSITIONS[vivos.length % SQUAD_POSITIONS.length];
       const edad = 17 + Math.floor(rnd() * 4);
       // El sorteo va centrado en el nivel del club. Si los juveniles entraran
@@ -787,10 +827,14 @@ const Mercado = {
       // mientras el tuyo sube: la diferencia se iría a cualquier lado.
       const rating = Math.max(35, Math.round(nivel - 5 + rnd() * 10));
       const nation = this.nacionSembrada(rnd);
+      const idCantera = `${clubId}-c${anio}-${vivos.length}`;
       vivos.push({
-        id: `${clubId}-c${anio}-${vivos.length}`,
+        id: idCantera,
         name: this.nombreSembrado(rnd, nation),
-        pos, nation, age: edad, rating,
+        pos, nation, rating,
+        // Inventado: fecha de nacimiento inventada, del año en que apareció.
+        birthDate: engine.fechaDeNacimientoSembrada(idCantera, edad, engine.fechaDeJuegoDeLaTemporada(anio)),
+        age: edad,
         projection: engine.computePotential(rating, edad, club, rnd),
         contractYears: 2 + Math.floor(rnd() * 3),
         role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(rnd() * 3)] : undefined,
@@ -1076,6 +1120,11 @@ const Mercado = {
     s.squad.push({
       id: j.id, name: j.name, pos: j.pos, posDetail: j.posDetail, altPosDetail: j.altPosDetail,
       rating: j.rating, age: j.age, nation: j.nation, role: j.role,
+      // La fecha de nacimiento (o el reloj grueso, si no la tiene) viaja con
+      // el jugador: es del jugador y no del club.
+      birthDate: j.birthDate,
+      edadAlLlegar: j.edadAlLlegar,
+      temporadaAlLlegar: j.temporadaAlLlegar,
       contractYears: 3,
       potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
       // Llega entero: no viene de jugar.

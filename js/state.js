@@ -32,6 +32,7 @@
 //   noticias          el portal de noticias
 //   historialPuntos   los puntos y partidos de las temporadas terminadas de
 //                     cada club, para la tabla de promedios
+//   retirados         los que colgaron los botines, con edad y temporada
 //   log               el historial de resultados
 //   stats             partidos, goles y asistencias de cada jugador tuyo
 //   confianza         lo que piensa la dirigencia de vos

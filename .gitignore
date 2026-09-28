@@ -13,6 +13,10 @@ package-lock.json
 # prueba puntual y se borran al terminar. El juego no usa módulos (.mjs) ni
 # capturas: todo lo que corre en el navegador entra por <script> desde
 # index.html.
+#
+# Las pruebas que SÍ se guardan viven en tools/ y quedan fuera de esta regla:
+# están para poder volver a correrlas.
 *.mjs
+!tools/*.mjs
 piloto.js
 *.png

@@ -222,7 +222,12 @@ const Engine = {
   },
 
   load() {
-    return GameState.loadFromLocalStorage();
+    const ok = GameState.loadFromLocalStorage();
+    // Una partida guardada antes de que existiera la fecha de nacimiento
+    // trae jugadores sin ella. La edad se calcula igual (ver edadDe) y acá se
+    // pone al día la copia de lectura.
+    if (ok) this.refrescarEdades();
+    return ok;
   },
 
   resetGame() {
@@ -236,6 +241,224 @@ const Engine = {
   // - Ofensivo: arranca con más confianza (+10 de ánimo).
   // - Conservador: administra mejor la caja (+10% de presupuesto inicial).
   // - Equilibrado: sin bonus, deja que el club hable por sí solo.
+  // ---------- La fecha del juego, la edad y el retiro ----------
+  //
+  // Hasta acá la edad era un número que subía solo a fin de temporada
+  // (`p.age++`). Funcionaba, pero mentía: todos cumplían años el mismo día,
+  // el 31 de diciembre, y la edad no tenía nada que ver con el almanaque que
+  // el juego ya lleva. Ahora manda la FECHA DE NACIMIENTO:
+  //
+  //   birthDate   'AAAA-MM-DD', se escribe una vez y no se toca nunca más.
+  //               Viaja con el jugador: si lo vendés, si lo prestás o si se
+  //               va libre, se va con él (es del jugador, no del club).
+  //   edad        NO se guarda: se calcula con edadDe(), comparando la fecha
+  //               de nacimiento contra el día del almanaque en el que está
+  //               la partida. Sube exactamente el día del cumpleaños.
+  //
+  // `p.age` sigue existiendo adentro de cada jugador, pero como COPIA de
+  // lectura: la escribe una sola función (refrescarEdades) y siempre a
+  // partir de birthDate. Nadie más la toca. Está para no tener que cambiar
+  // las cincuenta pantallas y cuentas que ya la leían.
+  //
+  // ---------- Los que todavía no tienen fecha ----------
+  //
+  // De los jugadores reales (REAL_ROSTERS) no tenemos la fecha de
+  // nacimiento, y NO se inventa. Para esos la edad se calcula igual, pero
+  // con el reloj grueso que había: la edad con la que entraron más las
+  // temporadas que pasaron desde entonces (`edadAlLlegar` /
+  // `temporadaAlLlegar`). Cumplen años al cambiar de temporada, no el día
+  // que les toca. El día que carguemos su fecha real pasan solos al reloj
+  // fino, sin tocar una línea de código.
+
+  // El día del almanaque en el que está la partida.
+  fechaDelJuego() {
+    const s = this.state;
+    const anio = anioDeTemporada(s && s.season ? s.season.year : 1);
+    let dia = CALENDAR_START_DAY + ((s && s.calendar ? s.calendar.dayCount : 0) || 0);
+    let mes = CALENDAR_START_MONTH;
+    let corridoDeAnio = 0;
+    while (dia > DAYS_IN_MONTH[mes]) {
+      dia -= DAYS_IN_MONTH[mes];
+      mes = (mes + 1) % 12;
+      if (mes === 0) corridoDeAnio++;
+    }
+    return { dia, mes, anio: anio + corridoDeAnio };
+  },
+
+  // El mismo día del almanaque, pero en el año de otra temporada. Sirve para
+  // ponerle fecha de nacimiento a un jugador del que sabemos la edad que
+  // tenía en una temporada concreta (por ejemplo, la 1).
+  fechaDeJuegoDeLaTemporada(temporada) {
+    const hoy = this.fechaDelJuego();
+    const s = this.state;
+    const actual = s && s.season ? s.season.year : 1;
+    return { dia: hoy.dia, mes: hoy.mes, anio: hoy.anio - (actual - (temporada || 1)) };
+  },
+
+  // 'AAAA-MM-DD' -> { anio, mes (0-11), dia }. Devuelve null si no hay fecha
+  // o si viene mal escrita: el juego sigue andando con el reloj grueso.
+  parseFechaDeNacimiento(txt) {
+    if (typeof txt !== 'string') return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(txt.trim());
+    if (!m) return null;
+    const anio = Number(m[1]);
+    const mes = Number(m[2]) - 1;
+    const dia = Number(m[3]);
+    if (mes < 0 || mes > 11 || dia < 1 || dia > 31) return null;
+    return { anio, mes, dia };
+  },
+
+  // La edad de un jugador HOY. Es la única fuente de verdad.
+  edadDe(player) {
+    if (!player) return 0;
+    const nacimiento = this.parseFechaDeNacimiento(player.birthDate);
+    if (nacimiento) {
+      const hoy = this.fechaDelJuego();
+      let edad = hoy.anio - nacimiento.anio;
+      // Todavía no cumplió este año: la resta de años da uno de más.
+      if (hoy.mes < nacimiento.mes || (hoy.mes === nacimiento.mes && hoy.dia < nacimiento.dia)) edad--;
+      return Math.max(0, edad);
+    }
+    // Sin fecha de nacimiento: el reloj grueso.
+    if (player.edadAlLlegar != null) {
+      const temporada = this.state && this.state.season ? this.state.season.year : 1;
+      return player.edadAlLlegar + Math.max(0, temporada - (player.temporadaAlLlegar || 1));
+    }
+    return player.age || 0;
+  },
+
+  // ¿Hoy es el cumpleaños de este jugador? (Solo los que tienen fecha.)
+  cumpleHoy(player) {
+    const nacimiento = this.parseFechaDeNacimiento(player && player.birthDate);
+    if (!nacimiento) return false;
+    const hoy = this.fechaDelJuego();
+    return hoy.mes === nacimiento.mes && hoy.dia === nacimiento.dia;
+  },
+
+  // Una fecha de nacimiento para un jugador INVENTADO (los de los clubes que
+  // todavía no tienen plantel real, y mañana los de inferiores). El día y el
+  // mes salen del id del jugador y no del sorteo sembrado: así el mismo
+  // jugador tiene siempre la misma fecha y, sobre todo, no se corre la
+  // secuencia del generador — si se corriera, cambiarían de golpe todos los
+  // planteles de las partidas ya empezadas.
+  fechaDeNacimientoSembrada(id, edad, hoy) {
+    let h = 0;
+    const texto = String(id || '');
+    for (let i = 0; i < texto.length; i++) h = (h * 31 + texto.charCodeAt(i)) % 100000;
+    const mes = h % 12;
+    const dia = 1 + (Math.floor(h / 12) % DAYS_IN_MONTH[mes]);
+    const fecha = hoy || this.fechaDelJuego();
+    // Si el cumpleaños de este año ya pasó, nació hace `edad` años; si
+    // todavía no llegó, hace `edad + 1`. Así la cuenta al revés (edadDe)
+    // devuelve exactamente la edad que se le quiso dar.
+    const yaCumplio = mes < fecha.mes || (mes === fecha.mes && dia <= fecha.dia);
+    const anio = fecha.anio - (edad || 0) - (yaCumplio ? 0 : 1);
+    return `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  },
+
+  // Le deja al jugador con qué calcular su edad. A los inventados les pone
+  // fecha de nacimiento; a los reales, que no la tienen, les anota con qué
+  // edad entraron y en qué temporada. No pisa nada que ya esté puesto.
+  prepararEdad(player, edad, opciones) {
+    if (!player) return player;
+    const op = opciones || {};
+    if (!player.birthDate && op.inventado) {
+      player.birthDate = this.fechaDeNacimientoSembrada(player.id, edad, op.hoy);
+    }
+    if (!player.birthDate && player.edadAlLlegar == null) {
+      player.edadAlLlegar = edad;
+      player.temporadaAlLlegar = op.temporada != null
+        ? op.temporada
+        : (this.state && this.state.season ? this.state.season.year : 1);
+    }
+    player.age = this.edadDe(player);
+    return player;
+  },
+
+  // Pone al día la copia de lectura `p.age` de todos los jugadores que viven
+  // en la partida. Se llama cuando pasa un día y cuando se carga una partida:
+  // son los dos únicos momentos en los que puede cambiar una edad.
+  refrescarEdades() {
+    const s = this.state;
+    if (!s) return;
+    const tocar = (p) => { if (p) p.age = this.edadDe(p); };
+    (s.squad || []).forEach(tocar);
+    (s.cedidos || []).forEach((c) => tocar(c && c.jugador));
+    (s.libres || []).forEach(tocar);
+  },
+
+  // ---------- El retiro ----------
+  //
+  // Se mira una vez por año, al cerrar la temporada: el que pasó la edad
+  // cuelga los botines. No hay sorteo todavía —un sistema más fino (por
+  // puesto, por minutos jugados, por lesiones) queda para más adelante.
+  //
+  // Lo que NO pasa, y es el cambio importante: el juego no inventa a nadie
+  // para tapar el hueco. Si a un club con plantel real se le retiran dos, se
+  // queda con dos menos hasta que alguien los reemplace por las vías que
+  // correspondan (el mercado, y en el futuro las inferiores).
+  EDAD_DE_RETIRO: 39,
+
+  seRetira(player) {
+    return this.edadDe(player) > this.EDAD_DE_RETIRO;
+  },
+
+  // Los que cuelgan los botines al cerrar la temporada. Devuelve los avisos
+  // para la pantalla de fin de año; la noticia se publica acá mismo.
+  procesarRetiros() {
+    const s = this.state;
+    if (!s.retirados) s.retirados = [];
+    const avisos = [];
+    const temporada = s.season ? s.season.year : 1;
+
+    // 1. Tu plantel. El jugador desaparece de verdad: sale de la lista y el
+    //    hueco queda (repairStartingSlots solo reacomoda a los que quedan).
+    (s.squad || []).slice().forEach((p) => {
+      if (!this.seRetira(p)) return;
+      const edad = this.edadDe(p);
+      s.squad = s.squad.filter((x) => x.id !== p.id);
+      s.retirados.push({ id: p.id, name: p.name, pos: p.pos, edad, clubId: s.clubId, temporada });
+      avisos.push({ tono: 'malo', texto: `${p.name} se retiró del fútbol profesional a los ${edad} años.` });
+      if (typeof Noticias !== 'undefined') {
+        Noticias.retiro(this, p.name, edad, s.clubId);
+      }
+    });
+    if (avisos.length) this.repairStartingSlots();
+
+    // 2. Los clubes con plantel real investigado. Sus planteles no se
+    //    guardan (se arman cuando hacen falta, ver Mercado.plantel), así que
+    //    acá no hay nada que borrar: el jugador deja de aparecer solo. Lo
+    //    que sí se hace es contarlo, que es lo que hace que el mundo se
+    //    sienta vivo.
+    //
+    //    Se mira el plantel investigado CRUDO y no el que devuelve
+    //    Mercado.plantel, porque ese ya se los sacó: el que se acaba de
+    //    retirar no está más ahí.
+    if (typeof REAL_ROSTERS !== 'undefined') {
+      Object.keys(REAL_ROSTERS).forEach((clubId) => {
+        if (clubId === s.clubId || !this.getClub(clubId)) return;
+        const seFueron = typeof Mercado !== 'undefined'
+          ? new Set(Mercado.movimientosDe(s, clubId).fuera)
+          : new Set();
+        (REAL_ROSTERS[clubId] || []).forEach((entrada, i) => {
+          const id = `${clubId}-r${i}`;
+          if (seFueron.has(id)) return;
+          // La misma cuenta que hace Mercado.plantel: se arma el jugador tal
+          // como quedaría hoy y se le pregunta la edad a edadDe().
+          const edad = this.edadDe({
+            birthDate: entrada.birthDate,
+            edadAlLlegar: entrada.age,
+            temporadaAlLlegar: 1,
+          });
+          if (edad !== this.EDAD_DE_RETIRO + 1) return;
+          s.retirados.push({ id, name: entrada.name, pos: entrada.pos, edad, clubId, temporada });
+          if (typeof Noticias !== 'undefined') Noticias.retiro(this, entrada.name, edad, clubId);
+        });
+      });
+    }
+    return avisos;
+  },
+
   createDT(name, nation, style) {
     const cleanName = (name || '').trim().slice(0, 30) || 'DT';
     this.state = { screen: 'club-select', dt: { name: cleanName, nation, style } };
@@ -483,7 +706,14 @@ const Engine = {
     const real = REAL_ROSTERS[club.id];
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
-        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, age: p.age, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
+        id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
+        // La edad se calcula (ver edadDe): si el jugador tiene fecha de
+        // nacimiento investigada manda esa, y si no —hoy, todos— se anota con
+        // qué edad entró y en qué temporada.
+        birthDate: p.birthDate,
+        edadAlLlegar: p.age,
+        temporadaAlLlegar: 1,
+        age: p.age,
         posDetail: p.posDetail, altPosDetail: p.altPosDetail, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
         // Datos económicos reales, cuando el club los tiene investigados.
         value: p.value, salary: p.salary, clause: p.clause, transferState: p.transferState,
@@ -520,6 +750,9 @@ const Engine = {
         id: `p${i}`, name: nombreUnico(nation), pos, rating, age, nation, contractYears, role,
         posDetail: this.posDetalladaPara(pos, i, role),
         potential: this.computePotential(rating, age, club),
+        // Jugador inventado: fecha de nacimiento inventada, con la edad que
+        // se le acaba de sortear.
+        birthDate: this.fechaDeNacimientoSembrada(`p${i}-${club.id}`, age, this.fechaDeJuegoDeLaTemporada(1)),
       };
     });
   },
@@ -3780,6 +4013,7 @@ const Engine = {
       log: [],
     };
     this.sembrarHistorialDePromedios();
+    this.refrescarEdades();
     const club = this.getClub(clubId);
     let budget = this.startingBudget(club);
     if (dt && dt.style === 'conservador') budget = Math.round(budget * 1.1);
@@ -4447,6 +4681,9 @@ const Engine = {
     const cal = s.calendar;
     cal.dayInWeek++;
     cal.dayCount++;
+    // Un día más puede ser el cumpleaños de alguien: se pone al día la copia
+    // de lectura de la edad (la fecha de nacimiento no se toca nunca).
+    this.refrescarEdades();
     this.recuperarEnergia();
     // El club genera plata todos los días, no una vez al año: cada 7 días
     // de calendario entra el goteo fijo (TV, sponsors, cuota social).
@@ -6820,6 +7057,12 @@ const Engine = {
       // Llega hecho de otro lado, pero de acá en más crece —o se apaga— en tu
       // club: se usa tu cantera como aproximación.
       potential: j.projection || this.computePotential(j.rating, j.age, this.getClub(s.clubId)),
+      // Lo que hace falta para saber su edad. Viene con él desde donde haya
+      // estado (ver Mercado.jugadorFichado): la fecha de nacimiento no se
+      // vuelve a inventar en cada pase.
+      birthDate: j.birthDate,
+      edadAlLlegar: j.edadAlLlegar,
+      temporadaAlLlegar: j.temporadaAlLlegar,
       age: j.age,
       nation: j.nation,
       contractYears: 2,
@@ -6894,6 +7137,10 @@ const Engine = {
       projection: player.potential,
       ratingBase: player.rating,
       edadBase: player.age,
+      // Se va del club, pero su fecha de nacimiento se va con él.
+      birthDate: player.birthDate,
+      edadAlLlegar: player.edadAlLlegar,
+      temporadaAlLlegar: player.temporadaAlLlegar,
       contractYears: 1,
       desdeAnio: s.season ? s.season.year : 1,
       desdeClub: s.clubId,
@@ -6943,9 +7190,10 @@ const Engine = {
       c.ventanas -= 1;
       if (c.ventanas > 0) { siguen.push(c); return; }
       const j = c.jugador;
-      // Mientras estuvo afuera siguió cumpliendo años y jugando.
-      const anios = s.season ? Math.max(0, s.season.year - c.anio) : 0;
-      if (anios > 0) j.age += anios;
+      // Mientras estuvo afuera siguió cumpliendo años: la edad se recalcula
+      // sola contra el almanaque (ver edadDe), así que acá no se suma nada.
+      // La fecha de nacimiento vuelve con él, que para eso es del jugador.
+      j.age = this.edadDe(j);
       if (c.modalidad === 'compra-obligatoria') {
         Economia.registrar(this, `Venta de ${j.name} a ${c.clubNombre}`, c.compra);
         Mercado.transferir(s, j, s.clubId, c.clubId, s.season ? s.season.year : 1);
@@ -7298,7 +7546,16 @@ const Engine = {
       economyNote,
     };
 
-    s.squad.forEach((p) => { p.age++; p.contractYears = Math.max(0, p.contractYears - 1); });
+    // La edad ya NO se toca acá: sale de la fecha de nacimiento y sube sola
+    // el día del cumpleaños (ver edadDe). Lo que sí corre con la temporada es
+    // el contrato.
+    s.squad.forEach((p) => { p.contractYears = Math.max(0, p.contractYears - 1); });
+    // Y los que pasaron la edad cuelgan los botines. No se reemplaza a
+    // ninguno: el plantel queda con uno menos.
+    const retiros = this.procesarRetiros();
+    // Los retiros de TU plantel se cuentan en la pantalla de fin de
+    // temporada, además de salir en el diario.
+    s.lastSeasonSummary.retiros = retiros.map((r) => r.texto);
     s.screen = 'season-end';
     this.save();
   },
