@@ -15,13 +15,35 @@ Este archivo tiene tres cosas:
 Los datos terminan en `js/players.js`, en `REAL_ROSTERS`. Un club que no
 tiene entrada ahí sigue usando el generador de jugadores al azar.
 
-**Ojo con esto:** si la IA no tiene búsqueda web activada, va a inventar
-edades, dorsales y fechas de nacimiento con total soltura y van a parecer
-razonables. Los dos prompts piden fuente por jugador justamente para poder
-controlarlo. Un dato inventado es peor que un dato faltante: la fecha de
-nacimiento que falta el juego la reemplaza sola con el reloj viejo (la edad
-con la que entró más las temporadas que pasaron), pero una fecha falsa no
-la corrige nadie.
+---
+
+## Lo que ya nos pasó una vez (leer antes de usar los prompts)
+
+La primera tanda de 58 fechas de nacimiento vino de Gemini. De esas, **nueve
+estaban mal**, y las nueve traían "Fuente: Transfermarkt" al lado. No era
+cierto: la IA no había entrado ahí. Dos de esas nueve ni siquiera erraban el
+día, erraban el año (Bacidalupe y Lucas Silva son de 2007 y venían como 2006).
+
+Los nueve errores son todos juveniles. Ninguno es un jugador conocido. Eso no
+es casualidad: de Paredes o de Otamendi la fecha está escrita grande en mil
+páginas, mientras que la de un pibe de Reserva aparece sola, metida en el
+medio de un párrafo de un diario chico ("el entrerriano de 19 años nacido en
+El Ombú"). Ahí el modelo no la lee: la deduce, y le erra.
+
+Tres cosas que salieron de esto:
+
+1. **Preguntarle de nuevo a la misma IA no sirve de control.** Va a repetir su
+   propia invención con la misma seguridad. El buscador de Google con su
+   resumen arriba y Gemini son el mismo modelo: no son dos fuentes.
+2. **Pedir el link, no el nombre de la fuente.** "Transfermarkt" lo escribe
+   cualquiera; una URL se abre y se mira.
+3. **A los juveniles hay que chequearlos aparte, uno por uno**, contra una
+   nota de diario que los nombre. Los jugadores con trayectoria vinieron todos
+   bien: 49 de 49.
+
+Y el motivo de fondo: un dato inventado es peor que un dato faltante. La fecha
+que falta el juego la reemplaza sola con el reloj viejo (la edad con la que
+entró más las temporadas que pasaron); una fecha falsa no la corrige nadie.
 
 ---
 
@@ -203,10 +225,12 @@ Cambiá el nombre del club en la primera línea y copiá de acá para abajo.
 >   en el array, ordenados: arquero, defensa de derecha a izquierda,
 >   mediocampo, ataque.
 > - **Una tabla de control** con una fila por jugador y estas columnas:
->   nombre, fecha de nacimiento, de dónde sacaste la fecha (sitio y fecha
->   de consulta), y "sí/no" si el dorsal y el vencimiento de contrato los
->   pudiste confirmar. Marcá claramente las filas donde algo quedó en
->   `null`.
+>   nombre, fecha de nacimiento, **el link exacto de donde sacaste la fecha**
+>   (la URL completa, no el nombre del sitio) y la fecha en que lo
+>   consultaste, y "sí/no" si el dorsal y el vencimiento de contrato los
+>   pudiste confirmar. Marcá claramente las filas donde algo quedó en `null`.
+>   Si de un jugador no podés dar la URL, poné la fecha en `null`: prefiero
+>   el hueco.
 
 ---
 
@@ -227,7 +251,9 @@ volver a controlar las que ya están.
 >
 > Devolveme una tabla con: nombre exacto como te lo paso, fecha de
 > nacimiento en formato `AAAA-MM-DD`, edad que resulta de esa fecha al 30
-> de junio de 2026 (que es cuando se investigaron las edades que te paso), y la fuente (sitio + fecha de consulta).
+> de junio de 2026 (que es cuando se investigaron las edades que te paso) y
+> **el link exacto** de donde sacaste cada fecha: la URL completa, no el
+> nombre del sitio. Sin link, la fecha va en `null`.
 >
 > **Boca Juniors (31)**
 >
