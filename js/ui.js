@@ -1358,11 +1358,137 @@ function clubInitials(name) {
     .join('');
 }
 
-// Colores reales si el club los tiene cargados (ver CLUB_COLORS en
-// players.js); si no, cae al verde genérico de siempre.
+// ---------- La camiseta de cada club ----------
+//
+// Antes todas las camisetas del juego eran verdes: el mismo verde para el
+// plantel de Boca, el de Ferro y el de Colón. Ahora cada club juega con lo
+// suyo, y los colores no están escritos a mano: son los que sacó
+// tools/generar-colores.py contando los píxeles del escudo real (los 66 del
+// fútbol argentino) más los que traen cargados los del continente.
+//
+// Del escudo salen los COLORES, no el diseño: eso no se puede deducir de una
+// imagen. El diseño va en CAMISETAS, abajo, y solo está puesto donde no hay
+// ninguna duda (la franja de Boca, la banda de River, las rayas de Racing).
+// El que no está en la lista juega de liso con el color del club, que es lo
+// que pasa con la mayoría.
+//
+//   patron    'liso' | 'rayas' (verticales) | 'franja' (horizontal)
+//             | 'banda' (cruzada) | 'vertical' (una banda al medio)
+//             | 'mitades'
+//   invertida el escudo manda un color y la camiseta es al revés: el escudo
+//             de Huracán es rojo pero la camiseta es blanca con vivos rojos.
+const CAMISETAS = {
+  // Primera División
+  boca: { patron: 'franja' },
+  river: { patron: 'banda', invertida: true },
+  racing: { patron: 'rayas' },
+  independiente: { patron: 'liso' },
+  sanlorenzo: { patron: 'rayas' },
+  velez: { patron: 'vertical', invertida: true },
+  huracan: { patron: 'liso', invertida: true },
+  estudianteslp: { patron: 'rayas', invertida: true },
+  newells: { patron: 'mitades' },
+  rosariocentral: { patron: 'rayas' },
+  talleres: { patron: 'rayas' },
+  belgrano: { patron: 'liso' },
+  instituto: { patron: 'rayas' },
+  lanus: { patron: 'liso' },
+  banfield: { patron: 'rayas' },
+  defensayjusticia: { patron: 'rayas' },
+  argentinos: { patron: 'liso', invertida: true },
+  atleticotucuman: { patron: 'rayas' },
+  union: { patron: 'rayas' },
+  tigre: { patron: 'rayas' },
+  platense: { patron: 'rayas' },
+  gimnasiamendoza: { patron: 'rayas' },
+  sarmientojunin: { patron: 'rayas' },
+  aldosivi: { patron: 'rayas' },
+  riestra: { patron: 'rayas' },
+  // Primera Nacional
+  colon: { patron: 'rayas' },
+  quilmes: { patron: 'liso', invertida: true },
+  ferro: { patron: 'liso' },
+  chacarita: { patron: 'liso' },
+  allboys: { patron: 'liso', invertida: true },
+  almagro: { patron: 'rayas' },
+  atlanta: { patron: 'rayas' },
+  temperley: { patron: 'rayas' },
+  atleticorafaela: { patron: 'rayas' },
+  gimnasiajujuy: { patron: 'rayas' },
+  gimnasiaytiro: { patron: 'rayas' },
+  estudiantesba: { patron: 'rayas' },
+  chacoforever: { patron: 'rayas' },
+  centralnorte: { patron: 'rayas' },
+  nuevachicago: { patron: 'rayas' },
+  defensoresbelgrano: { patron: 'rayas' },
+  patronato: { patron: 'rayas' },
+  sanmartintuc: { patron: 'liso' },
+  sanmartinsj: { patron: 'rayas' },
+  sanmiguel: { patron: 'rayas' },
+  godoycruz: { patron: 'rayas' },
+  mitresgo: { patron: 'rayas' },
+  almirantebrown: { patron: 'rayas' },
+  madryn: { patron: 'rayas' },
+  losandes: { patron: 'liso' },
+  santelmo: { patron: 'rayas' },
+  tristansuarez: { patron: 'rayas' },
+  midland: { patron: 'rayas' },
+  colegiales: { patron: 'rayas' },
+  guemessgo: { patron: 'rayas' },
+  maipu: { patron: 'liso' },
+  moron: { patron: 'liso' },
+  racingcordoba: { patron: 'rayas' },
+  acassuso: { patron: 'rayas' },
+  agropecuario: { patron: 'liso' },
+  ciudaddebolivar: { patron: 'liso' },
+};
+
 function clubKit(club) {
-  const c = (typeof CLUB_COLORS !== 'undefined' && CLUB_COLORS[club.id]) || null;
-  return c || { shirt: 'var(--accent)', band: null, trim: '#04220f' };
+  if (!club) return KIT_GENERICO;
+  const par = paresDeColores(club.id);
+  if (!par) return KIT_GENERICO;
+  const diseño = CAMISETAS[club.id] || { patron: 'liso' };
+  const [uno, dos] = diseño.invertida ? [par[1], par[0]] : par;
+  const claro = luz(aRgb(uno)) > 0.55;
+  return {
+    shirt: uno,
+    segundo: dos,
+    patron: diseño.patron || 'liso',
+    // El contorno tiene que verse contra el fondo de la cancha y contra la
+    // camiseta: una línea oscura sobre una camiseta clara y al revés.
+    trim: claro ? '#18181c' : '#f4f4f6',
+    // El dorsal va del color que se lea encima del cuerpo de la camiseta.
+    numero: claro ? '#18181c' : '#f4f4f6',
+  };
+}
+
+const KIT_GENERICO = { shirt: 'var(--accent)', segundo: null, patron: 'liso', trim: '#04220f', numero: '#04220f' };
+
+// El diseño de la camiseta, dibujado adentro del cuerpo (el torso va de x=14
+// a x=30 y de y=4 a y=40 en las coordenadas de la camiseta). Se queda
+// adentro por geometría y no con un clip, así no hay que inventar un id
+// único por jugador para cada <clipPath>.
+function patronDeCamisetaSvg(kit) {
+  if (!kit.segundo || kit.patron === 'liso') return '';
+  const c = kit.segundo;
+  switch (kit.patron) {
+    case 'rayas':
+      // Tres rayas anchas: a este tamaño más rayas se convierten en una
+      // mancha gris.
+      return [15.6, 20.4, 25.2]
+        .map((x) => `<rect x="${x}" y="8" width="3.2" height="32" fill="${c}" />`)
+        .join('');
+    case 'franja':
+      return `<rect x="14" y="19" width="16" height="8" fill="${c}" />`;
+    case 'banda':
+      return `<polygon points="14,9 19,9 30,31 30,40 25,40 14,17" fill="${c}" />`;
+    case 'vertical':
+      return `<rect x="19.5" y="8" width="5" height="32" fill="${c}" />`;
+    case 'mitades':
+      return `<rect x="22" y="8" width="8" height="32" fill="${c}" />`;
+    default:
+      return '';
+  }
 }
 
 // ---------- Cancha: un solo SVG con todo calculado a mano ----------
@@ -1434,9 +1560,7 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
   // más ancha que la camiseta y el icono terminaba flotando al costado.
   const baja = Engine.outIcono(p);
   const label = p.number != null ? p.number : p.rating;
-  const bandPath = kit.band
-    ? `<path d="M14 4 L22 8 L30 4 L32 9 L22 13 L12 9 Z" fill="${kit.band}" />`
-    : '';
+  const diseño = patronDeCamisetaSvg(kit);
   // El puesto se marcaba con un marco de color alrededor de la camiseta, y
   // con once marcos encendidos la cancha era un arcoíris que tapaba a los
   // jugadores. Ahora: si está en su posición no se marca nada (que es lo
@@ -1466,8 +1590,11 @@ function playerMarkerSvg(p, club, x, y, selected, amonestado) {
 
       <g transform="scale(${scale})">
         <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
-        ${bandPath}
-        <text x="22" y="29" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.trim}">${label}</text>
+        ${diseño}
+        <!-- El dorsal va sobre una pastilla del color de la camiseta: con
+             rayas o con una banda atrás, el número solo se perdía. -->
+        <rect x="16" y="21" width="12" height="11" rx="2.5" fill="${kit.shirt}" opacity="0.92" />
+        <text x="22" y="29.5" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.numero}">${label}</text>
       </g>
       <rect x="-3" y="${h + 3}" width="${w + 6}" height="${PITCH_LABEL_H}" rx="3" fill="rgba(0,0,0,0.6)" />
       <text x="${w / 2}" y="${h + 3 + PITCH_LABEL_H - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">${truncateLastName(p.name)}</text>

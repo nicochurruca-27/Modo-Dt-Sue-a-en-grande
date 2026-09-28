@@ -65,6 +65,14 @@ abrir seguís donde quedaste.
   continente todavía no tienen escudo: esos se dibujan con un escudo
   genérico de iniciales **pintado con los colores del club**, así el cuadro
   de la Libertadores no queda mitad escudos y mitad círculos grises.
+- **La camiseta de cada club**: en el panel de plantel, el banco, la reserva y
+  el entretiempo cada club juega con lo suyo. Los colores salen del escudo
+  real (los cuenta `tools/generar-colores.py`), así que no hay una lista de
+  colores escrita a ojo; el diseño —rayas, franja, banda cruzada, banda
+  vertical, mitades— sí está a mano (`CAMISETAS` en `js/ui.js`), porque eso
+  no se puede sacar de una imagen: hoy lo tienen 46 de los 66 y el resto
+  juega de liso con el color del club. El dorsal va sobre una pastilla del
+  color de la camiseta para que se lea también sobre las rayas.
 - **La Primera Nacional, club por club** (`NACIONAL_DATOS` en `js/data.js`):
   los 36 no tienen plantel real cargado, así que se les genera uno. Antes
   ese plantel salía solo de la reputación, que va del 1 al 3 y metía a los

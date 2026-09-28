@@ -124,22 +124,22 @@ que te miden). Falta:
 
 ---
 
-## 6. Camisetas con los colores de cada club
+## 6. Camisetas: falta confirmar los diseños
 
-En la plantilla cada jugador se muestra con una camisetita, pero siempre con
-los colores del club del usuario. La idea es que cada club tenga la suya —la
-franja de River, el amarillo y azul de Boca— y que se vea en el once, el banco,
-la reserva y el mercado.
+Ya no hay camisetas verdes: en el plantel, el banco, la reserva y el
+entretiempo cada club juega con sus colores, que salen del escudo real
+(`js/colores.js`), y 46 de los 66 tienen además su diseño —rayas, franja,
+banda cruzada, banda vertical, mitades— en `CAMISETAS` (`js/ui.js`).
 
-Los colores ya están todos: los 66 del fútbol argentino en `js/colores.js`
-(sacados del escudo con `tools/generar-colores.py`) y los del continente en
-`internacional.js`.
-Así que es trabajo de dibujo y no de datos: hay que darle a `benchJerseySvg` y
-al once una forma de camiseta por club (lisa, a rayas, con banda cruzada, con
-franja). Hoy los colores del club solo se usan en el escudo genérico y en el
-tinte de las pantallas.
+Lo que queda:
 
----
+- **Confirmar los diseños uno por uno.** Los colores salen del escudo, pero
+  el diseño no se puede deducir de una imagen: está escrito a mano y solo
+  donde no había duda. Los 20 que quedaron lisos son los que no estaban
+  claros, y alguno de los 46 puede estar mal.
+- **La camiseta del rival** no se muestra en ningún lado todavía (el partido
+  no dibuja los once del otro).
+- **Los 103 clubes del continente** tienen colores pero ningún diseño.
 
 ## 7. Economía, lo que quedó afinar
 

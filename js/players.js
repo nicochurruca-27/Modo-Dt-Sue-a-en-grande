@@ -158,9 +158,8 @@ const REAL_LINEUPS = {
   },
 };
 
-// Colores reales de la camiseta titular de cada club con plantel cargado (se
-// va completando junto con los planteles). Un club sin entrada acá usa el
-// color genérico (verde) del resto del juego.
-const CLUB_COLORS = {
-  river: { shirt: '#ffffff', band: '#d5001c', trim: '#0a0a0a' },
-};
+// Acá vivía CLUB_COLORS, una tabla de colores de camiseta escrita a mano que
+// tenía UN club adentro (River). Ya no hace falta: la camiseta de cada club
+// sale de sus colores reales, que tools/generar-colores.py saca del escudo
+// (js/colores.js), y el diseño —rayas, franja, banda— está en CAMISETAS, en
+// js/ui.js, al lado de donde se dibuja.
