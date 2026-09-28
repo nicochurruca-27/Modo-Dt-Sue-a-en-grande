@@ -198,4 +198,6 @@ un archivo por país con sus divisiones, cuántos equipos, si hay zonas, si hay
 playoffs, cuántos descienden, qué copas juega y cómo reparte los cupos. El
 motor lee ese formato y arma la temporada. Los 103 clubes del continente ya
 están cargados con país, nivel, estadio y colores, así que Sudamérica es el
-primer paso natural.
+primer paso natural. Cuando se haga, esos clubes van con todo: sus escudos
+(hoy se dibujan con iniciales, ver punto 1) y el diseño de sus camisetas
+(punto 6).
