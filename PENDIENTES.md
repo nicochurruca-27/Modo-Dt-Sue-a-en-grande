@@ -133,11 +133,17 @@ camiseta —que no siempre son los del escudo— y su diseño. Los 36 de la
 Nacional van con los colores de su escudo y el diseño puesto a ojo, y así
 quedan: se revisaron y están bien.
 
-Lo único que falta de este tema:
+Dos cosas que quedaron decididas y NO se van a hacer por ahora:
 
-- **La camiseta del rival** no se muestra en ningún lado todavía (el partido
-  no dibuja los once del otro).
-- **Los 103 clubes del continente** tienen colores pero ningún diseño.
+- **La camiseta del rival** no se muestra en ningún lado, y está bien así:
+  hoy no hay ninguna pantalla donde iría. El partido no dibuja los once del
+  otro equipo, y en la previa y en el marcador el rival ya se identifica con
+  su escudo. Tiene sentido recién el día que el partido muestre la formación
+  rival.
+- **El diseño de los 103 clubes del continente** se hace junto con las ligas
+  del resto del continente (punto 9), no antes: hoy esos clubes solo
+  aparecen en el cuadro de las copas, con su escudo de iniciales pintado con
+  sus colores.
 
 Lo de las **cartas estilo FUT en la cancha** quedó descartado y probado: se
 maquetaron las dos versiones con el mismo once y en el panel no entra la
