@@ -141,6 +141,12 @@ Lo que queda:
   no dibuja los once del otro).
 - **Los 103 clubes del continente** tienen colores pero ningún diseño.
 
+Lo de las **cartas estilo FUT en la cancha** quedó descartado y probado: se
+maquetaron las dos versiones con el mismo once y en el panel no entra la
+línea de cuatro, y aunque entrara se pierde de un vistazo la formación, que
+es justo para lo que sirve esa pantalla. La carta quedó donde rinde: la
+ficha del jugador.
+
 ## 7. Economía, lo que quedó afinar
 
 Cada club de Primera tiene su economía real en `js/finanzas.js` y de ahí salen

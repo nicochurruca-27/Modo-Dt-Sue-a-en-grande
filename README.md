@@ -73,6 +73,15 @@ abrir seguís donde quedaste.
   no se puede sacar de una imagen: hoy lo tienen 46 de los 66 y el resto
   juega de liso con el color del club. El dorsal va sobre una pastilla del
   color de la camiseta para que se lea también sobre las rayas.
+- **La ficha del jugador es una carta**: tocás a cualquiera —de la cancha, del
+  banco o de la reserva— y abajo aparece su carta con los colores del club,
+  la valoración, el puesto, el escudo, la bandera y la camiseta con su
+  dorsal, más la lista de datos al costado (edad, techo, contrato, energía,
+  amarillas, lo que lleva jugado en el año) y, si no está disponible, qué le
+  pasa y por cuántas fechas. Donde un juego con licencia pone la foto del
+  jugador acá va la camiseta: la mitad del plantel del juego son jugadores
+  generados —los juveniles que suben, los que vas a fichar dentro de cinco
+  temporadas— y de esos no puede haber foto nunca.
 - **La Primera Nacional, club por club** (`NACIONAL_DATOS` en `js/data.js`):
   los 36 no tienen plantel real cargado, así que se les genera uno. Antes
   ese plantel salía solo de la reputación, que va del 1 al 3 y metía a los

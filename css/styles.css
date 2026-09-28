@@ -2050,7 +2050,8 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   font-size: 0.9rem;
 }
 
-/* La ficha del jugador que tocaste en el plantel. */
+/* La ficha del jugador que tocaste en el plantel: la carta a la izquierda y
+   los datos al lado. */
 .ficha-jugador {
   margin: 8px 0 4px;
   padding: 8px 10px;
@@ -2062,8 +2063,76 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 }
 
 .ficha-jugador.con-baja { border-left-color: #f87171; }
-.ficha-nombre { margin-bottom: 2px; }
+.ficha-nombre { margin-bottom: 4px; }
 .ficha-jugador .muted { font-size: 0.78rem; }
+
+.ficha-cuerpo { display: flex; gap: 10px; align-items: flex-start; }
+.ficha-datos { flex: 1 1 0; min-width: 0; }
+
+.ficha-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+  font-size: 0.78rem;
+}
+
+.ficha-fila span:last-child { text-align: right; min-width: 0; }
+
+/* ---------- La carta del jugador ---------- */
+/* Con los colores del club: el fondo es la camiseta y adentro va la
+   camiseta otra vez, sobre una ventana más clara o más oscura para que no
+   se confunda con el fondo (el azul de Boca sobre el azul de Boca). */
+.carta-jugador {
+  flex: 0 0 auto;
+  border-radius: 10px;
+  padding: 5px;
+  color: #0b1220;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.carta-jugador.oscura { color: #f4f4f6; }
+
+.carta-arriba { display: flex; justify-content: space-between; align-items: flex-start; line-height: 1; }
+.carta-valor { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+.carta-puesto { font-size: 9px; font-weight: 700; opacity: 0.85; margin-top: 1px; }
+.carta-club { text-align: right; }
+.carta-club img { display: block; margin-left: auto; }
+.carta-club .nation-flag { display: block; margin: 3px 0 0 auto; }
+
+.carta-foto {
+  display: flex;
+  justify-content: center;
+  margin: -2px 0 1px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.carta-jugador.oscura .carta-foto { background: rgba(255, 255, 255, 0.14); }
+
+.carta-nombre {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-top: 1px solid rgba(0, 0, 0, 0.28);
+  padding-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.carta-jugador.oscura .carta-nombre { border-top-color: rgba(255, 255, 255, 0.3); }
+
+.carta-pie {
+  display: flex;
+  justify-content: space-between;
+  gap: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  opacity: 0.8;
+  white-space: nowrap;
+}
 
 .ficha-baja {
   margin-top: 6px;

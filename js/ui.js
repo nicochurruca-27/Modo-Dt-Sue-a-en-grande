@@ -2104,21 +2104,84 @@ function balanceDeLaFormacionHtml(empuje, riesgo) {
   `;
 }
 
-// La ficha del jugador que tocaste: lo que hace falta saber de él, y sobre
-// todo qué le pasa si no está disponible. La idea es que en la cancha no haya
-// más que un icono (🚑 / 🟥) y que el detalle aparezca acá, al tocarlo.
+// ---------- La carta del jugador ----------
+//
+// La camiseta es la figurita de la cancha: chica, y lo que dice es dónde
+// está parado cada uno. La carta es lo contrario —una sola, grande, con todo
+// lo del jugador— y por eso va en la ficha y no en la cancha: once cartas no
+// entran en el panel y, aunque entraran, dejás de ver la formación.
+//
+// Ahí donde un juego con licencia pone la foto, acá va la camiseta con el
+// dorsal. No es una solución de pobre: la mitad de los jugadores del juego
+// son generados —los juveniles que suben, los que vas a fichar en 2031— y de
+// esos no puede haber foto nunca.
+function cartaDeJugadorHtml(p, club, ancho) {
+  const kit = clubKit(club);
+  const crest = (typeof CLUB_CRESTS !== 'undefined' && CLUB_CRESTS[club.id]) || null;
+  const claro = luz(aRgb(kit.shirt === 'var(--accent)' ? '#22c55e' : kit.shirt)) > 0.55;
+  const apellido = p.name.trim().split(' ').slice(-1)[0];
+  const puesto = posDetailAbbrev(p.posDetail) || p.pos;
+  const energia = Math.round(Engine.energiaDe(p));
+  return `
+    <div class="carta-jugador${claro ? '' : ' oscura'}" style="width:${ancho}px;background:${kit.shirt}">
+      <div class="carta-arriba">
+        <div>
+          <div class="carta-valor">${p.rating}</div>
+          <div class="carta-puesto">${puesto}</div>
+        </div>
+        <div class="carta-club">
+          ${crest ? `<img src="${crest}" alt="" width="20" height="20">` : ''}
+          ${nationFlag(p.nation, 9)}
+        </div>
+      </div>
+      <div class="carta-foto">${camisetaDeCartaSvg(kit, p.number != null ? p.number : '', Math.round(ancho * 0.62))}</div>
+      <div class="carta-nombre">${apellido}</div>
+      <div class="carta-pie"><span>${p.age} años</span><span>${energia}%</span></div>
+    </div>
+  `;
+}
+
+// La misma camiseta de la cancha, suelta, para meterla adentro de la carta.
+function camisetaDeCartaSvg(kit, label, tam) {
+  return `<svg width="${tam}" height="${tam}" viewBox="0 0 44 44" aria-hidden="true">
+    <path d="M14 4 L22 8 L30 4 L38 10 L34 17 L30 14 L30 40 L14 40 L14 14 L10 17 L6 10 Z" fill="${kit.shirt}" stroke="${kit.trim}" stroke-width="1.5" />
+    ${patronDeCamisetaSvg(kit)}
+    <rect x="16" y="21" width="12" height="11" rx="2.5" fill="${kit.shirt}" opacity="0.92" />
+    <text x="22" y="29.5" text-anchor="middle" font-size="12" font-weight="700" fill="${kit.numero}">${label}</text>
+  </svg>`;
+}
+
+// La ficha del jugador que tocaste: la carta y, al lado, todo lo que hace
+// falta saber de él —y sobre todo qué le pasa si no está disponible—. En la
+// cancha no hay más que un icono (🚑 / 🟥); el detalle aparece acá.
 function fichaDelSeleccionadoHtml() {
   const s = Engine.state;
   const p = (s.squad || []).find((x) => x.id === selectedPlayerId);
   if (!p) return '';
+  const club = Engine.getClub(s.clubId);
   const baja = Engine.outLabel(p);
   const energia = Math.round(Engine.energiaDe(p));
   const contrato = `${p.contractYears} ${p.contractYears === 1 ? 'año' : 'años'}`;
-  const amarillas = p.amarillas ? ` · ${p.amarillas} ${p.amarillas === 1 ? 'amarilla' : 'amarillas'}` : '';
+  const st = Engine.estadisticasDe ? Engine.estadisticasDe(p) : null;
+  const filas = [
+    ['Puesto', p.posDetail || p.pos],
+    ['Edad', `${p.age} años`],
+    ['País', `${nationFlag(p.nation, 10)} ${Engine.nationName(p.nation)}`],
+    ['Valoración', `${p.rating}${p.potential > p.rating ? ` · techo ${p.potential}` : ''}`],
+    ['Contrato', contrato],
+    ['Energía', `${energia}%`],
+    ...(p.amarillas ? [['Amarillas', `${p.amarillas} de 5`]] : []),
+    ...(st && st.pj ? [['Este año', `${st.pj} PJ · ${st.goles} G · ${st.asistencias} A`]] : []),
+  ];
   return `
     <div class="ficha-jugador${baja ? ' con-baja' : ''}">
-      <div class="ficha-nombre"><strong>${p.name}</strong> <span class="muted">${p.posDetail || p.pos} · ${p.rating}${p.potential > p.rating ? ` (techo ${p.potential})` : ''}</span></div>
-      <div class="muted">${p.age} años · ${nationFlag(p.nation)} ${Engine.nationName(p.nation)} · contrato ${contrato} · energía ${energia}%${amarillas}</div>
+      <div class="ficha-cuerpo">
+        ${cartaDeJugadorHtml(p, club, 84)}
+        <div class="ficha-datos">
+          <div class="ficha-nombre"><strong>${p.name}</strong></div>
+          ${filas.map(([que, cuanto]) => `<div class="ficha-fila"><span class="muted">${que}</span><span>${cuanto}</span></div>`).join('')}
+        </div>
+      </div>
       ${baja ? `<div class="ficha-baja">${Engine.outIcono(p)} ${baja}</div>` : ''}
     </div>
   `;
