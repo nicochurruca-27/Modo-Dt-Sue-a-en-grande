@@ -22,6 +22,13 @@ el juego siga funcionando igual abierto como index.html o como el archivo
 ARCHIVO -> id del club en CLUB_TEMPLATES (data.js). Si el archivo se llama
 igual que el id, igual conviene dejarlo escrito acá para que quede a la
 vista qué escudo entró y cuál no.
+
+El script no se enoja si falta un escudo: genera los que encuentre y al
+final lista los que no estaban, así se puede ir cargando la Nacional de a
+tandas. Cuando entren esos escudos conviene correr también
+tools/generar-colores.py, que saca los colores de cada club del propio
+escudo y deja de hacer falta tenerlos escritos a mano en NACIONAL_DATOS
+(js/data.js).
 """
 
 import base64
@@ -69,6 +76,47 @@ ARCHIVO_A_CLUB = {
     'union': 'union',
     'velez': 'velez',
 }
+
+# Primera Nacional (36). Acá el archivo se llama igual que el id del club, así
+# que alcanza con guardar cada PNG con ese nombre y correr el script.
+ARCHIVO_A_CLUB.update({
+    'allboys':             'allboys',  # All Boys
+    'ferro':               'ferro',  # Ferro Carril Oeste
+    'madryn':              'madryn',  # Deportivo Madryn
+    'chacoforever':        'chacoforever',  # Chaco For Ever
+    'moron':               'moron',  # Deportivo Morón
+    'estudiantesba':       'estudiantesba',  # Estudiantes (BA)
+    'racingcordoba':       'racingcordoba',  # Racing de Córdoba
+    'losandes':            'losandes',  # Los Andes
+    'mitresgo':            'mitresgo',  # Mitre (SdE)
+    'almirantebrown':      'almirantebrown',  # Almirante Brown
+    'ciudaddebolivar':     'ciudaddebolivar',  # Ciudad de Bolívar
+    'colon':               'colon',  # Colón
+    'centralnorte':        'centralnorte',  # Central Norte (Salta)
+    'godoycruz':           'godoycruz',  # Godoy Cruz
+    'santelmo':            'santelmo',  # San Telmo
+    'sanmiguel':           'sanmiguel',  # San Miguel
+    'defensoresbelgrano':  'defensoresbelgrano',  # Defensores de Belgrano
+    'acassuso':            'acassuso',  # Acassuso
+    'nuevachicago':        'nuevachicago',  # Nueva Chicago
+    'atlanta':             'atlanta',  # Atlanta
+    'sanmartintuc':        'sanmartintuc',  # San Martín de Tucumán
+    'gimnasiajujuy':       'gimnasiajujuy',  # Gimnasia de Jujuy
+    'almagro':             'almagro',  # Almagro
+    'chacarita':           'chacarita',  # Chacarita Juniors
+    'sanmartinsj':         'sanmartinsj',  # San Martín de San Juan
+    'temperley':           'temperley',  # Temperley
+    'guemessgo':           'guemessgo',  # Güemes (SdE)
+    'tristansuarez':       'tristansuarez',  # Tristán Suárez
+    'agropecuario':        'agropecuario',  # Agropecuario
+    'patronato':           'patronato',  # Patronato
+    'gimnasiaytiro':       'gimnasiaytiro',  # Gimnasia y Tiro (Salta)
+    'maipu':               'maipu',  # Deportivo Maipú
+    'quilmes':             'quilmes',  # Quilmes
+    'colegiales':          'colegiales',  # Colegiales
+    'atleticorafaela':     'atleticorafaela',  # Atlético de Rafaela
+    'midland':             'midland',  # Ferrocarril Midland
+})
 
 
 def data_uri(path):
