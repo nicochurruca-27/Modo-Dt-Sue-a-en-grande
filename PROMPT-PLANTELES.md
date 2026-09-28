@@ -11,6 +11,8 @@ Este archivo tiene tres cosas:
    plantel completo de un club (Racing, Independiente, el que sea) y otro
    para pedirle sólo las fechas de nacimiento de los jugadores que ya están
    cargados.
+4. **De dónde bajar los datos en bloque**, que es el camino para cargar ligas
+   enteras en vez de un club por vez.
 
 Los datos terminan en `js/players.js`, en `REAL_ROSTERS`. Un club que no
 tiene entrada ahí sigue usando el generador de jugadores al azar.
@@ -325,7 +327,90 @@ volver a controlar las que ya están.
 
 ---
 
-## 5. Qué hacer con la respuesta
+## 5. De dónde sacar los datos en bloque (para cargar ligas enteras)
+
+Pedirle club por club a una IA sirve para uno o dos clubes. Para las 64
+entradas que faltan del fútbol argentino —y más todavía para las ligas del
+mundo— conviene una base de datos y un conversor.
+
+### La que mejor encaja: las bases del EA Sports FC / SoFIFA
+
+Son volcados del videojuego con licencia. Encajan casi uno a uno con lo que
+necesita el juego, y —esto es lo importante— **son la única fuente pública que
+trae algo equivalente a `rating` y `projection`**, que es justamente lo que no
+se puede investigar en un diario.
+
+| Campo nuestro | Columna del CSV | Cómo se arma |
+| --- | --- | --- |
+| `name` | `short_name` / `long_name` | Ojo con las tildes y con cómo se lo conoce acá. |
+| `birthDate` | `dob` | Ya viene `AAAA-MM-DD`. |
+| `age` | `age` | Mejor recalcularla de `dob` al 1 de enero del año de arranque. |
+| `pos` | `player_positions` (la primera) | GK→POR · CB/LB/RB/LWB/RWB→DEF · CDM/CM/CAM/LM/RM→MED · LW/RW/ST/CF→**DEL** |
+| `posDetail` | `player_positions` (la primera) | Ver la tabla de abajo. |
+| `altPosDetail` | `player_positions` (las demás) | Misma tabla. |
+| `nation` | `nationality_name` | Pasar a código de tres letras. |
+| `contractYears` | `club_contract_valid_until` | Año de vencimiento − año de arranque + 1. |
+| `rating` | `overall` | Tal cual. |
+| `projection` | `potential` | Tal cual. |
+| `number` | `club_jersey_number` | Tal cual. |
+| `value` | `value_eur` | Tal cual (o pasado a dólares). |
+| `salary` | `wage_eur` | **Ojo: el sueldo del CSV es semanal.** Anual = × 52. |
+| `clause` | `release_clause_eur` | Tal cual. |
+| `role` | — | Se deriva del `posDetail`: defensivo→contención, mixto o por un costado→mixto, ofensivo→ofensivo. |
+| `transferState` | — | No está en ninguna base. Es criterio nuestro. |
+| `loanFrom` / `loanUntil` | `club_loaned_from` | Solo en algunas ediciones. |
+
+La traducción de puestos, que es la parte que hay que hacer con cuidado:
+
+```
+GK  → arquero                    CDM → mediocampista defensivo
+RB  → lateral derecho            CM  → mediocampista mixto
+LB  → lateral izquierdo          CAM → mediocampista ofensivo
+RWB → carrilero derecho          RM  → volante por derecha
+LWB → carrilero izquierdo        LM  → volante por izquierda
+CB  → defensor central           RW  → extremo derecho
+ST  → delantero centro           LW  → extremo izquierdo
+CF  → segundo delantero
+```
+
+Dónde están: en Kaggle, buscando "EA FC player database". Por ejemplo
+[EA FC25 Player Database](https://www.kaggle.com/datasets/mexwell/ea-fc25-player-database),
+[EA Sports FC 25 database, ratings and stats](https://www.kaggle.com/datasets/nyagami/ea-sports-fc-25-database-ratings-and-stats)
+o [el volcado de SoFIFA](https://www.kaggle.com/datasets/aniss7/fifa-player-data-from-sofifa-2025-06-03),
+que es el que suele traer las columnas con estos nombres exactos.
+
+**Los tres límites que tiene esta fuente:**
+
+1. **La Primera Nacional no está.** El videojuego tiene la Liga Profesional
+   argentina, no el ascenso. Para esos 36 clubes hay que ir por otro lado.
+2. **Es una foto de una fecha.** Un plantel de hace una temporada tiene
+   jugadores que ya se fueron y le faltan los que llegaron.
+3. **Los juveniles recién subidos suelen no estar**, o estar con un rating
+   genérico. Son, otra vez, los mismos que fallan por el otro camino.
+
+### Las otras dos que sirven
+
+- [salimt/football-datasets](https://github.com/salimt/football-datasets) —
+  93.000 jugadores sacados de Transfermarkt: perfil, fecha de nacimiento,
+  posición, nacionalidad, club, valor de mercado, transferencias y lesiones.
+  **No trae rating ni proyección**, pero es mucho más completa en clubes y está
+  más al día. Buena para cruzar contra la de arriba.
+- [openfootball](https://github.com/openfootball) — datos libres de dominio
+  público en JSON, sin API key. Fuerte en calendarios y resultados, más flojo
+  en planteles, pero es la única de licencia totalmente abierta.
+
+### El paso que falta
+
+Cuando tengas el CSV, **pasámelo (con veinte filas alcanza)** y te escribo el
+conversor en `tools/` que lo lee y escribe las entradas de `REAL_ROSTERS`
+solas, con el mapeo de puestos, el sueldo anualizado y los años de contrato ya
+calculados. No lo escribo antes porque los nombres de las columnas cambian de
+una base a la otra, y un conversor que no probé contra el archivo de verdad es
+un conversor roto.
+
+---
+
+## 6. Qué hacer con la respuesta
 
 1. Controlá la tabla de fuentes antes que nada. Si una fila no tiene
    fuente, tratá el dato como si no existiera.
