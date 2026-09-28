@@ -60,7 +60,18 @@ abrir seguís donde quedaste.
 - **Escudos**: los 30 clubes de Primera tienen su escudo real, embebido en
   `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
   la Nacional todavía no están: esos clubes se muestran con un escudo
-  genérico con sus iniciales.
+  genérico de iniciales, pero **pintado con los colores del club** (el rojo
+  y negro de Chacarita, el amarillo y azul de Atlanta), así la tabla de la
+  Nacional no es una pared de círculos grises iguales.
+- **La Primera Nacional, club por club** (`NACIONAL_DATOS` en `js/data.js`):
+  los 36 no tienen plantel real cargado, así que se les genera uno. Antes
+  ese plantel salía solo de la reputación, que va del 1 al 3 y metía a los
+  36 clubes en tres cajones —Colón y Central Norte eran casi lo mismo para
+  el motor—. Ahora cada club tiene su nivel, cuánto de ese nivel está
+  arriba y cuánto atrás (un club con más defensa que ataque genera mejores
+  defensores que delanteros) y su propio presupuesto. Los números son
+  relativos entre ellos y el motor los traduce a su escala: el mejor de la
+  Nacional sigue estando por debajo de la mitad de tabla de Primera.
 - **Trofeo de Campeones**: campeón del Apertura contra campeón del Clausura, a
   partido único. Si el mismo club gana los dos torneos no hay partido: el
   trofeo es suyo y se lo lleva sin jugar.

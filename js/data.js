@@ -111,6 +111,72 @@ const CLUB_TEMPLATES = [
   { id: 'midland', name: 'Ferrocarril Midland', division: 'D2', zone: 'B', reputation: 1 },
 ];
 
+// ---------- La Primera Nacional, club por club ----------
+//
+// Los 36 de la Nacional no tienen plantel real cargado (ver REAL_ROSTERS en
+// players.js, que hoy solo tiene Boca y River): se les genera uno a partir
+// del nivel del club. Hasta acá ese nivel salía solo de `reputation`, que va
+// del 1 al 3 y por lo tanto metía a los 36 clubes en tres cajones: Colón y
+// Central Norte eran, para el motor, casi lo mismo.
+//
+// Esta tabla los separa uno por uno:
+//
+//   plantel      el nivel general del plantel, en la escala de la Nacional
+//                (67 el más flojo, 77 el mejor armado)
+//   ataque       cuánto de ese nivel está arriba
+//   defensa      cuánto está atrás. Un club con defensa > ataque genera
+//                mejores defensores que delanteros (ver Mercado.plantel).
+//   presupuesto  cuánta plata maneja, en la misma escala relativa entre
+//                ellos. El motor la pasa a pesos (ver startingBudget).
+//   colores      los dos colores del club, para el escudo genérico y la
+//                camiseta. Los de Primera salen de su escudo real
+//                (js/colores.js); estos son a mano, porque los escudos de la
+//                Nacional todavía no están cargados.
+//
+// OJO con la escala: estos números NO están en la misma escala que las
+// valoraciones de los jugadores ni que la fuerza de los clubes de Primera.
+// Son relativos entre los 36 de la Nacional y el motor los convierte (ver
+// Engine.nivelDeLaNacional). Si se los tomara literales, Colón tendría el
+// plantel de River y ascender no significaría nada.
+const NACIONAL_DATOS = {
+  allboys:             { plantel: 72, ataque: 71, defensa: 73, presupuesto: 170000, colores: ['#ffffff', '#000000'] },
+  ferro:               { plantel: 75, ataque: 75, defensa: 74, presupuesto: 200000, colores: ['#008000', '#ffffff'] },
+  madryn:              { plantel: 70, ataque: 70, defensa: 70, presupuesto: 150000, colores: ['#ffff00', '#000000'] },
+  chacoforever:        { plantel: 69, ataque: 68, defensa: 70, presupuesto: 145000, colores: ['#000000', '#ffffff'] },
+  moron:               { plantel: 72, ataque: 71, defensa: 73, presupuesto: 170000, colores: ['#ff0000', '#ffffff'] },
+  estudiantesba:       { plantel: 71, ataque: 70, defensa: 72, presupuesto: 165000, colores: ['#ffffff', '#000000'] },
+  racingcordoba:       { plantel: 70, ataque: 71, defensa: 69, presupuesto: 150000, colores: ['#00aaff', '#ffffff'] },
+  losandes:            { plantel: 70, ataque: 69, defensa: 70, presupuesto: 150000, colores: ['#ff0000', '#ffffff'] },
+  mitresgo:            { plantel: 69, ataque: 69, defensa: 69, presupuesto: 145000, colores: ['#ffff00', '#000000'] },
+  almirantebrown:      { plantel: 70, ataque: 72, defensa: 69, presupuesto: 160000, colores: ['#fdd835', '#000000'] },
+  ciudaddebolivar:     { plantel: 67, ataque: 67, defensa: 68, presupuesto: 135000, colores: ['#0000ff', '#00aaff'] },
+  colon:               { plantel: 77, ataque: 78, defensa: 76, presupuesto: 250000, colores: ['#ff0000', '#000000'] },
+  centralnorte:        { plantel: 68, ataque: 67, defensa: 69, presupuesto: 135000, colores: ['#000000', '#ffffff'] },
+  godoycruz:           { plantel: 76, ataque: 76, defensa: 75, presupuesto: 230000, colores: ['#0000ff', '#ffffff'] },
+  santelmo:            { plantel: 71, ataque: 72, defensa: 70, presupuesto: 155000, colores: ['#0000ff', '#00aaff'] },
+  sanmiguel:           { plantel: 70, ataque: 70, defensa: 71, presupuesto: 150000, colores: ['#008000', '#ffffff'] },
+  defensoresbelgrano:  { plantel: 71, ataque: 71, defensa: 71, presupuesto: 160000, colores: ['#ff0000', '#000000'] },
+  acassuso:            { plantel: 68, ataque: 68, defensa: 69, presupuesto: 140000, colores: ['#003399', '#ffffff'] },
+  nuevachicago:        { plantel: 73, ataque: 73, defensa: 73, presupuesto: 180000, colores: ['#008000', '#000000'] },
+  atlanta:             { plantel: 71, ataque: 72, defensa: 70, presupuesto: 165000, colores: ['#ffff00', '#0000ff'] },
+  sanmartintuc:        { plantel: 76, ataque: 77, defensa: 75, presupuesto: 220000, colores: ['#ff0000', '#ffffff'] },
+  gimnasiajujuy:       { plantel: 71, ataque: 70, defensa: 71, presupuesto: 160000, colores: ['#00aaff', '#ffffff'] },
+  almagro:             { plantel: 69, ataque: 68, defensa: 70, presupuesto: 140000, colores: ['#0000ff', '#ffffff'] },
+  chacarita:           { plantel: 74, ataque: 75, defensa: 73, presupuesto: 190000, colores: ['#ff0000', '#000000'] },
+  sanmartinsj:         { plantel: 73, ataque: 72, defensa: 73, presupuesto: 175000, colores: ['#008000', '#000000'] },
+  temperley:           { plantel: 72, ataque: 71, defensa: 72, presupuesto: 170000, colores: ['#00aaff', '#ffffff'] },
+  guemessgo:           { plantel: 69, ataque: 68, defensa: 70, presupuesto: 140000, colores: ['#ff0000', '#0000ff'] },
+  tristansuarez:       { plantel: 69, ataque: 69, defensa: 69, presupuesto: 145000, colores: ['#0000ff', '#ffffff'] },
+  agropecuario:        { plantel: 71, ataque: 70, defensa: 72, presupuesto: 150000, colores: ['#006400', '#ff0000'] },
+  patronato:           { plantel: 73, ataque: 72, defensa: 74, presupuesto: 185000, colores: ['#ff0000', '#000000'] },
+  gimnasiaytiro:       { plantel: 69, ataque: 68, defensa: 70, presupuesto: 145000, colores: ['#00aaff', '#ffffff'] },
+  maipu:               { plantel: 71, ataque: 72, defensa: 70, presupuesto: 155000, colores: ['#ff0000', '#ffffff'] },
+  quilmes:             { plantel: 76, ataque: 76, defensa: 75, presupuesto: 210000, colores: ['#ffffff', '#000080'] },
+  colegiales:          { plantel: 68, ataque: 68, defensa: 69, presupuesto: 140000, colores: ['#0000ff', '#ff0000'] },
+  atleticorafaela:     { plantel: 70, ataque: 70, defensa: 70, presupuesto: 160000, colores: ['#00aaff', '#ffffff'] },
+  midland:             { plantel: 68, ataque: 67, defensa: 68, presupuesto: 135000, colores: ['#0000ff', '#ffffff'] },
+};
+
 // Clásicos de Primera División. En el torneo argentino, además de las 14
 // fechas contra los equipos de tu propia zona hay dos fechas interzonales, y
 // una de ellas es SIEMPRE contra el clásico rival. Por eso al sortear las

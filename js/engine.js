@@ -313,10 +313,64 @@ const Engine = {
   // Ahora sale de la economía real del club (ver Economia.presupuestoInicial y
   // js/finanzas.js). Los clubes de la Primera Nacional, que no tienen datos
   // publicados, siguen con la tabla de siempre.
+  // ---------- El nivel de un club de la Nacional ----------
+  //
+  // Los 36 de la Primera Nacional tienen sus números en NACIONAL_DATOS
+  // (data.js), en una escala propia que va de 67 (el más flojo) a 77 (el
+  // mejor armado). Adentro del juego los planteles se miden en otra escala:
+  // un club de reputación 1 arma un plantel de ~50 y uno de reputación 3,
+  // de ~62. Así que los números de la Nacional se estiran sobre ESE tramo,
+  // que es el que le corresponde a la categoría.
+  //
+  // Traducirlos en vez de usarlos crudos no es un detalle: tomados
+  // literales, Colón (77) tendría el plantel de River y ascender no
+  // significaría nada. Lo que importa de esos números es el orden y la
+  // distancia entre ellos, y eso se conserva entero.
+  NIVEL_NACIONAL: { desde: 67, hasta: 77, piso: 50, techo: 62 },
+
+  datosDeLaNacional(club) {
+    if (!club || club.division !== 'D2') return null;
+    return (typeof NACIONAL_DATOS === 'undefined' ? null : NACIONAL_DATOS[club.id]) || null;
+  },
+
+  // De la escala de la Nacional a la del juego. Devuelve null si el club no
+  // está cargado, y ahí el motor sigue con la reputación de siempre.
+  nivelDeLaNacional(club, campo) {
+    const d = this.datosDeLaNacional(club);
+    if (!d) return null;
+    const e = this.NIVEL_NACIONAL;
+    const valor = d[campo || 'plantel'];
+    if (valor == null) return null;
+    return e.piso + ((valor - e.desde) * (e.techo - e.piso)) / (e.hasta - e.desde);
+  },
+
+  // Cuánto mejor (o peor) es este club arriba y atrás que su propio nivel
+  // general, ya en la escala del juego. Sale de ataque/defensa: un club con
+  // defensa 73 y plantel 71 genera defensores un poco mejores que el resto
+  // de su plantel.
+  sesgoDeLaNacional(club) {
+    const base = this.nivelDeLaNacional(club, 'plantel');
+    if (base == null) return null;
+    const ataque = this.nivelDeLaNacional(club, 'ataque');
+    const defensa = this.nivelDeLaNacional(club, 'defensa');
+    return {
+      base,
+      ataque: ataque == null ? 0 : ataque - base,
+      defensa: defensa == null ? 0 : defensa - base,
+    };
+  },
+
   startingBudget(club) {
     if (club.division === 'D1' && Economia.finanzasDe(club)) {
       return Economia.presupuestoInicial(club);
     }
+    // La Nacional tiene su propio presupuesto club por club (NACIONAL_DATOS),
+    // en la misma escala relativa que el resto de sus números. Se lleva a
+    // pesos estirándolo sobre el tramo que la categoría ya usaba: el más
+    // pobre de los 36 queda en $650.000 y el más rico en $1.800.000, que
+    // eran el piso y el techo de la tabla de abajo.
+    const dn = this.datosDeLaNacional(club);
+    if (dn && dn.presupuesto) return Math.round(650000 + (dn.presupuesto - 135000) * 10);
     const tier = club.budgetTier || club.reputation;
     const table = club.division === 'D1'
       ? { 5: 16000000, 4: 8000000, 3: 5000000, 2: 3000000, 1: 1800000 }

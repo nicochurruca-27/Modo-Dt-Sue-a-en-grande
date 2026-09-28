@@ -1320,7 +1320,27 @@ function clubCrest(club, size) {
   if (crest) {
     return `<img class="club-crest" src="${crest}" alt="Escudo de ${club.name}" width="${size}" height="${size}">`;
   }
-  return `<span class="club-crest club-crest-generic" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.36)}px">${clubInitials(club.name)}</span>`;
+  // Sin escudo cargado va el de iniciales. Si el club tiene colores escritos
+  // a mano (los 36 de la Nacional, ver NACIONAL_DATOS en data.js) el escudo
+  // genérico se pinta con ellos: la tabla de la Nacional deja de ser una
+  // pared de rectángulos grises todos iguales.
+  const pintura = coloresGenericos(club.id);
+  const estilo = pintura ? `background:${pintura.fondo};color:${pintura.texto};border-color:${pintura.borde};` : '';
+  return `<span class="club-crest club-crest-generic" style="${estilo}width:${size}px;height:${size}px;font-size:${Math.round(size * 0.36)}px">${clubInitials(club.name)}</span>`;
+}
+
+// Con qué colores se pinta el escudo de iniciales. Devuelve null si el club
+// no tiene colores propios cargados (y ahí queda el gris de siempre).
+function coloresGenericos(clubId) {
+  const par = (typeof NACIONAL_DATOS !== 'undefined' && NACIONAL_DATOS[clubId] && NACIONAL_DATOS[clubId].colores) || null;
+  if (!par) return null;
+  const [primario, secundario] = par;
+  // Las iniciales van del segundo color, salvo que no se lean encima del
+  // primero (dos claros o dos oscuros): ahí se usa blanco o negro.
+  const fondoClaro = luz(aRgb(primario)) > 0.6;
+  const textoClaro = luz(aRgb(secundario)) > 0.6;
+  const texto = fondoClaro === textoClaro ? (fondoClaro ? '#18181c' : '#f4f4f6') : secundario;
+  return { fondo: primario, texto, borde: fondoClaro ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.28)' };
 }
 
 // Iniciales para el escudo genérico: las primeras letras de las primeras
@@ -2437,7 +2457,13 @@ function aclararHasta(hex, minimo) {
 }
 
 function coloresDelClub(clubId) {
-  const par = (typeof CLUB_COLORES !== 'undefined' && CLUB_COLORES[clubId]) || ['#334155', '#94a3b8'];
+  // Los de Primera salen del escudo (CLUB_COLORES, generado por
+  // tools/generar-colores.py). Los de la Nacional todavía no tienen escudo
+  // cargado, así que sus colores están escritos a mano en NACIONAL_DATOS
+  // (data.js). Si no hay ni una cosa ni la otra, el gris de siempre.
+  const delEscudo = (typeof CLUB_COLORES !== 'undefined' && CLUB_COLORES[clubId]) || null;
+  const aMano = (typeof NACIONAL_DATOS !== 'undefined' && NACIONAL_DATOS[clubId] && NACIONAL_DATOS[clubId].colores) || null;
+  const par = delEscudo || aMano || ['#334155', '#94a3b8'];
   const [primario, secundario] = par;
   // El acento es el que más se distingue del fondo: el segundo si tiene
   // fuerza, y si no el primero aclarado.

@@ -3,7 +3,7 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
-Última revisión: 27/9/2026.
+Última revisión: 28/9/2026.
 
 ---
 
@@ -16,7 +16,10 @@ lo único que no depende de programar.
 
 Hoy solo Boca y River tienen plantel real cargado (`REAL_ROSTERS` en
 `js/players.js`). Los otros 28 de Primera y los 36 de la Nacional juegan con
-planteles generados al azar a partir de la reputación del club.
+planteles generados. Los de la Nacional ya no salen de la reputación a secas:
+cada club tiene su nivel, su ataque y su defensa en `NACIONAL_DATOS`
+(`js/data.js`), así que los 36 se diferencian entre sí. Lo que falta son los
+nombres: jugador por jugador.
 
 Por jugador hace falta: nombre, puesto (`POR`/`DEF`/`MED`/`DEL`), posición
 detallada, edad, nacionalidad, dorsal, valoración y **proyección** (el techo al
@@ -125,10 +128,13 @@ los colores del club del usuario. La idea es que cada club tenga la suya —la
 franja de River, el amarillo y azul de Boca— y que se vea en el once, el banco,
 la reserva y el mercado.
 
-Los colores ya están en `js/colores.js` (sacados del escudo con
-`tools/generar-colores.py`) y los del continente en `internacional.js`, así que
-es trabajo de dibujo y no de datos: hay que darle a `benchJerseySvg` y al once
-una forma de camiseta por club (lisa, a rayas, con banda cruzada, con franja).
+Los colores ya están todos: los de Primera en `js/colores.js` (sacados del
+escudo con `tools/generar-colores.py`), los 36 de la Nacional en
+`NACIONAL_DATOS` (`js/data.js`) y los del continente en `internacional.js`.
+Así que es trabajo de dibujo y no de datos: hay que darle a `benchJerseySvg` y
+al once una forma de camiseta por club (lisa, a rayas, con banda cruzada, con
+franja). Hoy los colores del club solo se usan en el escudo genérico y en el
+tinte de las pantallas.
 
 ---
 
@@ -137,8 +143,10 @@ una forma de camiseta por club (lisa, a rayas, con banda cruzada, con franja).
 Cada club de Primera tiene su economía real en `js/finanzas.js` y de ahí salen
 el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
 
-- **La Primera Nacional sigue andando por categoría**: no hay datos publicados
-  comparables de esos 36 clubes.
+- **La Primera Nacional anda con números relativos**: cada club tiene su
+  presupuesto en `NACIONAL_DATOS` (`js/data.js`) y el motor lo pasa a pesos,
+  pero son proporciones estimadas entre ellos, no las cuentas publicadas de
+  cada club como en Primera (`js/finanzas.js`).
 - **La recaudación de local no usa el aforo**, que está cargado y sería el dato
   natural.
 - **Los socios tampoco se usan todavía**: están cargados para cuando la cuota

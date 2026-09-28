@@ -715,9 +715,24 @@ const Mercado = {
         // de cada reputación haya clubes mejor y peor armados, que es lo que
         // pasa de verdad y lo que hace que la tabla no tenga siempre la
         // misma forma.
-        const nivelDelClub = 44 + club.reputation * 6 + (rnd() * 6 - 3);
+        // Los 36 de la Nacional tienen su nivel cargado uno por uno (ver
+        // NACIONAL_DATOS en data.js); el resto sigue saliendo de la
+        // reputación, con el sorteo sembrado de siempre para que dos clubes
+        // de la misma reputación no den el mismo número hasta el decimal.
+        const cargado = engine.sesgoDeLaNacional ? engine.sesgoDeLaNacional(club) : null;
+        const nivelDelClub = cargado
+          ? cargado.base + (rnd() * 2 - 1)
+          : 44 + club.reputation * 6 + (rnd() * 6 - 3);
         return SQUAD_POSITIONS.map((pos, i) => {
-        const promedio = nivelDelClub;
+        // Un club con más defensa que ataque arma mejores defensores que
+        // delanteros. El mediocampo se lleva la mitad de cada cosa.
+        let sesgo = 0;
+        if (cargado) {
+          if (pos === 'DEF' || pos === 'POR') sesgo = cargado.defensa;
+          else if (pos === 'DEL') sesgo = cargado.ataque;
+          else sesgo = (cargado.ataque + cargado.defensa) / 2;
+        }
+        const promedio = nivelDelClub + sesgo;
         const ratingBase = Math.max(35, Math.min(90, Math.round(promedio + (rnd() * 16 - 8))));
         const edadBase = Math.round(17 + rnd() * 18);
         const nation = this.nacionSembrada(rnd);
