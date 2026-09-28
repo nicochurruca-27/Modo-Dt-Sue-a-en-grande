@@ -34,6 +34,7 @@ escudo y deja de hacer falta tenerlos escritos a mano en NACIONAL_DATOS
 import base64
 import io
 import os
+import re
 import sys
 
 from PIL import Image
@@ -132,6 +133,19 @@ def data_uri(path):
     return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
 
 
+def leer_generados(salida):
+    """Los escudos que ya están adentro de js/escudos.js, tal cual están.
+
+    Se leen del propio archivo generado y no de los PNG originales, que no
+    viven en el repo: así se puede agregar una tanda de escudos nuevos sin
+    tener a mano los que ya se habían cargado.
+    """
+    if not os.path.exists(salida):
+        return {}
+    texto = open(salida, encoding='utf-8').read()
+    return dict(re.findall(r"^  ([a-z0-9]+): '(data:image/png;base64,[^']+)',$", texto, re.M))
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -139,14 +153,24 @@ def main():
     origen = sys.argv[1]
     salida = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'js', 'escudos.js')
 
-    entradas = []
+    # Lo que ya está generado se conserva: la carpeta que se pasa puede tener
+    # tres escudos nuevos y no por eso hay que perder los otros sesenta y
+    # tres. Un archivo que SÍ está en la carpeta pisa al de antes.
+    ya_estan = leer_generados(salida)
+
+    entradas = {}
+    nuevos = []
     faltantes = []
     for archivo, club in sorted(ARCHIVO_A_CLUB.items(), key=lambda kv: kv[1]):
         ruta = os.path.join(origen, archivo + '.png')
-        if not os.path.exists(ruta):
+        if os.path.exists(ruta):
+            entradas[club] = data_uri(ruta)
+            nuevos.append(club)
+        elif club in ya_estan:
+            entradas[club] = ya_estan[club]
+        else:
             faltantes.append(archivo)
-            continue
-        entradas.append((club, data_uri(ruta)))
+    entradas = sorted(entradas.items())
 
     with open(salida, 'w', encoding='utf-8') as f:
         f.write(
@@ -156,8 +180,8 @@ def main():
             '// index.html o el archivo único, sin depender de una carpeta de imágenes.\n'
             '//\n'
             '// La clave es el id del club en CLUB_TEMPLATES (data.js). Un club que no\n'
-            '// está acá (hoy, los de Primera Nacional) se dibuja con un escudo genérico\n'
-            '// con sus iniciales — ver clubCrest en ui.js.\n'
+            '// esté acá se dibuja con un escudo genérico con sus iniciales, pintado con\n'
+            '// los colores del club si los tiene — ver clubCrest en ui.js.\n'
             'const CLUB_CRESTS = {\n'
         )
         for club, uri in entradas:
@@ -166,8 +190,9 @@ def main():
 
     peso = os.path.getsize(salida) / 1024
     print(f'{len(entradas)} escudos -> {salida} ({peso:.0f} KB)')
+    print(f'nuevos o actualizados en esta corrida: {len(nuevos)}')
     if faltantes:
-        print('sin archivo:', ', '.join(faltantes))
+        print('sin escudo todavía:', ', '.join(faltantes))
     return 0
 
 

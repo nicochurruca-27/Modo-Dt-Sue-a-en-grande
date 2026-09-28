@@ -1320,19 +1320,21 @@ function clubCrest(club, size) {
   if (crest) {
     return `<img class="club-crest" src="${crest}" alt="Escudo de ${club.name}" width="${size}" height="${size}">`;
   }
-  // Sin escudo cargado va el de iniciales. Si el club tiene colores escritos
-  // a mano (los 36 de la Nacional, ver NACIONAL_DATOS en data.js) el escudo
-  // genérico se pinta con ellos: la tabla de la Nacional deja de ser una
-  // pared de rectángulos grises todos iguales.
+  // Sin escudo cargado va el de iniciales, pintado con los colores del club
+  // si los tiene: así una tabla llena de clubes sin escudo no es una pared
+  // de círculos grises todos iguales.
   const pintura = coloresGenericos(club.id);
   const estilo = pintura ? `background:${pintura.fondo};color:${pintura.texto};border-color:${pintura.borde};` : '';
   return `<span class="club-crest club-crest-generic" style="${estilo}width:${size}px;height:${size}px;font-size:${Math.round(size * 0.36)}px">${clubInitials(club.name)}</span>`;
 }
 
-// Con qué colores se pinta el escudo de iniciales. Devuelve null si el club
-// no tiene colores propios cargados (y ahí queda el gris de siempre).
+// Con qué colores se pinta el escudo de iniciales. Hoy lo usan los 103 clubes
+// del continente (js/internacional.js), que son los únicos que quedaron sin
+// escudo: en el cuadro de la Libertadores se veía la mitad de los escudos
+// reales y la otra mitad como círculos grises todos iguales.
+// Devuelve null si el club no tiene colores cargados, y ahí queda el gris.
 function coloresGenericos(clubId) {
-  const par = (typeof NACIONAL_DATOS !== 'undefined' && NACIONAL_DATOS[clubId] && NACIONAL_DATOS[clubId].colores) || null;
+  const par = paresDeColores(clubId);
   if (!par) return null;
   const [primario, secundario] = par;
   // Las iniciales van del segundo color, salvo que no se lean encima del
@@ -2456,14 +2458,21 @@ function aclararHasta(hex, minimo) {
   return `rgb(${rgb.join(', ')})`;
 }
 
-function coloresDelClub(clubId) {
-  // Los de Primera salen del escudo (CLUB_COLORES, generado por
-  // tools/generar-colores.py). Los de la Nacional todavía no tienen escudo
-  // cargado, así que sus colores están escritos a mano en NACIONAL_DATOS
-  // (data.js). Si no hay ni una cosa ni la otra, el gris de siempre.
+// Los dos colores de un club, vengan de donde vengan: los 66 del fútbol
+// argentino los saca tools/generar-colores.py del propio escudo (CLUB_COLORES)
+// y los 103 del continente los traen cargados a mano en internacional.js.
+// Devuelve null si el club no tiene ninguno.
+function paresDeColores(clubId) {
   const delEscudo = (typeof CLUB_COLORES !== 'undefined' && CLUB_COLORES[clubId]) || null;
-  const aMano = (typeof NACIONAL_DATOS !== 'undefined' && NACIONAL_DATOS[clubId] && NACIONAL_DATOS[clubId].colores) || null;
-  const par = delEscudo || aMano || ['#334155', '#94a3b8'];
+  if (delEscudo) return delEscudo;
+  const deAfuera = typeof CLUBES_INTERNACIONALES === 'undefined'
+    ? null
+    : (CLUBES_INTERNACIONALES.find((c) => c.id === clubId) || {}).colores;
+  return deAfuera && deAfuera.primario ? [deAfuera.primario, deAfuera.secundario || '#f4f4f6'] : null;
+}
+
+function coloresDelClub(clubId) {
+  const par = paresDeColores(clubId) || ['#334155', '#94a3b8'];
   const [primario, secundario] = par;
   // El acento es el que más se distingue del fondo: el segundo si tiene
   // fuerza, y si no el primero aclarado.

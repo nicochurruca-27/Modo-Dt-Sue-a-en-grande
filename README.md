@@ -57,12 +57,14 @@ abrir seguís donde quedaste.
   coincidir — por ejemplo San Lorenzo tiene un plantel de nivel medio pero un
   presupuesto bajo por su crisis institucional, mientras que Boca y River
   manejan presupuestos muy por encima del resto.
-- **Escudos**: los 30 clubes de Primera tienen su escudo real, embebido en
-  `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). Los de
-  la Nacional todavía no están: esos clubes se muestran con un escudo
-  genérico de iniciales, pero **pintado con los colores del club** (el rojo
-  y negro de Chacarita, el amarillo y azul de Atlanta), así la tabla de la
-  Nacional no es una pared de círculos grises iguales.
+- **Escudos**: los **66 clubes del fútbol argentino** —los 30 de Primera y
+  los 36 de la Primera Nacional— tienen su escudo real, embebido en
+  `js/escudos.js` (ver `tools/generar-escudos.py` para regenerarlo). De ahí
+  salen también los colores de cada club, contando los píxeles del propio
+  escudo (`tools/generar-colores.py` → `js/colores.js`). Los 103 del
+  continente todavía no tienen escudo: esos se dibujan con un escudo
+  genérico de iniciales **pintado con los colores del club**, así el cuadro
+  de la Libertadores no queda mitad escudos y mitad círculos grises.
 - **La Primera Nacional, club por club** (`NACIONAL_DATOS` en `js/data.js`):
   los 36 no tienen plantel real cargado, así que se les genera uno. Antes
   ese plantel salía solo de la reputación, que va del 1 al 3 y metía a los

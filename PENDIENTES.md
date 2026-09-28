@@ -26,14 +26,17 @@ detallada, edad, nacionalidad, dorsal, valoración y **proyección** (el techo a
 que puede llegar). Si además vienen años de contrato, valor, sueldo y cláusula,
 mejor; si no, se estiman con la escala que ya usa el resto.
 
-### Escudos de la Nacional, de la tercera y del continente
+### Escudos del continente (y de la tercera, cuando esté)
 
-Hoy solo están los 30 de Primera (`js/escudos.js`). El resto —los 36 de la
-Nacional y los 103 clubes del continente en `js/internacional.js`— se dibuja
-con un escudo genérico de iniciales. Se nota sobre todo en el cuadro de la
-Libertadores, donde la mitad de los escudos son reales y la otra mitad no.
+Ya están los 66 del fútbol argentino: los 30 de Primera y los 36 de la
+Primera Nacional (`js/escudos.js`). Faltan los 103 clubes del continente
+(`js/internacional.js`), que se dibujan con un escudo genérico de iniciales
+pintado con los colores del club. Se nota en el cuadro de la Libertadores,
+donde la mitad de los escudos son reales y la otra mitad son iniciales.
 
-Se generan con `tools/generar-escudos.py` a partir de una carpeta con los PNG.
+Se generan con `tools/generar-escudos.py` a partir de una carpeta con los
+PNG, con el archivo llamado igual que el id del club. El script conserva los
+que ya están, así que se puede cargar de a tandas.
 
 ### Clubes de la tercera división
 
@@ -128,9 +131,9 @@ los colores del club del usuario. La idea es que cada club tenga la suya —la
 franja de River, el amarillo y azul de Boca— y que se vea en el once, el banco,
 la reserva y el mercado.
 
-Los colores ya están todos: los de Primera en `js/colores.js` (sacados del
-escudo con `tools/generar-colores.py`), los 36 de la Nacional en
-`NACIONAL_DATOS` (`js/data.js`) y los del continente en `internacional.js`.
+Los colores ya están todos: los 66 del fútbol argentino en `js/colores.js`
+(sacados del escudo con `tools/generar-colores.py`) y los del continente en
+`internacional.js`.
 Así que es trabajo de dibujo y no de datos: hay que darle a `benchJerseySvg` y
 al once una forma de camiseta por club (lisa, a rayas, con banda cruzada, con
 franja). Hoy los colores del club solo se usan en el escudo genérico y en el
