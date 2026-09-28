@@ -38,6 +38,11 @@ detallada, edad, nacionalidad, dorsal, valoración y **proyección** (el techo a
 que puede llegar). Si además vienen años de contrato, valor, sueldo y cláusula,
 mejor; si no, se estiman con la escala que ya usa el resto.
 
+El pedido ya está escrito en `PROMPT-PLANTELES.md`: ahí está el plantel de
+Boca entero como modelo, qué significa cada campo con su vocabulario exacto,
+un prompt para pedirle a otra IA el plantel completo de un club y otro para
+pedirle solo las fechas de nacimiento de los 58 que ya están cargados.
+
 ### Escudos del continente (y de la tercera, cuando esté)
 
 Ya están los 66 del fútbol argentino: los 30 de Primera y los 36 de la
