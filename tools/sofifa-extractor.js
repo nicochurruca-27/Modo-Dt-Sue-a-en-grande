@@ -26,7 +26,9 @@
   // ae edad · oa valoración · pt potencial · vl valor · wg salario
   // rc cláusula · by año de nacimiento · hi altura · wi peso · pf pierna hábil
   // ir reputación internacional · cj dorsal · bp mejor posición · gu progresión
-  const COLUMNAS = ['ae', 'oa', 'pt', 'vl', 'wg', 'rc', 'by', 'hi', 'wi', 'pf', 'ir', 'cj', 'bp', 'gu'];
+  // hc cara real (¿tiene foto escaneada o una genérica?)
+  // le fecha de fin de préstamo (los cedidos no traen años de contrato)
+  const COLUMNAS = ['ae', 'oa', 'pt', 'vl', 'wg', 'rc', 'by', 'hi', 'wi', 'pf', 'ir', 'cj', 'bp', 'gu', 'hc', 'le'];
 
   const limpiar = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
@@ -49,6 +51,10 @@
       j.sofifaId = (link.getAttribute('href').match(/\/player\/(\d+)/) || [])[1];
       j.nombre = limpiar(link.getAttribute('data-tippy-content') || link.textContent);
       j.url = 'https://sofifa.com' + link.getAttribute('href').replace('https://sofifa.com', '');
+      // La foto no hace falta bajarla: la URL sale del id, rellenado a 6
+      // dígitos y partido en dos mitades (183898 -> players/183/898/).
+      const seis = String(j.sofifaId).padStart(6, '0');
+      j.fotoUrl = `https://cdn.sofifa.net/players/${seis.slice(0, 3)}/${seis.slice(3)}/27_120.png`;
       const celda = link.closest('td');
       // Los puestos aparecen anidados (un contenedor y adentro el texto), así
       // que sin el Set salen duplicados: ED/ED/MD/MD en vez de ED/MD.
