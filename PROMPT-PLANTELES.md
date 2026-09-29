@@ -333,12 +333,29 @@ Pedirle club por club a una IA sirve para uno o dos clubes. Para las 64
 entradas que faltan del fútbol argentino —y más todavía para las ligas del
 mundo— conviene una base de datos y un conversor.
 
-### La que mejor encaja: las bases del EA Sports FC / SoFIFA
+### La que mejor encaja: las bases del EA Sports FC
 
 Son volcados del videojuego con licencia. Encajan casi uno a uno con lo que
 necesita el juego, y —esto es lo importante— **son la única fuente pública que
 trae algo equivalente a `rating` y `projection`**, que es justamente lo que no
 se puede investigar en un diario.
+
+**Hay que usar la edición en curso.** Hoy es FC 27, que salió en septiembre de
+2026, y sus planteles son los de la temporada 2026/27: exactamente el año en
+que arranca el juego. Una base de FC 25 o FC 26 trae jugadores que ya se
+fueron y le faltan los que llegaron. Al bajar cualquier archivo, lo primero es
+mirar la fecha del volcado.
+
+**Y ojo, que no todas las bases traen lo mismo.** Hay dos clases y se confunden
+fácil:
+
+| | Qué trae | Qué le falta |
+| --- | --- | --- |
+| **Ratings oficiales** (la API pública de EA) | Nombre, club, liga, nacionalidad, posición, `overall` y los 34 atributos | **No trae `potential`, ni fecha de nacimiento, ni contrato, ni valor, ni sueldo** |
+| **Base del Modo Carrera** (SoFIFA, CMTracker, FIFA Index) | Todo lo anterior **más** `potential`, fecha de nacimiento, vencimiento de contrato, valor, sueldo y dorsal | Hay que sacarla de una web, no viene en un CSV servido |
+
+Para este juego hace falta la segunda. La de ratings oficiales sola te deja sin
+proyección ni contratos, que son dos campos que usamos.
 
 | Campo nuestro | Columna del CSV | Cómo se arma |
 | --- | --- | --- |
@@ -373,20 +390,36 @@ ST  → delantero centro           LW  → extremo izquierdo
 CF  → segundo delantero
 ```
 
-Dónde están: en Kaggle, buscando "EA FC player database". Por ejemplo
-[EA FC25 Player Database](https://www.kaggle.com/datasets/mexwell/ea-fc25-player-database),
-[EA Sports FC 25 database, ratings and stats](https://www.kaggle.com/datasets/nyagami/ea-sports-fc-25-database-ratings-and-stats)
-o [el volcado de SoFIFA](https://www.kaggle.com/datasets/aniss7/fifa-player-data-from-sofifa-2025-06-03),
-que es el que suele traer las columnas con estos nombres exactos.
+#### Dónde está la de FC 27
+
+- **[SoFIFA](https://sofifa.com/players)** — la base del Modo Carrera, con
+  volcado del 17 de septiembre de 2026. Trae todo lo que necesitamos. Hay que
+  bajarla de la web.
+- **[FIFA Index](https://fifaindex.com/players)** — lo mismo, con `potential` y
+  crecimiento por jugador.
+- **[CMTracker](https://cmtracker.net/players)** y
+  **[FC Tools Hub](https://fctoolshub.com/en/database/fc27/players)** — bases
+  del Modo Carrera con valores y sueldos. Si tenés el juego en PC, **estas dos
+  leen tu propio archivo de partida guardada**: ese es el volcado más completo
+  y más al día que existe, porque es literalmente la base del juego.
+- **[EA SPORTS FC 27 Player Ratings](https://www.kaggle.com/datasets/mikedpad/ea-sports-fc27-player-ratings)**
+  (Kaggle, volcado del 12/9/2026, 19.789 jugadores) — este es un CSV servido y
+  cómodo, pero sale de la API de ratings de EA, así que es de la primera clase:
+  hay que dar por sentado que **no trae proyección, fecha de nacimiento ni
+  contrato** hasta que se abra el archivo y se confirme.
 
 **Los tres límites que tiene esta fuente:**
 
 1. **La Primera Nacional no está.** El videojuego tiene la Liga Profesional
    argentina, no el ascenso. Para esos 36 clubes hay que ir por otro lado.
-2. **Es una foto de una fecha.** Un plantel de hace una temporada tiene
-   jugadores que ya se fueron y le faltan los que llegaron.
+2. **Es una foto del día del volcado.** Si el mercado se movió después, lo que
+   bajaste ya tiene una diferencia.
 3. **Los juveniles recién subidos suelen no estar**, o estar con un rating
    genérico. Son, otra vez, los mismos que fallan por el otro camino.
+
+Y una cosa que conviene tener presente: la base del EA FC es propiedad de EA.
+Para armar el juego y jugarlo no hay drama; si en algún momento este
+repositorio se publica con los planteles adentro, ahí sí es algo a pensar.
 
 ### Las otras dos que sirven
 
@@ -401,12 +434,13 @@ que es el que suele traer las columnas con estos nombres exactos.
 
 ### El paso que falta
 
-Cuando tengas el CSV, **pasámelo (con veinte filas alcanza)** y te escribo el
-conversor en `tools/` que lo lee y escribe las entradas de `REAL_ROSTERS`
+Cuando tengas el archivo, **pasámelo (con veinte filas alcanza)** y te escribo
+el conversor en `tools/` que lo lee y escribe las entradas de `REAL_ROSTERS`
 solas, con el mapeo de puestos, el sueldo anualizado y los años de contrato ya
 calculados. No lo escribo antes porque los nombres de las columnas cambian de
 una base a la otra, y un conversor que no probé contra el archivo de verdad es
-un conversor roto.
+un conversor roto. Con la primera muestra queda escrito y después cada liga
+nueva son cinco minutos.
 
 ---
 
