@@ -57,6 +57,22 @@ body {
   top: 16px;
 }
 
+/* La columna de la derecha: el plantel arriba, las inferiores abajo. Las
+   medidas viven acá y no en #squad-panel, igual que pasa con .center-col. */
+.right-col {
+  flex: 0 0 460px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 16px;
+}
+
+.right-col .side-panel {
+  flex: 1 1 auto;
+  position: static;
+}
+
 #squad-panel {
   flex-basis: 460px;
 }
@@ -112,6 +128,7 @@ body {
      formación aparecía recién después de media pantalla en blanco. En
      vertical la columna tiene que medir lo que mida su contenido. */
   .center-col { flex: 0 0 auto; max-width: 100%; width: 100%; margin: 0; }
+  .right-col { flex: 0 0 auto; max-width: 100%; width: 100%; position: static; }
   .side-panel { flex: 1 1 auto; width: 100%; position: static; }
 
   /* Una pestaña por vez. El mercado es la cuarta: en el celular es su propia
@@ -119,22 +136,32 @@ body {
   #mobile-tabs button { font-size: 0.9em; padding: 10px 4px; }
 
   .layout[data-view="app"] #table-panel,
+  .layout[data-view="app"] .right-col,
   .layout[data-view="app"] #squad-panel,
+  .layout[data-view="app"] #youth-panel,
   .layout[data-view="app"] #market-panel { display: none; }
   /* En Tabla y en Plantel no se muestra nada de la columna del medio (ni
      #app ni el mercado), así que se esconde la columna entera: si no, queda
      igual sumando el gap de 16px del layout. */
   .layout[data-view="table"] .center-col,
   .layout[data-view="table"] #app,
-  .layout[data-view="table"] #squad-panel,
+  .layout[data-view="table"] .right-col,
   .layout[data-view="table"] #market-panel { display: none; }
+  /* En Plantel se ve el plantel, no las inferiores: la columna de la derecha
+     queda, pero adentro se muestra una sola de las dos. */
   .layout[data-view="squad"] .center-col,
   .layout[data-view="squad"] #app,
   .layout[data-view="squad"] #table-panel,
+  .layout[data-view="squad"] #youth-panel,
   .layout[data-view="squad"] #market-panel { display: none; }
   .layout[data-view="market"] #app,
   .layout[data-view="market"] #table-panel,
-  .layout[data-view="market"] #squad-panel { display: none; }
+  .layout[data-view="market"] .right-col { display: none; }
+  .layout[data-view="youth"] .center-col,
+  .layout[data-view="youth"] #app,
+  .layout[data-view="youth"] #table-panel,
+  .layout[data-view="youth"] #squad-panel,
+  .layout[data-view="youth"] #market-panel { display: none; }
 }
 
 /* Cuando la pantalla da de sobra, el panel de tablas se ensancha. En un
@@ -155,6 +182,7 @@ body {
    paneles laterales para que entre todo sin scroll horizontal). */
 @media (max-width: 960px) and (orientation: landscape) {
   .side-panel { flex-basis: 200px; }
+  .right-col { flex-basis: 230px; }
   #squad-panel { flex-basis: 230px; }
 }
 
@@ -1440,6 +1468,8 @@ body.sin-scroll { overflow: hidden; }
    las cuatro pestañas vacías arriba del formulario. */
 body[data-fase="inicio"] { padding: 0; }
 body[data-fase="inicio"] .layout { display: block; max-width: none; }
+body[data-fase="inicio"] #youth-panel,
+body[data-fase="creacion"] #youth-panel,
 body[data-fase="inicio"] #table-panel,
 body[data-fase="inicio"] #squad-panel,
 body[data-fase="inicio"] #market-panel,
@@ -2414,3 +2444,139 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
   text-align: right;
   white-space: nowrap;
 }
+
+/* ---------- Inferiores ---------- */
+/*
+   El panel de la cantera. Se parece al del plantel a propósito: es la misma
+   clase de pantalla (una lista de jugadores en la que tocás uno y se abre su
+   ficha), y conviene que se maneje igual.
+*/
+.juveniles-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cantera-estrellas {
+  color: #f59e0b;
+  letter-spacing: 1px;
+  font-size: 0.95em;
+}
+
+.juvenil-nota {
+  background: #10281a;
+  border: 1px solid #1f6b40;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+
+.juvenil-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.juvenil-fila {
+  display: grid;
+  /* Puesto, nombre (lo que sobra), edad, valoración, chapita del techo. */
+  grid-template-columns: 34px 1fr 24px 28px auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #111827;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.88em;
+}
+
+.juvenil-fila:hover { border-color: #475569; }
+.juvenil-fila.abierta { border-color: var(--accent); background: #12241a; }
+
+/* El que está en su última temporada: si no firma, lo perdés. */
+.juvenil-fila.ultimo-anio { border-left: 3px solid #f59e0b; }
+
+.juvenil-pos {
+  font-weight: 700;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+.juvenil-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.juvenil-rating { font-weight: 700; text-align: right; }
+
+.juvenil-nivel {
+  border: 1px solid var(--nivel);
+  color: var(--nivel);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.78em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.juvenil-ficha {
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  margin: -6px 0 6px;
+  padding: 10px;
+  background: #0d1a13;
+}
+
+.juvenil-ficha-datos { display: flex; flex-direction: column; gap: 2px; }
+
+.juvenil-aviso {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #2a1d07;
+  border: 1px solid #f59e0b;
+  font-size: 0.85em;
+}
+
+.juvenil-plata { margin: 8px 0 6px; font-size: 0.85em; }
+.juvenil-motivo { margin: 6px 0 0; font-size: 0.82em; }
+
+.juvenil-acciones { display: flex; gap: 6px; }
+.juvenil-acciones .btn { flex: 1; }
+
+.juvenil-btn { width: 100%; margin-top: 8px; }
+
+.ojeador-bloque {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  margin: 10px 0;
+  background: #0f1620;
+}
+
+.ojeador-bloque.volvio { border-color: var(--accent); background: #101f16; }
+.ojeador-bloque h4 { margin: 0 0 4px; }
+.ojeador-bloque p { margin: 0 0 8px; font-size: 0.85em; }
+
+.ojeo-campo { display: block; margin-bottom: 8px; font-size: 0.85em; }
+.ojeo-campo select {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: inherit;
+}
+
+.ojeo-puestos { display: flex; gap: 4px; margin-top: 3px; }
+.ojeo-puestos .tab-btn { flex: 1; }

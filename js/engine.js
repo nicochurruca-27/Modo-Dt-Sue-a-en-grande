@@ -4742,6 +4742,9 @@ const Engine = {
     // de calendario entra el goteo fijo (TV, sponsors, cuota social).
     if (cal.dayCount % 7 === 0) Economia.cobrarSemana(this);
     Noticias.tick(this);
+    // El ojeador puede volver de viaje hoy. Frena igual que un mensaje del
+    // club: trae un informe con doce chicos y hay que resolverlo.
+    if (typeof Juveniles !== 'undefined' && Juveniles.revisarOjeador(this)) return 'frena';
     // Con el mercado abierto puede llegar una oferta cualquier día.
     if (this.ofertaDelDia()) return 'frena';
 
@@ -7609,6 +7612,11 @@ const Engine = {
     // Los retiros de TU plantel se cuentan en la pantalla de fin de
     // temporada, además de salir en el diario.
     s.lastSeasonSummary.retiros = retiros.map((r) => r.texto);
+    // Y los juveniles que cumplieron la edad y no firmaron contrato se van
+    // libres. Es la contracara de que tenerlos en la cantera sea gratis.
+    if (typeof Juveniles !== 'undefined') {
+      s.lastSeasonSummary.juveniles = Juveniles.cerrarTemporada(this).map((a) => a.texto);
+    }
     s.screen = 'season-end';
     this.save();
   },

@@ -131,27 +131,33 @@ guarda. Falta subirle el nivel a esa IA, que hoy es a propósito simple:
 
 Es lo que más emparejaría el juego: hoy vos podés comprar y ellos casi no.
 
-### Los planteles se vacían con los años (medido)
+### Los planteles se vacían con los años — resuelto con las inferiores
 
-Ahora que los 30 clubes de Primera tienen plantel real, esto dejó de ser un
-detalle de dos clubes y pasó a ser de todos. Medido en el navegador, dejando
-correr los retiros temporada por temporada:
+Estaba medido y era grave: dejando correr los retiros, en la temporada 15 el
+club más chico quedaba con **8 jugadores** y no podía ni parar un once.
+
+Lo arreglan las inferiores (`js/juveniles.js`). Cada club tiene su cantera, y
+un club al que se le retiraron tres veteranos sube tres pibes: los que hagan
+falta para no bajar de su piso, y ni uno más. El piso no es parejo para todos
+—sale del tamaño que tiene su plantel de verdad—, así que Boca sostiene un
+plantel más grande que Instituto, como corresponde.
+
+Medido de nuevo, con las inferiores puestas:
 
 | Temporada | Plantel más chico | Plantel más grande |
 |---|---|---|
 | 1  | 27 | 36 |
-| 5  | 25 | 36 |
-| 10 | 19 | 35 |
-| 15 |  8 | 24 |
+| 10 | 22 | 35 |
+| 15 | 22 | 30 |
+| 25 | 22 | 30 |
 
-El juego no inventa a nadie para tapar el hueco (es una decisión tomada, ver
-`procesarRetiros`), y los clubes con plantel real no tienen todavía cantera
-propia. En la temporada 15 hay clubes que no pueden ni parar once.
+Nunca baja de 22 en 25 temporadas, y la valoración media de la liga se queda
+quieta en torno a 70 en vez de irse para cualquier lado.
 
-Las dos salidas son las que ya están en la lista de arriba: **política de
-juveniles** (que cada club suba pibes propios) y que la IA compre de verdad
-para tapar sus puestos flojos. Mientras no estén, una carrera larga se
-desinfla.
+**Lo que sigue faltando de esto**: que la IA rival además COMPRE para tapar
+sus puestos flojos, que es lo que está en la lista de arriba. Hoy un club
+repone cantidad, no puesto: si se le retiran los dos arqueros, sube a los dos
+mejores que tenga aunque sean delanteros.
 
 ### `retirados` engorda la partida
 
@@ -240,7 +246,31 @@ línea de cuatro, y aunque entrara se pierde de un vistazo la formación, que
 es justo para lo que sirve esa pantalla. La carta quedó donde rinde: la
 ficha del jugador.
 
-## 7. Economía, lo que quedó afinar
+## 7. Renovar contratos: negociar, no aceptar
+
+Hoy renovar un contrato es un botón con un precio fijo (ver
+`Economia.costoRenovacion`). Tendría que ser una negociación, porque es una de
+las decisiones más lindas del modo carrera y hoy no existe:
+
+- **Cuanto mejor es el jugador, más pide.** No solo por valoración: un pibe de
+  19 con techo 88 tiene que costar mucho más que un jugador hecho de 30 con la
+  misma valoración de hoy, porque lo que se está comprando es el futuro.
+- **El club importa.** A una joya en un club chico se le va a querer ir, y hay
+  que pagarle por encima de lo que vale para que se quede. En un club grande
+  la misma joya firma más barato, porque está donde quiere estar.
+- **Que se pueda negociar de verdad**: que pidas un número, el jugador pida
+  otro, y haya lugar para ofrecer más años, más sueldo o una cláusula más
+  alta. Que también pueda decir que no.
+- **Que avise antes.** Un contrato que vence en seis meses tendría que
+  aparecer en el panel, no enterarte cuando el jugador ya se fue libre.
+
+Esto se cruza directo con las inferiores: el pibe que subiste firma su primer
+contrato por tres años, y cuando se le vence, si salió bueno, ahí empieza el
+problema de verdad.
+
+---
+
+## 8. Economía, lo que quedó afinar
 
 Cada club de Primera tiene su economía real en `js/finanzas.js` y de ahí salen
 el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
@@ -256,7 +286,7 @@ el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
 
 ---
 
-## 8. Detalles sueltos
+## 9. Detalles sueltos
 
 - **La pantalla de elegir club** podría contar bastante más de cada club antes
   de que te decidas (hoy la reputación son cinco estrellitas y nada más).
@@ -264,10 +294,23 @@ el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
   una división más abajo de donde traer reemplazos.
 - **El usuario todavía gana de más**, aunque mucho menos que antes. Se termina
   de emparejar con la IA de clubes (punto 2).
+- **El ojeador solo puede viajar a seis países** (Argentina, Uruguay, Brasil,
+  Paraguay, Colombia y Chile). No es una decisión: son los únicos para los que
+  el juego tiene nombres cargados (`NAMES_BY_NATION` en `data.js`), y mandarlo
+  a España devolvería doce chicos con nombre argentino. Agregar un país es
+  agregarle su lista de nombres y aparece solo en el selector.
+- **Los nombres inventados pueden caer justo en uno real.** Las listas de
+  nombres se armaron con nombres y apellidos de futbolistas conocidos, y se
+  combinan al azar: en las de países con pocas entradas (Uruguay tiene 10 y 10)
+  cada tanto sale la combinación exacta de una persona que existe — en las
+  pruebas apareció un juvenil llamado Edinson Cavani. Antes casi no se notaba;
+  con las inferiores generando pibes en 30 clubes por temporada, se nota. Se
+  arregla agrandando las listas, o cruzando contra una lista de combinaciones
+  prohibidas.
 
 ---
 
-## 9. Lo grande que viene: más de una liga
+## 10. Lo grande que viene: más de una liga
 
 La idea es que el juego deje de ser solo la liga argentina. Antes de escribir
 una línea conviene tener presente qué del motor es argentino y qué no:

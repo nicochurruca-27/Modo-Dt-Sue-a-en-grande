@@ -254,15 +254,17 @@ await probar('15. HOY: el estado de la vista NO se reinicia al terminar una carr
   selectedPlayerId = Engine.state.squad[0].id;
   mercadoClubId = 'river';
   noticiaFiltro = 'retiros';
+  juvenilSeleccionado = Juveniles.camada(Engine, 'boca')[0].id;
   Engine.resetGame();
   const quedaron = [
     selectedPlayerId !== null && 'selectedPlayerId',
     mercadoClubId !== null && 'mercadoClubId',
     noticiaFiltro !== 'todas' && 'noticiaFiltro',
+    juvenilSeleccionado !== null && 'juvenilSeleccionado',
   ].filter(Boolean);
   // Hoy esto es correcto (no hay cambio de carrera). El Bloque 2 lo invierte.
   return {
-    ok: quedaron.length === 3,
+    ok: quedaron.length === 4,
     detalle: `sobreviven: ${quedaron.join(', ')} — el Bloque 2 tiene que dejar esta lista vacía`,
   };
 });

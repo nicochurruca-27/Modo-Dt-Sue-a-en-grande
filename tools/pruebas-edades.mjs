@@ -145,20 +145,22 @@ await probar('7. Al retirarse NO aparece ningún jugador de reemplazo', () => {
   };
 });
 
-await probar('8. Un club con plantel real puede quedar por debajo del mínimo', () => {
+// Antes, esta prueba fijaba que un club con plantel real PODÍA quedar por
+// debajo del mínimo: no había de dónde reponer y en la temporada 16 Boca
+// tenía 13 jugadores. Las inferiores dieron vuelta eso a propósito. Lo que se
+// sigue fijando, que es lo importante, es que la reposición venga de la
+// cantera del club y NO del relleno genérico.
+await probar('8. Un club con plantel real repone con SU cantera, no con relleno', () => {
   window.__carrera('platense');
-  // Quince temporadas más adelante: a Boca se le retiró medio plantel y
-  // nadie lo repone.
+  // Quince temporadas más adelante: a Boca se le retiró medio plantel.
   Engine.state.season.year = 16;
   Engine._fuerzas = {};
   const boca = Mercado.plantel(Engine, 'boca');
-  // De comparación va un club de la Nacional: desde que entraron los 930
-  // jugadores de SoFIFA, los 30 de Primera tienen todos plantel real y ya no
-  // sirve ninguno como ejemplo de plantel generado.
-  const generado = Mercado.plantel(Engine, 'ferro');
+  const canteranos = boca.filter((p) => p.deLaCantera).length;
+  const relleno = boca.filter((p) => /-c\d/.test(p.id)).length;
   return {
-    ok: boca.length < 22 && !boca.some((p) => /-c\d/.test(p.id)),
-    detalle: `Boca (plantel real) ${boca.length} jugadores · Ferro (generado) ${generado.length}`,
+    ok: boca.length >= Juveniles.pisoDe('boca') && canteranos > 0 && relleno === 0,
+    detalle: `Boca ${boca.length} jugadores (piso ${Juveniles.pisoDe('boca')}): ${canteranos} de la cantera, ${relleno} de relleno genérico`,
   };
 });
 

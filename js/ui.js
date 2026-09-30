@@ -139,6 +139,7 @@ function render() {
   renderTablePanel();
   renderSquadPanel();
   renderMarketPanel();
+  renderYouthPanel();
   wireBotonesDePartida();
   sonarSegunLaPantalla();
   const endCareerBtn = document.getElementById('end-career-btn');
@@ -4670,7 +4671,14 @@ function renderSeasonEnd() {
           <div class="avisos-partido avisos-neutros">
             <h3>Colgaron los botines</h3>
             ${sum.retiros.map((t) => `<p>${t}</p>`).join('')}
-            <p class="muted">El plantel queda con esos jugadores menos: los reemplazos salen del mercado de pases.</p>
+            <p class="muted">El plantel queda con esos jugadores menos: los reemplazos salen del mercado de pases y de las inferiores.</p>
+          </div>
+        ` : ''}
+        ${(sum.juveniles || []).length ? `
+          <div class="avisos-partido avisos-neutros">
+            <h3>Se fueron de inferiores</h3>
+            ${sum.juveniles.map((t) => `<p>${t}</p>`).join('')}
+            <p class="muted">Cumplieron la edad de las inferiores sin firmar contrato. Para quedarse con uno hay que subirlo a Primera antes de que cumpla los 20.</p>
           </div>
         ` : ''}
       </div>
@@ -5101,8 +5109,237 @@ function renderMarketPanel() {
   });
 }
 
-// Barra de pestañas de solo celular (vertical): cambia cuál de los 4
-// paneles se ve sin tener que scrollear (Tabla, Partido, Plantel, Mercado).
+// ---------- El panel de Inferiores ----------
+//
+// La cantera del club: los pibes que hay ahora, qué techo se le ve a cada uno,
+// y las tres cosas que podés hacer con ellos (subirlo a Primera, dejarlo donde
+// está, o soltarlo). Más el ojeador, que es la manera de traer juveniles de
+// otros países.
+//
+// Tenerlos en inferiores no cuesta nada. El costo aparece recién cuando
+// firmás: ahí el pibe pasa al plantel y empieza a cobrar sueldo.
+
+const POS_LARGO = { POR: 'arqueros', DEF: 'defensores', MED: 'mediocampistas', DEL: 'delanteros' };
+
+let juvenilSeleccionado = null;  // el juvenil cuya ficha está abierta
+let ojeoPais = null;             // país elegido en el formulario del ojeador
+let ojeoPuestos = [];            // los dos puestos que se le piden
+let juvenilesNota = null;        // el último mensaje ("firmó", "quedó libre")
+
+// Las estrellitas de la cantera del club, de 1 a 5.
+function estrellasDeCantera(n) {
+  return `<span class="cantera-estrellas" title="Calidad de la cantera: ${n} de 5">${
+    '★'.repeat(n)}<span class="muted">${'★'.repeat(5 - n)}</span></span>`;
+}
+
+// La chapita de color con el techo del jugador. Es lo único que de verdad
+// importa de un juvenil: la valoración de hoy siempre es baja.
+function chapaDeNivel(p) {
+  return `<span class="juvenil-nivel" style="--nivel:${p.nivelColor}" title="${p.nivelLabel}">${p.nivelCorto} ${p.projection}</span>`;
+}
+
+function filaDeJuvenilHtml(p, abierta) {
+  const ultimoAnio = p.age >= Juveniles.EDAD_MAXIMA;
+  return `
+    <button class="juvenil-fila${abierta ? ' abierta' : ''}${ultimoAnio ? ' ultimo-anio' : ''}" data-juvenil="${p.id}">
+      <span class="juvenil-pos">${posDetailAbbrev(p.posDetail) || p.pos}</span>
+      <span class="juvenil-nombre">${nationFlag(p.nation, 10)} ${p.name}</span>
+      <span class="juvenil-edad muted">${p.age}</span>
+      <span class="juvenil-rating">${p.rating}</span>
+      ${chapaDeNivel(p)}
+    </button>
+  `;
+}
+
+// La ficha completa, con todo lo que tendría un jugador del plantel.
+function fichaDeJuvenilHtml(p, opciones) {
+  const op = opciones || {};
+  const permiso = op.sinAcciones ? null : Juveniles.puedeSubir(Engine, p);
+  const costo = Juveniles.costoDeSubir(Engine, p);
+  const sueldo = Juveniles.sueldoDe(Engine, p);
+  const ultimoAnio = p.age >= Juveniles.EDAD_MAXIMA;
+  const filas = [
+    ['Puesto', p.posDetail || p.pos],
+    ['Edad', `${p.age} años`],
+    ['País', `${nationFlag(p.nation, 10)} ${Engine.nationName(p.nation)}`],
+    ['Valoración hoy', String(p.rating)],
+    ['Techo', `${p.projection} — ${p.nivelLabel}`],
+    ['Pierna hábil', p.pierna],
+    ['Altura', `${p.altura} cm`],
+    ['Peso', `${p.peso} kg`],
+    ...(p.role ? [['Rol', p.role]] : []),
+  ];
+  return `
+    <div class="juvenil-ficha">
+      <div class="juvenil-ficha-datos">
+        ${filas.map(([q, c]) => `<div class="ficha-fila"><span class="muted">${q}</span><span>${c}</span></div>`).join('')}
+      </div>
+      ${ultimoAnio && !op.sinAcciones ? `
+        <p class="juvenil-aviso">Última temporada en inferiores. Si no le hacés contrato ahora, al cerrar el año se va libre.</p>
+      ` : ''}
+      ${op.sinAcciones ? `
+        <button class="btn primary juvenil-btn" data-elegir-juvenil="${p.id}">Quedármelo</button>
+      ` : `
+        <p class="muted juvenil-plata">Primer contrato: <strong>${Mercado.plata(costo)}</strong> de prima y <strong>${Mercado.plata(sueldo)}</strong> por año, por 3 años.</p>
+        <div class="juvenil-acciones">
+          <button class="btn primary" data-subir-juvenil="${p.id}"${permiso && permiso.ok ? '' : ' disabled'}>Subir a Primera</button>
+          <button class="btn" data-liberar-juvenil="${p.id}">Dejarlo libre</button>
+        </div>
+        ${permiso && !permiso.ok ? `<p class="muted juvenil-motivo">${permiso.motivo}</p>` : ''}
+      `}
+    </div>
+  `;
+}
+
+// El bloque del ojeador: o está de viaje, o volvió con un informe, o hay que
+// mandarlo a algún lado.
+function ojeadorHtml() {
+  const s = Engine.state;
+  const j = Juveniles.init(s);
+  if (j.informe) {
+    const inf = j.informe;
+    return `
+      <div class="ojeador-bloque volvio">
+        <h4>El ojeador volvió de ${Engine.nationName(inf.pais)}</h4>
+        <p class="muted">Vio ${inf.jugadores.length} chicos de ${inf.puestos.map((x) => POS_LARGO[x] || x).join(' y ')}. Te podés quedar con uno solo; a los demás no los vas a volver a ver.</p>
+        <div class="juvenil-lista">
+          ${inf.jugadores.map((p) => `
+            ${filaDeJuvenilHtml(p, juvenilSeleccionado === p.id)}
+            ${juvenilSeleccionado === p.id ? fichaDeJuvenilHtml(p, { sinAcciones: true }) : ''}
+          `).join('')}
+        </div>
+        <button class="btn juvenil-btn" data-descartar-informe="1">No me quedo con ninguno</button>
+      </div>
+    `;
+  }
+  if (j.ojeador) {
+    const faltan = Juveniles.diasQueFaltan(s);
+    return `
+      <div class="ojeador-bloque">
+        <h4>El ojeador está en ${Engine.nationName(j.ojeador.pais)}</h4>
+        <p class="muted">Buscando ${j.ojeador.puestos.map((x) => POS_LARGO[x] || x).join(' y ')}. Vuelve en ${faltan} ${faltan === 1 ? 'día' : 'días'}.</p>
+      </div>
+    `;
+  }
+  const paises = Juveniles.paises();
+  const pais = ojeoPais && paises.includes(ojeoPais) ? ojeoPais : paises[0];
+  return `
+    <div class="ojeador-bloque">
+      <h4>Mandar al ojeador</h4>
+      <p class="muted">Tarda un mes y vuelve con ${Juveniles.DEL_INFORME} chicos de los puestos que le pidas. Te quedás con uno y va derecho a inferiores.</p>
+      <label class="ojeo-campo"><span class="muted">País</span>
+        <select data-ojeo-pais>
+          ${paises.map((c) => `<option value="${c}"${c === pais ? ' selected' : ''}>${Engine.nationName(c)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="ojeo-campo"><span class="muted">Puestos (hasta dos)</span>
+        <div class="ojeo-puestos">
+          ${['POR', 'DEF', 'MED', 'DEL'].map((x) => `
+            <button class="tab-btn ${ojeoPuestos.includes(x) ? 'active' : ''}" data-ojeo-puesto="${x}">${x}</button>
+          `).join('')}
+        </div>
+      </div>
+      <button class="btn primary juvenil-btn" data-mandar-ojeador="1"${ojeoPuestos.length ? '' : ' disabled'}>Mandarlo a ${Engine.nationName(pais)}</button>
+    </div>
+  `;
+}
+
+function renderYouthPanel() {
+  const panel = document.getElementById('youth-panel');
+  if (!panel) return;
+  const s = Engine.state;
+  if (!s || !s.clubId || !s.season || typeof Juveniles === 'undefined') { panel.innerHTML = ''; return; }
+  const club = Engine.getClub(s.clubId);
+  const cantera = Engine.canteraDe(club);
+  const lista = Juveniles.camada(Engine, s.clubId);
+
+  panel.innerHTML = `
+    <div class="card side-card juveniles-card">
+      <div class="juveniles-cabecera">
+        <h3>Inferiores</h3>
+        ${estrellasDeCantera(cantera)}
+      </div>
+      <p class="muted">Los pibes del club. Tenerlos acá no cuesta nada: recién cuando los subís a Primera hay que hacerles contrato. A los 20 años se terminó — o firmaron, o se van libres.</p>
+      ${juvenilesNota ? `<p class="juvenil-nota">${juvenilesNota}</p>` : ''}
+      ${ojeadorHtml()}
+      <h4>La cantera (${lista.length})</h4>
+      ${lista.length ? `
+        <div class="juvenil-lista">
+          ${lista.map((p) => `
+            ${filaDeJuvenilHtml(p, juvenilSeleccionado === p.id)}
+            ${juvenilSeleccionado === p.id ? fichaDeJuvenilHtml(p) : ''}
+          `).join('')}
+        </div>
+      ` : '<p class="muted">No queda nadie en inferiores. La camada del año que viene entra al cerrar la temporada.</p>'}
+    </div>
+  `;
+
+  panel.querySelectorAll('[data-juvenil]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.juvenil;
+      juvenilSeleccionado = juvenilSeleccionado === id ? null : id;
+      renderYouthPanel();
+    });
+  });
+  panel.querySelectorAll('[data-subir-juvenil]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const r = Juveniles.subir(Engine, btn.dataset.subirJuvenil);
+      juvenilesNota = r.nota;
+      juvenilSeleccionado = null;
+      render();
+    });
+  });
+  panel.querySelectorAll('[data-liberar-juvenil]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const r = Juveniles.liberar(Engine, btn.dataset.liberarJuvenil);
+      juvenilesNota = r.nota;
+      juvenilSeleccionado = null;
+      renderYouthPanel();
+    });
+  });
+  panel.querySelectorAll('[data-elegir-juvenil]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const r = Juveniles.elegirDelInforme(Engine, btn.dataset.elegirJuvenil);
+      juvenilesNota = r.nota;
+      juvenilSeleccionado = null;
+      renderYouthPanel();
+    });
+  });
+  const descartar = panel.querySelector('[data-descartar-informe]');
+  if (descartar) {
+    descartar.addEventListener('click', () => {
+      juvenilesNota = Juveniles.descartarInforme(Engine).nota;
+      juvenilSeleccionado = null;
+      renderYouthPanel();
+    });
+  }
+  const selectPais = panel.querySelector('[data-ojeo-pais]');
+  if (selectPais) {
+    selectPais.addEventListener('change', () => { ojeoPais = selectPais.value; renderYouthPanel(); });
+  }
+  panel.querySelectorAll('[data-ojeo-puesto]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const x = btn.dataset.ojeoPuesto;
+      if (ojeoPuestos.includes(x)) ojeoPuestos = ojeoPuestos.filter((y) => y !== x);
+      else ojeoPuestos = [...ojeoPuestos, x].slice(-2);
+      renderYouthPanel();
+    });
+  });
+  const mandar = panel.querySelector('[data-mandar-ojeador]');
+  if (mandar) {
+    mandar.addEventListener('click', () => {
+      const paises = Juveniles.paises();
+      const pais = ojeoPais && paises.includes(ojeoPais) ? ojeoPais : paises[0];
+      juvenilesNota = Juveniles.mandarOjeador(Engine, pais, ojeoPuestos).nota;
+      ojeoPuestos = [];
+      renderYouthPanel();
+    });
+  }
+}
+
+// Barra de pestañas de solo celular (vertical): cambia cuál de los 5
+// paneles se ve sin tener que scrollear (Tabla, Partido, Plantel, Mercado,
+// Inferiores).
 // En PC / celular horizontal esta barra está oculta y los paneles se ven
 // todos juntos, con el mercado abajo del partido (ver css/styles.css).
 function setupMobileTabs() {

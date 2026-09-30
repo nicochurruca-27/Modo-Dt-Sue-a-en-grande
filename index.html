@@ -12,6 +12,7 @@
     <button data-view="app" class="active">Partido</button>
     <button data-view="squad">Plantel</button>
     <button data-view="market">Mercado</button>
+    <button data-view="youth">Inferiores</button>
   </nav>
   <div class="layout" data-view="app">
     <aside id="table-panel" class="side-panel"></aside>
@@ -23,7 +24,15 @@
       <main id="app"></main>
       <section id="market-panel"></section>
     </div>
-    <aside id="squad-panel" class="side-panel"></aside>
+    <!-- La columna de la derecha: arriba el plantel y abajo las inferiores.
+         Van juntas por la misma razón por la que #app y el mercado comparten
+         la del medio: en la PC las inferiores caen justo abajo del plantel
+         sin pedirle una cuarta columna a un layout que ya usa todo el ancho,
+         y en el celular cada una es su propia pestaña. -->
+    <div class="right-col">
+      <aside id="squad-panel" class="side-panel"></aside>
+      <section id="youth-panel"></section>
+    </div>
   </div>
   <script defer src="js/data.js"></script>
   <script defer src="js/state.js"></script>
@@ -37,6 +46,7 @@
   <script defer src="js/colores.js"></script>
   <script defer src="js/marcas.js"></script>
   <script defer src="js/players.js"></script>
+  <script defer src="js/juveniles.js"></script>
   <script defer src="js/engine.js"></script>
   <script defer src="js/ui.js"></script>
 </body>

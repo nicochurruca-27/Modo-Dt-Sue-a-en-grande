@@ -101,6 +101,45 @@ const Noticias = {
     );
   },
 
+  // ---------- Las inferiores ----------
+
+  debutJuvenil(engine, p) {
+    const club = engine.getClub(engine.state.clubId);
+    const esJoya = p.projection >= 80;
+    this.push(
+      engine.state,
+      esJoya ? 'ultimahora' : 'mercado',
+      esJoya
+        ? `${p.name} firmó su primer contrato en ${club.name}`
+        : `${p.name} subió al plantel de ${club.name}`,
+      esJoya
+        ? `Tiene ${p.age} años y en el club creen que es de lo mejor que salió de las inferiores en años. Juega de ${p.posDetail}.`
+        : `${p.age} años, ${p.posDetail}. Sale de las inferiores del club.`,
+      { clubId: engine.state.clubId, sobre: p.name, destacada: esJoya },
+    );
+  },
+
+  juvenilQueSeFue(engine, p) {
+    const club = engine.getClub(engine.state.clubId);
+    this.push(
+      engine.state,
+      'mercado',
+      `${p.name} se va de ${club.name} sin firmar`,
+      `Cumplió la edad de las inferiores y el club nunca le ofreció contrato. Queda libre a los ${p.age} años.`,
+      { clubId: engine.state.clubId, sobre: p.name },
+    );
+  },
+
+  volvioElOjeador(engine, pais) {
+    this.push(
+      engine.state,
+      'ultimahora',
+      `Volvió el ojeador de ${engine.nationName(pais)}`,
+      'Trae un informe con los chicos que vio. Entrá a Inferiores para decidir si te quedás con alguno.',
+      { clubId: engine.state.clubId, destacada: true },
+    );
+  },
+
   // Después de jugarse una fecha completa de la liga.
   trasLaFecha(engine) {
     const s = engine.state;

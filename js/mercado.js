@@ -817,6 +817,25 @@ const Mercado = {
     // club se le cargue su REAL_ROSTERS pasa solo al otro comportamiento,
     // sin tocar una línea de acá.
     const tienePlantelReal = !!(real && real.length >= 11);
+
+    // ---------- Las inferiores ----------
+    //
+    // Acá se cumple lo que promete el comentario de arriba. Un club con
+    // plantel real no recibe relleno inventado, pero SÍ sube los pibes de su
+    // propia cantera, que no son inventados a la ligera: salen de la misma
+    // semilla de siempre y del nivel de cantera del club (ver js/juveniles.js
+    // y CANTERAS en data.js). Argentinos sube mejores juveniles que Barracas,
+    // como en la realidad.
+    //
+    // Sube solo los que hagan falta para no bajar del piso, así que un club
+    // completo no suma a nadie y uno al que se le retiraron tres veteranos
+    // repone tres. Sin esto los planteles reales se vaciaban solos: medido,
+    // en la temporada 15 el club más chico quedaba con 8 jugadores.
+    if (tienePlantelReal && typeof Juveniles !== 'undefined') {
+      const suben = Juveniles.egresados(engine, clubId, Juveniles.pisoDe(clubId) - vivos.length);
+      suben.forEach((p) => { if (!movimientos.fuera.includes(p.id)) vivos.push(p); });
+    }
+
     const nivel = 44 + club.reputation * 6;
     while (!tienePlantelReal && vivos.length < PLANTEL_MINIMO) {
       const pos = SQUAD_POSITIONS[vivos.length % SQUAD_POSITIONS.length];
