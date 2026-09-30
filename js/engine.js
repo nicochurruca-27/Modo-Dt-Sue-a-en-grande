@@ -399,8 +399,47 @@ const Engine = {
   // correspondan (el mercado, y en el futuro las inferiores).
   EDAD_DE_RETIRO: 39,
 
+  // El retiro se procesa al CIERRE de la temporada, así que la edad que
+  // decide es la que el jugador tiene al terminar el año, no la de hoy.
+  // Preguntarlo con la edad de hoy tenía dos consecuencias feas:
+  //
+  //   · Los jugadores que arrancan pasados de edad no llegaban a jugar. Los
+  //     planteles reales traen un par (José Sosa, 40, e Insaurralde, 41): el
+  //     juego los borraba antes del primer partido en vez de dejarles su
+  //     última temporada.
+  //   · Un jugador se esfumaba en mitad del torneo, el día de su cumpleaños.
+  //
+  // Ahora son dos preguntas distintas. `seRetira` es la del cierre: ¿este
+  // año fue el último? `yaSeRetiro` es la que hay que hacerle a un plantel
+  // que se está armando: ¿colgó los botines en un cierre ANTERIOR?
+  //
+  // La edad al cierre se cuenta al 31 de diciembre, con lo cual cualquiera
+  // que cumpla años ese año ya los cumplió. Vale para las dos preguntas, así
+  // que tu plantel y los de los rivales usan exactamente la misma cuenta y
+  // no puede pasar que un jugador exista de un lado y del otro no.
+  edadAlCierreDeTemporada(player, temporada) {
+    const nacimiento = this.parseFechaDeNacimiento(player && player.birthDate);
+    if (nacimiento) return Math.max(0, anioDeTemporada(temporada) - nacimiento.anio);
+    // Sin fecha de nacimiento, el reloj grueso de siempre.
+    if (player && player.edadAlLlegar != null) {
+      return player.edadAlLlegar + Math.max(0, temporada - (player.temporadaAlLlegar || 1));
+    }
+    return (player && player.age) || 0;
+  },
+
+  // ¿Se retira al cerrar la temporada que se está jugando?
   seRetira(player) {
-    return this.edadDe(player) > this.EDAD_DE_RETIRO;
+    const temporada = this.state && this.state.season ? this.state.season.year : 1;
+    return this.edadAlCierreDeTemporada(player, temporada) > this.EDAD_DE_RETIRO;
+  },
+
+  // ¿Ya se retiró en un cierre anterior? En la temporada 1 no hay cierre
+  // anterior, así que la respuesta es siempre no: con eso los veteranos de
+  // más de 40 arrancan el juego adentro del plantel.
+  yaSeRetiro(player) {
+    const temporada = this.state && this.state.season ? this.state.season.year : 1;
+    if (temporada <= 1) return false;
+    return this.edadAlCierreDeTemporada(player, temporada - 1) > this.EDAD_DE_RETIRO;
   },
 
   // Los que cuelgan los botines al cerrar la temporada. Devuelve los avisos
@@ -415,7 +454,7 @@ const Engine = {
     //    hueco queda (repairStartingSlots solo reacomoda a los que quedan).
     (s.squad || []).slice().forEach((p) => {
       if (!this.seRetira(p)) return;
-      const edad = this.edadDe(p);
+      const edad = this.edadAlCierreDeTemporada(p, temporada);
       s.squad = s.squad.filter((x) => x.id !== p.id);
       s.retirados.push({ id: p.id, name: p.name, pos: p.pos, edad, clubId: s.clubId, temporada });
       avisos.push({ tono: 'malo', texto: `${p.name} se retiró del fútbol profesional a los ${edad} años.` });
@@ -440,17 +479,23 @@ const Engine = {
         const seFueron = typeof Mercado !== 'undefined'
           ? new Set(Mercado.movimientosDe(s, clubId).fuera)
           : new Set();
+        const yaContados = new Set(s.retirados.map((r) => r.id));
         (REAL_ROSTERS[clubId] || []).forEach((entrada, i) => {
           const id = `${clubId}-r${i}`;
-          if (seFueron.has(id)) return;
+          if (seFueron.has(id) || yaContados.has(id)) return;
           // La misma cuenta que hace Mercado.plantel: se arma el jugador tal
-          // como quedaría hoy y se le pregunta la edad a edadDe().
-          const edad = this.edadDe({
+          // como quedaría y se pregunta qué edad tiene al cerrar el año.
+          const edad = this.edadAlCierreDeTemporada({
             birthDate: entrada.birthDate,
             edadAlLlegar: entrada.age,
             temporadaAlLlegar: 1,
-          });
-          if (edad !== this.EDAD_DE_RETIRO + 1) return;
+          }, temporada);
+          // Antes acá decía `edad !== EDAD_DE_RETIRO + 1`: solo avisaba del
+          // que cumplía 40 justo ese año, y los que arrancan el juego con 41
+          // se iban sin que el diario dijera nada. Ahora avisa de cualquiera
+          // que pasó la edad, y el que ya está en `retirados` no se cuenta
+          // dos veces.
+          if (edad <= this.EDAD_DE_RETIRO) return;
           s.retirados.push({ id, name: entrada.name, pos: entrada.pos, edad, clubId, temporada });
           if (typeof Noticias !== 'undefined') Noticias.retiro(this, entrada.name, edad, clubId);
         });
@@ -703,13 +748,15 @@ const Engine = {
   },
 
   generateSquad(club) {
-    // Los que a la fecha de arranque ya pasaron la edad de retiro no entran.
-    // No es un capricho: Mercado.plantel ya los filtra para los clubes
-    // rivales (con el mismo seRetira), así que sin esto un jugador de 40
-    // existía si vos dirigías su club y no existía si era tu rival. Se usa
-    // `age` y no edadDe() porque el plantel se arma antes de que haya
-    // almanaque, y `age` es justamente la edad al primer día del juego.
-    const real = (REAL_ROSTERS[club.id] || []).filter((p) => p.age <= this.EDAD_DE_RETIRO);
+    // Los que ya colgaron los botines en un cierre anterior no entran. En la
+    // temporada 1 eso no le pasa a nadie, así que los veteranos de más de 40
+    // arrancan adentro del plantel y juegan su última temporada. Es la misma
+    // pregunta que hace Mercado.plantel para los clubes rivales, así que no
+    // puede pasar que un jugador exista si dirigís su club y no exista si es
+    // tu rival.
+    const real = (REAL_ROSTERS[club.id] || []).filter((p) => !this.yaSeRetiro({
+      birthDate: p.birthDate, edadAlLlegar: p.age, temporadaAlLlegar: 1,
+    }));
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
         id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,

@@ -797,7 +797,7 @@ const Mercado = {
     // semilla, así que el guardado no engorda por más años que pasen.
     const movimientos = this.movimientosDe(s, clubId);
     const vivos = base
-      .filter((p) => !engine.seRetira(p) && !movimientos.fuera.includes(p.id))
+      .filter((p) => !engine.yaSeRetiro(p) && !movimientos.fuera.includes(p.id))
       .concat(movimientos.dentro.map((j) => this.jugadorFichado(engine, j, anio)));
 
     // ---------- El relleno, y por qué NO se hace en los clubes con plantel

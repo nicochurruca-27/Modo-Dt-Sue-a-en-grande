@@ -238,6 +238,70 @@ await probar('14. Al recargar la partida la noticia no se duplica', () => {
   };
 });
 
+// ---------- 15 a 18: el veterano juega su última temporada ----------
+//
+// Los planteles reales arrancan con jugadores pasados de la edad de retiro
+// (José Sosa, 40, en Estudiantes; Insaurralde, 41, en Sarmiento). La regla es
+// que esos juegan la temporada 1 entera y cuelgan los botines al cerrarla,
+// igual que cualquiera que llegue a los 40 en el medio. Antes desaparecían
+// antes del primer partido, y peor: desaparecían solo si NO dirigías su club.
+
+await probar('15. El veterano de más de 40 arranca adentro del plantel', () => {
+  window.__carrera('estudianteslp');
+  const viejos = Engine.state.squad.filter((p) => Engine.edadDe(p) > Engine.EDAD_DE_RETIRO);
+  return {
+    ok: viejos.some((p) => p.name === 'José Sosa'),
+    detalle: viejos.map((p) => `${p.name} (${Engine.edadDe(p)})`).join(', ') || 'ninguno',
+  };
+});
+
+await probar('16. El mismo veterano existe igual si es tu rival', () => {
+  window.__carrera('boca');
+  Engine._fuerzas = {};
+  const rival = Mercado.plantel(Engine, 'estudianteslp');
+  const propio = (() => {
+    window.__carrera('estudianteslp');
+    const n = Engine.state.squad.length;
+    window.__carrera('boca');
+    Engine._fuerzas = {};
+    return n;
+  })();
+  return {
+    ok: rival.length === propio && rival.some((p) => p.name === 'José Sosa'),
+    detalle: `${propio} dirigiéndolo vos, ${rival.length} como rival`,
+  };
+});
+
+await probar('17. Al cerrar la temporada se retira, y el diario lo cuenta', () => {
+  window.__carrera('estudianteslp');
+  const antes = Engine.state.squad.length;
+  const avisos = Engine.procesarRetiros();
+  const sigue = Engine.state.squad.some((p) => p.name === 'José Sosa');
+  // Y los de los otros clubes también quedan anotados, aunque arranquen con
+  // 41: antes solo se avisaba del que cumplía 40 justo ese año.
+  const deOtros = Engine.state.retirados.filter((r) => r.clubId !== 'estudianteslp');
+  return {
+    ok: !sigue && Engine.state.squad.length < antes && avisos.length >= 1
+      && deOtros.some((r) => r.name === 'Juan Manuel Insaurralde'),
+    detalle: `${antes} -> ${Engine.state.squad.length}; ${avisos.length} aviso(s) propios, ${deOtros.length} de otros clubes`,
+  };
+});
+
+await probar('18. En la temporada 2 ya no está, y no se lo cuenta dos veces', () => {
+  window.__carrera('estudianteslp');
+  Engine.procesarRetiros();
+  Engine.state.season.year = 2;
+  Engine._fuerzas = {};
+  const enSarmiento = Mercado.plantel(Engine, 'sarmientojunin')
+    .filter((p) => p.name === 'Juan Manuel Insaurralde').length;
+  Engine.procesarRetiros();
+  const veces = Engine.state.retirados.filter((r) => r.name === 'Juan Manuel Insaurralde').length;
+  return {
+    ok: enSarmiento === 0 && veces === 1,
+    detalle: `sigue en el plantel: ${enSarmiento} · anotado ${veces} vez/veces en retirados`,
+  };
+});
+
 // ---------- El informe ----------
 console.log('\nPRUEBAS DE EDAD, CUMPLEAÑOS Y RETIRO\n');
 pruebas.forEach((p) => {

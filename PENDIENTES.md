@@ -131,6 +131,36 @@ guarda. Falta subirle el nivel a esa IA, que hoy es a propósito simple:
 
 Es lo que más emparejaría el juego: hoy vos podés comprar y ellos casi no.
 
+### Los planteles se vacían con los años (medido)
+
+Ahora que los 30 clubes de Primera tienen plantel real, esto dejó de ser un
+detalle de dos clubes y pasó a ser de todos. Medido en el navegador, dejando
+correr los retiros temporada por temporada:
+
+| Temporada | Plantel más chico | Plantel más grande |
+|---|---|---|
+| 1  | 27 | 36 |
+| 5  | 25 | 36 |
+| 10 | 19 | 35 |
+| 15 |  8 | 24 |
+
+El juego no inventa a nadie para tapar el hueco (es una decisión tomada, ver
+`procesarRetiros`), y los clubes con plantel real no tienen todavía cantera
+propia. En la temporada 15 hay clubes que no pueden ni parar once.
+
+Las dos salidas son las que ya están en la lista de arriba: **política de
+juveniles** (que cada club suba pibes propios) y que la IA compre de verdad
+para tapar sus puestos flojos. Mientras no estén, una carrera larga se
+desinfla.
+
+### `retirados` engorda la partida
+
+Cada jugador que cuelga los botines queda anotado en `state.retirados` para
+siempre. Con 930 jugadores en la liga eso son 494 anotaciones y **51 KB** en
+la temporada 15 — de lejos la parte que más crece del guardado (110 KB en
+total). Alcanzaría con quedarse con los de las últimas temporadas, que es lo
+único que el diario y la pantalla de fin de año llegan a mostrar.
+
 ---
 
 ## 3. Estadísticas
