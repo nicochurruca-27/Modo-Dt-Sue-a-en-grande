@@ -152,17 +152,20 @@ await probar('8. Un club con plantel real puede quedar por debajo del mínimo', 
   Engine.state.season.year = 16;
   Engine._fuerzas = {};
   const boca = Mercado.plantel(Engine, 'boca');
-  const generado = Mercado.plantel(Engine, 'talleres');
+  // De comparación va un club de la Nacional: desde que entraron los 930
+  // jugadores de SoFIFA, los 30 de Primera tienen todos plantel real y ya no
+  // sirve ninguno como ejemplo de plantel generado.
+  const generado = Mercado.plantel(Engine, 'ferro');
   return {
     ok: boca.length < 22 && !boca.some((p) => /-c\d/.test(p.id)),
-    detalle: `Boca (plantel real) ${boca.length} jugadores · Talleres (generado) ${generado.length}`,
+    detalle: `Boca (plantel real) ${boca.length} jugadores · Ferro (generado) ${generado.length}`,
   };
 });
 
 await probar('9. Un club sin plantel real sigue completando su plantel', () => {
   Engine.state.season.year = 16;
   Engine._fuerzas = {};
-  const t = Mercado.plantel(Engine, 'talleres');
+  const t = Mercado.plantel(Engine, 'ferro');
   const rellenados = t.filter((p) => /-c\d/.test(p.id)).length;
   return { ok: t.length >= 22, detalle: `${t.length} jugadores, ${rellenados} venidos del relleno` };
 });
@@ -171,9 +174,9 @@ await probar('9. Un club sin plantel real sigue completando su plantel', () => {
 
 await probar('10. Un jugador transferido conserva su fecha de nacimiento', () => {
   window.__carrera('platense');
-  const j = Mercado.plantel(Engine, 'talleres').find((p) => p.birthDate);
+  const j = Mercado.plantel(Engine, 'ferro').find((p) => p.birthDate);
   const antes = j.birthDate;
-  Mercado.transferir(Engine.state, j, 'talleres', 'lanus', Engine.state.season.year);
+  Mercado.transferir(Engine.state, j, 'ferro', 'lanus', Engine.state.season.year);
   Engine._fuerzas = {};
   const enLanus = Mercado.plantel(Engine, 'lanus').find((p) => p.id === j.id);
   return {

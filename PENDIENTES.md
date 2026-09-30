@@ -3,7 +3,7 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
-Última revisión: 28/9/2026.
+Última revisión: 30/9/2026.
 
 ---
 
@@ -41,24 +41,49 @@ cambia la cuenta:
 Se descartó porque ahorraría unos diez minutos por liga frente a los scripts
 de SoFIFA, que ya funcionan y devuelven un CSV ordenado.
 
-### Jugadores de todos los clubes
+### Jugadores: la Primera entera, hecha
 
-Hoy solo Boca y River tienen plantel real cargado (`REAL_ROSTERS` en
-`js/players.js`). Los otros 28 de Primera y los 36 de la Nacional juegan con
-planteles generados. Los de la Nacional ya no salen de la reputación a secas:
-cada club tiene su nivel, su ataque y su defensa en `NACIONAL_DATOS`
-(`js/data.js`), así que los 36 se diferencian entre sí. Lo que falta son los
-nombres: jugador por jugador.
+Los 30 clubes de Primera tienen plantel real: **930 jugadores**, sacados de
+SoFIFA (`sofifa.com/league/353`) el 17 de septiembre de 2026. Cada uno trae
+valoración, potencial, valor de mercado, sueldo, cláusula, contrato, dorsal,
+posiciones, fecha de nacimiento exacta, altura, peso, pierna hábil y su
+`sofifaId`, que es la llave estable (en esta liga hay siete pares de jugadores
+con nombre y apellido idénticos; el id no se repite nunca).
 
-Por jugador hace falta: nombre, puesto (`POR`/`DEF`/`MED`/`DEL`), posición
-detallada, edad, nacionalidad, dorsal, valoración y **proyección** (el techo al
-que puede llegar). Si además vienen años de contrato, valor, sueldo y cláusula,
-mejor; si no, se estiman con la escala que ya usa el resto.
+La cadena entera está en el repo y se puede volver a correr cuando salga la
+próxima actualización de la base:
 
-El pedido ya está escrito en `PROMPT-PLANTELES.md`: ahí está el plantel de
-Boca entero como modelo, qué significa cada campo con su vocabulario exacto,
-un prompt para pedirle a otra IA el plantel completo de un club y otro para
-pedirle solo las fechas de nacimiento de los 58 que ya están cargados.
+1. `tools/sofifa-extractor.js` — se pega en la consola del navegador con
+   sofifa.com abierto y baja el listado de la liga.
+2. `tools/sofifa-fechas.js` — lo mismo, pero entra a la ficha de cada jugador
+   a buscar la fecha de nacimiento, que en el listado no está.
+3. `tools/convertir-sofifa.py` — convierte los dos CSV (guardados en `datos/`)
+   en el bloque `REAL_ROSTERS` de `js/players.js`. Ese archivo **no se edita a
+   mano**: se regenera.
+
+Dos cosas no se copian tal cual y están explicadas en el conversor: el
+potencial de los veteranos (en EA es su techo histórico, no su futuro, y sin
+traducirlo el motor hacía crecer a Di María de 82 a 87 a los 38 años) y el
+estado de transferencia, que en SoFIFA no existe.
+
+**Lo que sigue faltando son los 36 de la Nacional.** Juegan con planteles
+generados, que ya no salen de la reputación a secas: cada club tiene su nivel,
+su ataque y su defensa en `NACIONAL_DATOS` (`js/data.js`). SoFIFA no tiene la
+Primera Nacional argentina, así que ahí hay que volver al camino de
+`PROMPT-PLANTELES.md`: pedírselos a una IA club por club, con las precauciones
+que ese archivo documenta.
+
+### Las caras
+
+Están a un paso. La foto de cada jugador sale de su `sofifaId` sin scrapear
+nada: con el id en seis dígitos partido 3 + 3,
+`https://cdn.sofifa.net/players/AAA/BBBBB/27_120.png`. De los 930, solo dos no
+tienen (Facundo Herrera y Matías Satas, los dos de Boca).
+
+Lo que falta no son los datos, es el envase: el juego se abre desde `file://`
+y el CDN no sirve las imágenes con ese origen. Entra cuando se sirva el juego
+como web (ver el bloque de arquitectura). Cuando entren, en la pantalla de
+Plantel la cara reemplaza a la camiseta y al dorsal.
 
 ### Escudos del continente (y de la tercera, cuando esté)
 

@@ -703,7 +703,13 @@ const Engine = {
   },
 
   generateSquad(club) {
-    const real = REAL_ROSTERS[club.id];
+    // Los que a la fecha de arranque ya pasaron la edad de retiro no entran.
+    // No es un capricho: Mercado.plantel ya los filtra para los clubes
+    // rivales (con el mismo seRetira), así que sin esto un jugador de 40
+    // existía si vos dirigías su club y no existía si era tu rival. Se usa
+    // `age` y no edadDe() porque el plantel se arma antes de que haya
+    // almanaque, y `age` es justamente la edad al primer día del juego.
+    const real = (REAL_ROSTERS[club.id] || []).filter((p) => p.age <= this.EDAD_DE_RETIRO);
     if (real && real.length >= 11) {
       return real.map((p, i) => ({
         id: `${club.id}-${i}`, name: p.name, pos: p.pos, rating: p.rating, nation: p.nation, contractYears: p.contractYears, number: p.number, role: p.role,
