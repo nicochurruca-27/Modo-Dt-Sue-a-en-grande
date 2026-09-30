@@ -19,6 +19,28 @@ edad sale del almanaque y sube sola el día del cumpleaños. El que falta es el
 club que se cargue de acá en adelante: el pedido ya está escrito en
 `PROMPT-PLANTELES.md` y la fecha va en el mismo renglón del jugador.
 
+### El save de FC 27: mirado y descartado por ahora
+
+Se abrió un archivo de guardado del Modo Carrera de FC 27 (16 MB) para ver si
+servía para cargar ligas sin scrapear. Lo que se averiguó, por si algún día
+cambia la cuenta:
+
+- Es un contenedor `FBCHUNKS` con bloques `BNRY` / `LTLE` adentro, **sin
+  comprimir** (entropía 6,49 con 25% de ceros).
+- **Los ids de jugador son los mismos que los de SoFIFA**, que son los de EA.
+  Las dos fuentes se cruzan sin ambigüedad.
+- Los planteles están como listas de ids de 4 bytes seguidos: el de Boca son
+  30 ids contiguos alrededor del offset 4.389.970.
+- Tiene **el mundo entero**, no sólo la carrera: aparecen los 930 argentinos y
+  unos 29.000 ids en el rango de jugador.
+- **Lo que no se pudo leer son los atributos.** La fecha de nacimiento no
+  aparece con la codificación clásica de FIFA (días desde 1582-10-14), así que
+  lo más probable es que los campos estén empaquetados a nivel de bit. Sacar
+  ese esquema desde cero son horas sin garantía.
+
+Se descartó porque ahorraría unos diez minutos por liga frente a los scripts
+de SoFIFA, que ya funcionan y devuelven un CSV ordenado.
+
 ### Jugadores de todos los clubes
 
 Hoy solo Boca y River tienen plantel real cargado (`REAL_ROSTERS` en
