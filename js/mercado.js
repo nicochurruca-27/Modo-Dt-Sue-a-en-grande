@@ -185,6 +185,16 @@ const Mercado = {
     },
   },
 
+  // ¿Está a préstamo? Hay dos maneras de saberlo y hasta acá el juego miraba
+  // una sola. `loanFrom` es la de los préstamos que ocurren jugando (sabemos
+  // de qué club salió). `loanUntil` es la de los planteles investigados: la
+  // base de SoFIFA dice hasta cuándo está cedido pero no de qué club es, así
+  // que el dueño queda vacío. Los 134 cedidos de la liga argentina entran por
+  // ahí, y sin esto el filtro "a préstamo" del mercado no devolvía a nadie.
+  estaCedido(j) {
+    return !!(j && (j.loanFrom || j.loanUntil));
+  },
+
   estadoPropio(p) {
     return (p && p.mercado) || 'retenido';
   },
@@ -499,7 +509,7 @@ const Mercado = {
         const suyas = plantel.slice().sort((a, b) => b.rating - a.rating);
         // Las dos figuras no se venden: un club no se desarma solo.
         suyas.slice(2).forEach((j) => {
-          if (j.loanFrom || j.rating <= nivel) return;
+          if (this.estaCedido(j) || j.rating <= nivel) return;
           const ganancia = j.rating - nivel;
           if (!mejor || ganancia > mejor.ganancia) mejor = { jugador: j, vendedor, ganancia };
         });
@@ -584,7 +594,7 @@ const Mercado = {
       // contrato, que es como pasa de verdad.
       const flojos = plantel.slice().sort((a, b) => a.rating - b.rating)
         .slice(0, Math.ceil(plantel.length / 2))
-        .filter((j) => !j.loanFrom && j.age >= 30);
+        .filter((j) => !this.estaCedido(j) && j.age >= 30);
       const candidato = flojos.find((j) => (j.contractYears || 3) <= 1) || flojos.find((j) => j.age >= 33);
       if (!candidato) continue;
       tocados.add(club.id);
@@ -727,7 +737,7 @@ const Mercado = {
         nation: p.nation,
         // El contrato corre y, si se venció, el club lo renueva.
         contractYears: Math.max(1, (p.contractYears || 1) - (aniosPasados % Math.max(1, p.contractYears || 1))),
-        role: p.role, loanFrom: p.loanFrom,
+        role: p.role, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
         // El valor y el sueldo investigados valen para el plantel de hoy. Con
         // los años la valoración cambia, así que el valor se recalcula solo
         // (ver más abajo) y el sueldo se deja como referencia del contrato.
@@ -892,7 +902,7 @@ const Mercado = {
         // investigación y no de un dado. "Intocable" es más duro que
         // "Retenido": ahí el club directamente no negocia.
         let estado;
-        if (p.loanFrom) estado = 'retenido';
+        if (this.estaCedido(p)) estado = 'retenido';
         else if (p.transferState) estado = MERCADO_ESTADO_POR_TEXTO[p.transferState] || 'transferible';
         else if (p.contractYears <= 1) estado = 'fin-contrato';
         else if (esFigura && dado < 0.8) estado = 'retenido';
@@ -985,6 +995,78 @@ const Mercado = {
     return `${first} ${last}`;
   },
 
+  // ---------- Buscar jugadores en toda la liga ----------
+  //
+  // Antes el mercado era una lista de los 66 clubes: para encontrar un lateral
+  // izquierdo de menos de 25 había que entrar club por club y leer 66
+  // planteles. Ahora se busca por lo que uno realmente busca —puesto, edad,
+  // valoración, situación de contrato— y el club es apenas un dato más de
+  // cada fila.
+  //
+  // Armar los 66 planteles cuesta (son ~1.800 jugadores sembrados), así que el
+  // índice se guarda. NO va en this.state: es un dato derivado, se recalcula
+  // solo y no tiene por qué engordar el guardado. La clave lleva todo lo que
+  // puede cambiarlo: el año (los planteles envejecen), los que fichaste y los
+  // movimientos del mundo.
+  indice(engine) {
+    const s = engine.state;
+    const clave = `${s.season ? s.season.year : 1}|${(s.mercado && s.mercado.fichados || []).length}`
+      + `|${Object.keys(s.mundo || {}).length}|${(s.libres || []).length}`;
+    if (this._indice && this._indice.clave === clave) return this._indice.lista;
+    const lista = [];
+    this.clubes(engine).forEach((c) => {
+      this.plantel(engine, c.id).forEach((j) => {
+        lista.push({ ...j, clubId: c.id, clubName: c.name, division: c.division });
+      });
+    });
+    // Los que no tienen club entran a la misma búsqueda: es donde uno los
+    // busca, no en una pantalla aparte.
+    engine.jugadoresLibres().forEach((j) => {
+      lista.push({ ...j, clubId: null, clubName: 'Sin club', division: null, estado: 'libre' });
+    });
+    this._indice = { clave, lista };
+    return lista;
+  },
+
+  // La situación de un jugador, en las categorías con las que uno busca.
+  situacionDe(j) {
+    if (!j.clubId) return 'libre';
+    if (this.estaCedido(j)) return 'prestamo';
+    if (j.estado === 'transferible') return 'transferible';
+    if (j.estado === 'fin-contrato' || (j.contractYears || 9) <= 1) return 'fin-contrato';
+    if (j.clausula) return 'clausula';
+    return 'retenido';
+  },
+
+  SITUACIONES: [
+    { id: 'todas', label: 'Todos' },
+    { id: 'transferible', label: 'Transferibles' },
+    { id: 'fin-contrato', label: 'Fin de contrato' },
+    { id: 'libre', label: 'Libres' },
+    { id: 'clausula', label: 'Con cláusula' },
+    { id: 'prestamo', label: 'A préstamo' },
+  ],
+
+  TOPE_DE_RESULTADOS: 40,
+
+  filtrar(engine, f) {
+    const texto = (f.texto || '').trim().toLowerCase();
+    const puestos = f.puestos && f.puestos.length ? f.puestos : null;
+    const resultados = this.indice(engine).filter((j) => {
+      if (puestos && !puestos.includes(j.pos)) return false;
+      if (f.edadMin != null && j.age < f.edadMin) return false;
+      if (f.edadMax != null && j.age > f.edadMax) return false;
+      if (f.ratingMin != null && j.rating < f.ratingMin) return false;
+      if (f.division && f.division !== 'todas' && j.division !== f.division) return false;
+      if (f.situacion && f.situacion !== 'todas' && this.situacionDe(j) !== f.situacion) return false;
+      if (texto && !j.name.toLowerCase().includes(texto)
+        && !(j.clubName || '').toLowerCase().includes(texto)) return false;
+      return true;
+    });
+    resultados.sort((a, b) => b.rating - a.rating || a.age - b.age);
+    return { total: resultados.length, lista: resultados.slice(0, this.TOPE_DE_RESULTADOS) };
+  },
+
   buscar(engine, clubId, jugadorId) {
     return this.plantel(engine, clubId).find((p) => p.id === jugadorId) || null;
   },
@@ -1003,8 +1085,10 @@ const Mercado = {
 
     const club = engine.getClub(clubId);
     let texto;
-    if (j.loanFrom) {
-      texto = `En ${club.name} te aclaran que ${j.name} está a préstamo de ${j.loanFrom}: no es de ellos, no lo pueden vender.`;
+    if (this.estaCedido(j)) {
+      texto = j.loanFrom
+        ? `En ${club.name} te aclaran que ${j.name} está a préstamo de ${j.loanFrom}: no es de ellos, no lo pueden vender.`
+        : `En ${club.name} te aclaran que ${j.name} está a préstamo${j.loanUntil ? ` hasta ${j.loanUntil}` : ''}: no es de ellos, no lo pueden vender.`;
     } else if (j.estado === 'intocable') {
       texto = `En ${club.name} te cortan el teléfono: ${j.name} es intocable. Ni por ${this.plata(j.precio)} lo largan.`;
     } else if (j.estado === 'retenido') {
@@ -1042,14 +1126,13 @@ const Mercado = {
     if (m.rechazados.includes(jugadorId)) {
       return this.responder(engine, jugadorId, `${club.name} ya te dijo que no por ${j.name}. Habrá que esperar al próximo mercado para volver a intentarlo.`, false);
     }
-    if (j.loanFrom) {
-      return this.responder(engine, jugadorId, `${j.name} está a préstamo de ${j.loanFrom}: ${club.name} no puede negociarlo.`, false);
+    if (this.estaCedido(j)) {
+      return this.responder(engine, jugadorId, j.loanFrom
+        ? `${j.name} está a préstamo de ${j.loanFrom}: ${club.name} no puede negociarlo.`
+        : `${j.name} está a préstamo en ${club.name}: no es de ellos, no lo pueden negociar.`, false);
     }
     if (s.budget < costo) {
       return this.responder(engine, jugadorId, `No te alcanza: hacen falta ${this.plata(costo)} y tenés ${this.plata(s.budget)}.`, false);
-    }
-    if (s.squad.length >= MAX_SQUAD && !j.acordado) {
-      return this.responder(engine, jugadorId, `Tenés el plantel lleno (${MAX_SQUAD}). Vendé a alguien antes de traer a ${j.name}.`, false);
     }
 
     // La cláusula no se negocia: se paga y listo.
@@ -1127,9 +1210,6 @@ const Mercado = {
     const s = engine.state;
     const m = this.init(s);
     const j = a.jugador;
-    if (s.squad.length >= MAX_SQUAD) {
-      return { ok: false, nota: `${j.name} no pudo sumarse: el plantel está lleno (${MAX_SQUAD}). El acuerdo se cayó.` };
-    }
     if (s.budget < a.precio) {
       return { ok: false, nota: `${j.name} no pudo sumarse: hacían falta ${this.plata(a.precio)} y no los tenías. El acuerdo se cayó.` };
     }

@@ -323,9 +323,6 @@ const Juveniles = {
   puedeSubir(engine, p) {
     const s = engine.state;
     if (!p) return { ok: false, motivo: 'Ese juvenil ya no está en la cantera.' };
-    if (s.squad.length >= MAX_SQUAD) {
-      return { ok: false, motivo: `El plantel está lleno (${MAX_SQUAD}). Tenés que vender o liberar a alguien antes.` };
-    }
     const costo = this.costoDeSubir(engine, p);
     if (s.budget < costo) {
       return { ok: false, motivo: `La prima de contrato son ${Mercado.plata(costo)} y no los tenés.` };
@@ -419,6 +416,52 @@ const Juveniles = {
     // La lista de decisiones no puede crecer para siempre: los ids de camadas
     // viejas ya no los busca nadie, porque esos pibes pasaron la edad.
     this.podar(engine);
+    return avisos;
+  },
+
+  // ---------- La red de seguridad de TU club ----------
+  //
+  // Un club no juega con once. Si se te retiraron cuatro y no subiste a nadie,
+  // el club sube pibes SOLO, porque es lo que haría cualquier club de verdad:
+  // no se presenta a jugar con lo justo.
+  //
+  // Medido antes de esto: dejando correr quince temporadas sin tocar nada, el
+  // plantel del usuario bajaba de 32 a 11 jugadores. Los rivales ya tenían su
+  // reposición (ver egresados); al club del usuario le faltaba.
+  //
+  // El piso es el mismo mínimo que usa todo el juego: los once y el banco. Por
+  // debajo de eso el equipo no se puede presentar, así que si los retiros te
+  // dejaron corto, el club sube pibes y listo. De ahí para arriba decidís vos.
+  reponerPlantelDelUsuario(engine) {
+    const s = engine.state;
+    const faltan = MIN_SQUAD - (s.squad || []).length;
+    if (faltan <= 0) return [];
+    const disponibles = this.camada(engine, s.clubId);
+    const suben = disponibles.slice(0, faltan);
+    const avisos = [];
+    suben.forEach((p) => {
+      // Sube gratis: es una urgencia del club, no un fichaje que decidiste. El
+      // sueldo sí lo va a pagar, como cualquier contrato.
+      const j = this.init(s);
+      s.squad.push({
+        id: p.id, name: p.name, pos: p.pos, posDetail: p.posDetail, role: p.role,
+        nation: p.nation, birthDate: p.birthDate, age: p.age,
+        rating: p.rating, potential: p.projection,
+        contractYears: 3, salary: this.sueldoDe(engine, p),
+        energia: ENERGIA_MAXIMA, deLaCantera: true,
+        number: this.dorsalLibre(s.squad),
+        altura: p.altura, peso: p.peso, pierna: p.pierna,
+      });
+      j.subidos.push(p.id);
+      avisos.push({
+        tono: 'neutro',
+        texto: `${p.name} (${p.posDetail}, ${p.age} años) subió de inferiores: el plantel estaba corto y el club no podía dejarlo así.`,
+      });
+    });
+    if (suben.length) {
+      engine._fuerzas = {};
+      engine.repairStartingSlots();
+    }
     return avisos;
   },
 
@@ -592,6 +635,11 @@ const Juveniles = {
     return lista.sort((a, b) => b.projection - a.projection);
   },
 
+  // Te quedás con los que quieras del informe, no con uno solo. El límite de
+  // uno era una regla nuestra sin razón: si el ojeador vio doce chicos y a vos
+  // te sirven cuatro, te llevás cuatro. Tenerlos en inferiores no cuesta nada;
+  // el costo aparece cuando los subís a Primera, que es donde tiene que estar
+  // la decisión difícil.
   elegirDelInforme(engine, id) {
     const s = engine.state;
     const j = this.init(s);
@@ -599,7 +647,9 @@ const Juveniles = {
     const elegido = j.informe.jugadores.find((p) => p.id === id);
     if (!elegido) return { ok: false, nota: 'Ese chico no está en el informe.' };
     j.fichados.push({ ...elegido, clubId: s.clubId, camada: s.season ? s.season.year : 1 });
-    j.informe = null;
+    // Sale del informe, y el informe sigue abierto con los que quedan.
+    j.informe.jugadores = j.informe.jugadores.filter((p) => p.id !== id);
+    if (!j.informe.jugadores.length) j.informe = null;
     engine.save();
     return { ok: true, nota: `${elegido.name} se suma a las inferiores del club.`, jugador: elegido };
   },

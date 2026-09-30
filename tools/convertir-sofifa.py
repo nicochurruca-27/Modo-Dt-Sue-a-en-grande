@@ -221,8 +221,15 @@ def convertir(csv_listado, csv_fechas):
         rating = numero(f['Valoración general'])
         # El contrato: años que quedan contando 2026. Los cedidos no traen años
         # sino la fecha en que termina el préstamo.
-        hasta = numero(f['contratoHasta']) or anio_de_fecha_larga(
+        # Los cedidos no traen año de contrato sino fecha de fin del préstamo.
+        # Ojo: ese dato dice DOS cosas y en la primera versión se usaba una
+        # sola. Se sacaba el año para la cuenta del contrato y se tiraba el
+        # hecho de que fuera un préstamo, así que el juego no tenía forma de
+        # saber que esos 134 jugadores estaban cedidos: el filtro "a préstamo"
+        # del mercado no devolvía a nadie nunca.
+        fin_de_prestamo = anio_de_fecha_larga(
             f.get('Fecha de finalización del préstamo', ''))
+        hasta = numero(f['contratoHasta']) or fin_de_prestamo
         contrato = max(1, (hasta - HOY.year + 1)) if hasta else 1
 
         valor = plata(f['Valor'])
@@ -248,6 +255,13 @@ def convertir(csv_listado, csv_fechas):
             # El salario de SoFIFA es SEMANAL.
             'salary': (plata(f['Salario']) or 0) * 52,
         }
+        # SoFIFA dice HASTA CUÁNDO está cedido, pero no de qué club es: en el
+        # listado de la liga el jugador figura en el club donde juega y nada
+        # más. Así que se anota `loanUntil` y `loanFrom` queda vacío, que es
+        # lo honesto. Para el juego alcanza: lo que importa es que el club
+        # donde está no lo puede vender.
+        if fin_de_prestamo and not numero(f['contratoHasta']):
+            jugador['loanUntil'] = fin_de_prestamo
         if alternativas:
             jugador['altPosDetail'] = alternativas
         if pos == 'MED' and detalle in ROLES:

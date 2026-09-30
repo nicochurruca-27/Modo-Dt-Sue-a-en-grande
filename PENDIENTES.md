@@ -246,7 +246,27 @@ línea de cuatro, y aunque entrara se pierde de un vistazo la formación, que
 es justo para lo que sirve esa pantalla. La carta quedó donde rinde: la
 ficha del jugador.
 
-## 7. Renovar contratos: negociar, no aceptar
+## 7. Lo que sigue del mercado y del diseño
+
+- **Buscar por país y por liga de verdad.** El buscador ya filtra por liga
+  (Primera / Nacional), pero "país" todavía no significa nada porque hay un
+  solo país cargado. Cuando entren más ligas, el filtro está listo: solo hay
+  que sumarle el campo.
+- **De quién es el jugador que está a préstamo.** SoFIFA dice hasta cuándo
+  está cedido pero no de qué club es (en el listado de la liga figura en el
+  club donde juega). Por eso los 134 cedidos de la liga argentina tienen
+  `loanUntil` y no `loanFrom`, y el juego dice "está a préstamo hasta 2027" en
+  vez de "a préstamo de tal club". Para tener el dueño hay que entrar a la
+  ficha de cada uno, que es otro pasaje del script de SoFIFA.
+- **Que el préstamo se termine.** Hoy es solo información: el juego no simula
+  que el jugador vuelva a su club dueño cuando se cumple la fecha.
+- **La pantalla principal no debería llamarse "Partido"** ni quedar en una
+  punta de la barra. Es la pantalla del juego y tendría que sentirse como tal.
+  Va junto con el rediseño general, que quedó para más adelante.
+
+---
+
+## 8. Renovar contratos: negociar, no aceptar
 
 Hoy renovar un contrato es un botón con un precio fijo (ver
 `Economia.costoRenovacion`). Tendría que ser una negociación, porque es una de
@@ -270,7 +290,7 @@ problema de verdad.
 
 ---
 
-## 8. Economía, lo que quedó afinar
+## 9. Economía, lo que quedó afinar
 
 Cada club de Primera tiene su economía real en `js/finanzas.js` y de ahí salen
 el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
@@ -286,7 +306,7 @@ el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
 
 ---
 
-## 9. Detalles sueltos
+## 10. Detalles sueltos
 
 - **La pantalla de elegir club** podría contar bastante más de cada club antes
   de que te decidas (hoy la reputación son cinco estrellitas y nada más).
@@ -310,7 +330,7 @@ el presupuesto, el goteo semanal, la vara de sueldos y la recaudación. Queda:
 
 ---
 
-## 10. Lo grande que viene: más de una liga
+## 11. Lo grande que viene: más de una liga
 
 La idea es que el juego deje de ser solo la liga argentina. Antes de escribir
 una línea conviene tener presente qué del motor es argentino y qué no:

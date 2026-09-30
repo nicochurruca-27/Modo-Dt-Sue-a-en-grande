@@ -254,7 +254,10 @@ await probar('14. Trae del país y de los puestos que le pediste', () => {
   };
 });
 
-await probar('15. Te quedás con uno y los otros once desaparecen', () => {
+// Antes acá se fijaba que te quedabas con UNO solo. Era una regla nuestra sin
+// ninguna razón: si el ojeador vio doce chicos y a vos te sirven cuatro, te
+// llevás cuatro. Tenerlos en inferiores no cuesta nada.
+await probar('15. Te quedás con los que quieras, y el resto se pierde al cerrar', () => {
   window.__carrera('aldosivi');
   Juveniles.mandarOjeador(Engine, 'BRA', ['DEL']);
   for (let i = 0; i < 60 && !Engine.state.juveniles.informe; i++) {
@@ -262,15 +265,39 @@ await probar('15. Te quedás con uno y los otros once desaparecen', () => {
     if (Engine.state.screen !== 'calendar') Engine.state.screen = 'calendar';
   }
   const inf = Engine.state.juveniles.informe;
-  const elegido = inf.jugadores[0];
-  const descartado = inf.jugadores[1];
-  Juveniles.elegirDelInforme(Engine, elegido.id);
+  const cuantos = inf.jugadores.length;
+  const elegidos = inf.jugadores.slice(0, 3).map((p) => p.id);
+  const descartado = inf.jugadores[5];
+  elegidos.forEach((id) => Juveniles.elegirDelInforme(Engine, id));
+  const quedanEnElInforme = Engine.state.juveniles.informe.jugadores.length;
+  Juveniles.descartarInforme(Engine);
   const cantera = Juveniles.camada(Engine, 'aldosivi');
   return {
-    ok: Engine.state.juveniles.informe === null
-      && cantera.some((x) => x.id === elegido.id)
+    ok: elegidos.every((id) => cantera.some((x) => x.id === id))
+      && quedanEnElInforme === cuantos - 3
+      && Engine.state.juveniles.informe === null
       && !cantera.some((x) => x.id === descartado.id),
-    detalle: `${elegido.name} entró a inferiores; los otros ${inf.jugadores.length - 1} no`,
+    detalle: `entraron 3 de ${cuantos}; el informe quedó con ${quedanEnElInforme} y al cerrarlo se perdieron`,
+  };
+});
+
+await probar('15b. No hay tope de plantel, pero sí piso', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  // Subir a todos los de inferiores no lo tiene que frenar ningún tope.
+  const antes = s.squad.length;
+  let subidos = 0;
+  Juveniles.camada(Engine, 'boca').forEach((p) => {
+    s.budget = 99999999;
+    if (Juveniles.subir(Engine, p.id).ok) subidos++;
+  });
+  const sinTope = s.squad.length === antes + subidos && subidos > 0;
+  // Y bajar del piso no se puede de ninguna manera.
+  while (s.squad.length > MIN_SQUAD) s.squad.pop();
+  const rescision = Engine.rescindirContrato(s.squad[0].id);
+  return {
+    ok: sinTope && !rescision.ok,
+    detalle: `subieron ${subidos} sin tope (${antes} -> ${antes + subidos}); en el piso de ${MIN_SQUAD}: "${rescision.nota}"`,
   };
 });
 

@@ -2103,12 +2103,19 @@ function alBordeDeLaSuspension(squad) {
 function avisoDePlantel() {
   const s = Engine.state;
   if (!s || !s.squad) return '';
-  const libres = MAX_SQUAD - s.squad.length;
-  if (libres > AVISO_PLANTEL) return '';
-  if (libres <= 0) {
-    return `<p class="aviso-plantel lleno">Plantel lleno: ${s.squad.length} de ${MAX_SQUAD}. Para traer a alguien tiene que salir otro primero.</p>`;
+  // Ya no hay techo de plantel, así que el aviso mira solo el piso: los 11
+  // titulares más los 12 del banco. Es el que importa — quedarse sin lugar era
+  // una molestia, quedarse sin jugadores te deja sin poder presentar equipo.
+  const cuantos = s.squad.length;
+  if (cuantos <= MIN_SQUAD) {
+    return `<p class="aviso-plantel corto">Estás en el mínimo: ${cuantos} jugadores, los justos para poner once y llenar el banco. No podés vender, ceder ni rescindirle a nadie, y el contrato que se venza se renueva sí o sí. Fichá o subí un pibe de inferiores para recuperar margen.</p>`;
   }
-  return `<p class="aviso-plantel">Te ${libres === 1 ? 'queda 1 lugar' : `quedan ${libres} lugares`} en el plantel (${s.squad.length} de ${MAX_SQUAD}).</p>`;
+  if (cuantos <= MIN_SQUAD + 3) {
+    const cantera = typeof Juveniles !== 'undefined' ? Juveniles.camada(Engine, s.clubId).length : 0;
+    return `<p class="aviso-plantel corto">Plantel corto: ${cuantos} jugadores, a ${cuantos - MIN_SQUAD} del mínimo (${MIN_SQUAD}).${
+      cantera ? ` Tenés ${cantera} en inferiores para subir.` : ''}</p>`;
+  }
+  return '';
 }
 
 // Cómo se para la formación, en palabras: "4 defensores, 1 mediocampista
@@ -4455,6 +4462,9 @@ function renderContractRenewal() {
   const renewCost = Math.round(player.rating * 8000);
   const soleAtPosition = s.squad.filter((p) => p.pos === player.pos).length <= 1;
   const canRelease = s.squad.length > MIN_SQUAD && !soleAtPosition;
+  const porQueNo = soleAtPosition
+    ? `Es el único ${player.pos} que te queda: sin él no podés presentar equipo.`
+    : `Tenés ${s.squad.length} jugadores y el mínimo para presentar equipo son ${MIN_SQUAD} (once y el banco). Para poder dejarlo ir, primero fichá a alguien o subí un pibe de inferiores.`;
 
   app.innerHTML = `
     ${header()}
@@ -4464,6 +4474,7 @@ function renderContractRenewal() {
       <div class="options">
         <button class="option-btn" id="renew-btn">Renovar por ${money(renewCost)}</button>
         <button class="option-btn danger" id="release-btn" ${canRelease ? '' : 'disabled'}>Dejarlo ir a fin de año</button>
+        ${canRelease ? '' : `<p class="aviso-plantel corto">Renovarle es obligatorio. ${porQueNo}</p>`}
       </div>
       ${!canRelease ? `<p class="muted">No podés dejarlo ir: ${soleAtPosition ? 'es el único que te queda en esa posición' : 'el plantel ya está en el mínimo jugable'}.</p>` : ''}
     </div>
@@ -4490,7 +4501,7 @@ function renderTransfer() {
     ${header()}
     <div class="card">
       <h2>${windowLabel}</h2>
-      <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores en el plantel (máximo ${MAX_SQUAD}). Un refuerzo suma al plantel; si está lleno, primero tiene que salir alguien: que te lo compren, cederlo a préstamo o rescindirle el contrato.</p>
+      <p class="muted">Tenés ${money(s.budget)} y ${s.squad.length} jugadores. No hay tope de plantel: si podés pagarle el sueldo, podés tenerlo. Lo que no podés es bajar de ${MIN_SQUAD}, que son los once y el banco.</p>
       ${avisoDePlantel()}
       ${(s.notasDePrestamos || []).length ? `
         <div class="mercado-acuerdos">
@@ -4508,12 +4519,11 @@ function renderTransfer() {
       <p class="muted">Se quedaron sin club y no cuestan pase: lo único que sumás es el sueldo. Para traer a alguien que está en otro club, buscalo en el panel Mercado y negociá.</p>
       <div class="options" id="libres-list">
         ${libres.map((p, i) => {
-          const lleno = s.squad.length >= MAX_SQUAD;
           const deDonde = p.desdeClub && Engine.getClub(p.desdeClub) ? Engine.getClub(p.desdeClub).name : null;
           return `
           <div class="pick-row">
             <span>${p.name} — ${p.pos} (${p.rating}, ${p.age} años)${deDonde ? ` <span class="muted">— venía de ${deDonde}</span>` : ''}</span>
-            <button class="option-btn small" data-i="${i}" ${lleno ? 'disabled' : ''}>Fichar gratis</button>
+            <button class="option-btn small" data-i="${i}">Fichar gratis</button>
           </div>
         `;
         }).join('') || '<p class="muted">Por ahora no hay ningún jugador sin club.</p>'}
@@ -4674,6 +4684,13 @@ function renderSeasonEnd() {
             <p class="muted">El plantel queda con esos jugadores menos: los reemplazos salen del mercado de pases y de las inferiores.</p>
           </div>
         ` : ''}
+        ${(sum.subidosDeUrgencia || []).length ? `
+          <div class="avisos-partido avisos-neutros">
+            <h3>El club subió pibes de urgencia</h3>
+            ${sum.subidosDeUrgencia.map((t) => `<p>${t}</p>`).join('')}
+            <p class="muted">El plantel había quedado por debajo del mínimo. Si querés elegir vos a quién subir, hacelo desde Inferiores antes de que se cierre el año.</p>
+          </div>
+        ` : ''}
         ${(sum.juveniles || []).length ? `
           <div class="avisos-partido avisos-neutros">
             <h3>Se fueron de inferiores</h3>
@@ -4737,12 +4754,138 @@ function renderSeasonEnd() {
 // La lógica de planteles, estados y negociación está toda en js/mercado.js.
 // Acá solo se dibuja y se enganchan los botones.
 
-let mercadoClubId = null;   // club que se está mirando
+let mercadoClubId = null;   // club que se está mirando (lo sigue usando el Bloque 2)
 let plantelMercadoAbierto = false;
 // Hasta dónde bajaste la lista del plantel. Sin esto, marcar a un jugador del
 // puesto 25 te devolvía al principio de la lista en cada toque.
 let plantelMercadoScroll = 0;
-let mercadoBusqueda = '';   // texto del buscador
+
+// Los filtros del buscador. Antes acá había una lista de los 66 clubes y un
+// campo para buscar el club por nombre: para encontrar un lateral izquierdo de
+// menos de 25 años había que entrar club por club. Ahora se busca por lo que
+// uno realmente busca.
+let mercadoFiltros = {
+  texto: '',
+  puestos: [],
+  edadMin: 15,
+  edadMax: 42,
+  ratingMin: 0,
+  division: 'todas',
+  situacion: 'todas',
+};
+let mercadoFiltrosAbiertos = false;
+
+const MERCADO_EDAD_MIN = 15;
+const MERCADO_EDAD_MAX = 42;
+
+// El buscador. Los filtros viven en mercadoFiltros y el trabajo pesado lo
+// hace Mercado.filtrar (que además cachea el índice de los ~1.800 jugadores).
+function buscadorDeJugadoresHtml() {
+  const f = mercadoFiltros;
+  const hayFiltro = f.puestos.length || f.ratingMin > 0 || f.division !== 'todas'
+    || f.situacion !== 'todas' || f.edadMin > MERCADO_EDAD_MIN || f.edadMax < MERCADO_EDAD_MAX;
+  return `
+    <div class="mercado-buscador">
+      <input id="mercado-texto" class="text-input" type="text"
+             placeholder="Buscar por nombre o club…" value="${f.texto.replace(/"/g, '&quot;')}" />
+      <button class="tab-btn mercado-filtros-btn${mercadoFiltrosAbiertos || hayFiltro ? ' active' : ''}" data-abrir-filtros="1">
+        Filtros${hayFiltro ? ' ·' : ''}
+      </button>
+    </div>
+    ${mercadoFiltrosAbiertos ? `
+      <div class="mercado-filtros">
+        <div class="filtro-campo">
+          <span class="muted">Puesto</span>
+          <div class="filtro-botones">
+            ${['POR', 'DEF', 'MED', 'DEL'].map((x) => `
+              <button class="tab-btn ${f.puestos.includes(x) ? 'active' : ''}" data-filtro-puesto="${x}">${x}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="filtro-campo">
+          <span class="muted">Edad: <strong>${f.edadMin} a ${f.edadMax}</strong></span>
+          <div class="filtro-rango">
+            <input type="range" min="${MERCADO_EDAD_MIN}" max="${MERCADO_EDAD_MAX}" value="${f.edadMin}" data-filtro-edad="min" />
+            <input type="range" min="${MERCADO_EDAD_MIN}" max="${MERCADO_EDAD_MAX}" value="${f.edadMax}" data-filtro-edad="max" />
+          </div>
+        </div>
+        <div class="filtro-campo">
+          <span class="muted">Valoración mínima: <strong>${f.ratingMin || 'cualquiera'}</strong></span>
+          <input type="range" min="0" max="90" step="1" value="${f.ratingMin}" data-filtro-rating="1" />
+        </div>
+        <div class="filtro-campo">
+          <span class="muted">Situación</span>
+          <div class="filtro-botones">
+            ${Mercado.SITUACIONES.map((x) => `
+              <button class="tab-btn ${f.situacion === x.id ? 'active' : ''}" data-filtro-situacion="${x.id}">${x.label}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="filtro-campo">
+          <span class="muted">Liga</span>
+          <div class="filtro-botones">
+            ${[['todas', 'Todas'], ['D1', 'Primera'], ['D2', 'Nacional']].map(([id, label]) => `
+              <button class="tab-btn ${f.division === id ? 'active' : ''}" data-filtro-division="${id}">${label}</button>
+            `).join('')}
+          </div>
+        </div>
+        ${hayFiltro ? '<button class="btn" data-limpiar-filtros="1">Limpiar filtros</button>' : ''}
+      </div>
+    ` : ''}
+  `;
+}
+
+function wireBuscadorDeJugadores(panel) {
+  const texto = panel.querySelector('#mercado-texto');
+  if (texto) {
+    texto.addEventListener('input', (ev) => {
+      mercadoFiltros.texto = ev.target.value;
+      renderMarketPanel();
+      // Escribir no debe hacer perder el foco ni el cursor.
+      const nuevo = document.getElementById('mercado-texto');
+      if (nuevo) { nuevo.focus(); nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); }
+    });
+  }
+  const abrir = panel.querySelector('[data-abrir-filtros]');
+  if (abrir) {
+    abrir.addEventListener('click', () => { mercadoFiltrosAbiertos = !mercadoFiltrosAbiertos; renderMarketPanel(); });
+  }
+  panel.querySelectorAll('[data-filtro-puesto]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const x = btn.dataset.filtroPuesto;
+      mercadoFiltros.puestos = mercadoFiltros.puestos.includes(x)
+        ? mercadoFiltros.puestos.filter((y) => y !== x)
+        : [...mercadoFiltros.puestos, x];
+      renderMarketPanel();
+    });
+  });
+  panel.querySelectorAll('[data-filtro-edad]').forEach((input) => {
+    input.addEventListener('input', (ev) => {
+      const v = Number(ev.target.value);
+      // Las dos puntas no se pueden cruzar.
+      if (ev.target.dataset.filtroEdad === 'min') mercadoFiltros.edadMin = Math.min(v, mercadoFiltros.edadMax);
+      else mercadoFiltros.edadMax = Math.max(v, mercadoFiltros.edadMin);
+      renderMarketPanel();
+    });
+  });
+  const rating = panel.querySelector('[data-filtro-rating]');
+  if (rating) {
+    rating.addEventListener('input', (ev) => { mercadoFiltros.ratingMin = Number(ev.target.value); renderMarketPanel(); });
+  }
+  panel.querySelectorAll('[data-filtro-situacion]').forEach((btn) => {
+    btn.addEventListener('click', () => { mercadoFiltros.situacion = btn.dataset.filtroSituacion; renderMarketPanel(); });
+  });
+  panel.querySelectorAll('[data-filtro-division]').forEach((btn) => {
+    btn.addEventListener('click', () => { mercadoFiltros.division = btn.dataset.filtroDivision; renderMarketPanel(); });
+  });
+  const limpiar = panel.querySelector('[data-limpiar-filtros]');
+  if (limpiar) {
+    limpiar.addEventListener('click', () => {
+      mercadoFiltros = { texto: mercadoFiltros.texto, puestos: [], edadMin: MERCADO_EDAD_MIN, edadMax: MERCADO_EDAD_MAX, ratingMin: 0, division: 'todas', situacion: 'todas' };
+      renderMarketPanel();
+    });
+  }
+}
 
 function mercadoEstadoPill(estado) {
   const e = MERCADO_ESTADOS[estado];
@@ -4771,28 +4914,35 @@ function mercadoBotonNegociar(j) {
 function mercadoJugadorHtml(j) {
   const detalle = j.posDetail && POS_DETAIL_ABBREV[j.posDetail] ? POS_DETAIL_ABBREV[j.posDetail] : j.pos;
   const respuesta = Engine.state.mercado.respuestas[j.id];
-  const bloqueado = j.acordado || j.rechazado || !!j.loanFrom;
+  const bloqueado = j.acordado || j.rechazado || Mercado.estaCedido(j) || !j.clubId;
+  // Los resultados ya no salen de un club elegido: cada fila dice de qué club
+  // es y se lo lleva puesto en los botones.
+  const club = j.clubId ? Engine.getClub(j.clubId) : null;
+  const deQuien = club ? `${clubCrest(club, 16)}<span>${club.name}</span>` : '<span>Sin club</span>';
   return `
     <li class="mercado-jugador${j.acordado ? ' acordado' : ''}">
       <div class="mercado-jugador-datos">
         <div class="mercado-jugador-nombre">
           <strong>${j.name}</strong>
           <span class="muted">${detalle} · ${j.rating} · ${j.age} años</span>
+          <span class="muted mercado-jugador-club">${deQuien}</span>
         </div>
         ${mercadoEstadoPill(j.estado)}
       </div>
       <div class="mercado-valor">${mercadoValorTexto(j)}</div>
-      ${j.loanFrom ? `<p class="muted mercado-nota">A préstamo de ${j.loanFrom}: el club no lo puede vender.</p>` : ''}
+      ${Mercado.estaCedido(j) ? `<p class="muted mercado-nota">Está a préstamo${j.loanFrom ? ` de ${j.loanFrom}` : ''}${j.loanUntil ? ` hasta ${j.loanUntil}` : ''}: el club no lo puede vender.</p>` : ''}
       ${respuesta ? `<p class="mercado-respuesta">${respuesta}</p>` : ''}
-      <div class="mercado-acciones">
-        <button class="option-btn small" data-mercado-consultar="${j.id}">Consultar</button>
-        ${j.acordado
-          ? `<button class="option-btn small danger" data-mercado-cancelar="${j.id}">Cancelar acuerdo</button>`
-          : `<button class="option-btn small" data-mercado-negociar="${j.id}" ${bloqueado ? 'disabled' : ''}>${mercadoBotonNegociar(j)}</button>`}
-        ${!j.acordado && j.clausula && j.estado !== 'clausula' && j.estado !== 'fin-contrato'
-          ? `<button class="option-btn small" data-mercado-clausula="${j.id}" ${j.loanFrom ? 'disabled' : ''}>Pagar cláusula ${Mercado.plata(j.clausula)}</button>`
-          : ''}
-      </div>
+      ${j.clubId ? `
+        <div class="mercado-acciones">
+          <button class="option-btn small" data-mercado-consultar="${j.id}" data-club="${j.clubId}">Consultar</button>
+          ${j.acordado
+            ? `<button class="option-btn small danger" data-mercado-cancelar="${j.id}">Cancelar acuerdo</button>`
+            : `<button class="option-btn small" data-mercado-negociar="${j.id}" data-club="${j.clubId}" ${bloqueado ? 'disabled' : ''}>${mercadoBotonNegociar(j)}</button>`}
+          ${!j.acordado && j.clausula && j.estado !== 'clausula' && j.estado !== 'fin-contrato'
+            ? `<button class="option-btn small" data-mercado-clausula="${j.id}" data-club="${j.clubId}" ${Mercado.estaCedido(j) ? 'disabled' : ''}>Pagar cláusula ${Mercado.plata(j.clausula)}</button>`
+            : ''}
+        </div>
+      ` : '<p class="muted mercado-nota">Está sin club: se ficha gratis en la ventana de pases, desde la pantalla de mercado.</p>'}
     </li>
   `;
 }
@@ -5029,22 +5179,8 @@ function renderMarketPanel() {
   if (!s || !s.clubId || !s.season) { panel.innerHTML = ''; return; }
   Mercado.init(s);
 
-  const clubes = Mercado.clubes(Engine);
-  const filtro = mercadoBusqueda.trim().toLowerCase();
-  const filtrados = filtro ? clubes.filter((c) => c.name.toLowerCase().includes(filtro)) : clubes;
-  const elegido = mercadoClubId && clubes.some((c) => c.id === mercadoClubId) ? mercadoClubId : null;
   const acuerdos = s.mercado.acuerdos;
-
-  const listaClubes = filtrados.length
-    ? filtrados.map((c) => `
-        <button class="mercado-club ${c.id === elegido ? 'active' : ''}" data-mercado-club="${c.id}">
-          ${clubCrest(c, 20)}<span>${c.name}</span>
-          <span class="muted mercado-club-div">${c.division === 'D1' ? '1ª' : 'Nac'}</span>
-        </button>
-      `).join('')
-    : '<p class="muted">Ningún club coincide con esa búsqueda.</p>';
-
-  const jugadores = elegido ? Mercado.plantel(Engine, elegido) : [];
+  const encontrados = Mercado.filtrar(Engine, mercadoFiltros);
 
   panel.innerHTML = `
     <div class="card mercado-card">
@@ -5054,7 +5190,6 @@ function renderMarketPanel() {
         ? '<p class="mercado-aviso abierto"><strong>El mercado está abierto.</strong> Lo que negociaste se firma en esta ventana y podés fichar a los que están libres.</p>'
         : `<p class="muted mercado-aviso"><strong>El mercado está cerrado.</strong> Abre dos veces al año, como en la realidad: en la pretemporada (enero) y a mitad de año, al terminar el Apertura (junio). La próxima es en ${Engine.proximaVentanaDeMercado() || 'la próxima ventana'}. Mientras tanto podés negociar todo lo que quieras: el acuerdo que cierres se firma solo cuando abra.</p>`}
       ${avisoDePlantel()}
-      ${finanzasHtml()}
       ${tuPlantelEnElMercadoHtml()}
 
       ${acuerdos.length ? `
@@ -5066,43 +5201,25 @@ function renderMarketPanel() {
         </div>
       ` : ''}
 
-      <input id="mercado-buscador" class="text-input" type="text" placeholder="Buscar club…" value="${mercadoBusqueda.replace(/"/g, '&quot;')}" />
-      <div class="mercado-clubes">${listaClubes}</div>
-
-      ${elegido ? `
-        <div class="mercado-plantel">
-          <div class="mercado-plantel-titulo">${clubCrest(Engine.getClub(elegido), 24)}<strong>${Engine.getClub(elegido).name}</strong></div>
-          <ul class="mercado-lista">${jugadores.map(mercadoJugadorHtml).join('')}</ul>
-        </div>
-      ` : '<p class="muted">Elegí un club para ver cómo está cada jugador de contrato.</p>'}
+      ${buscadorDeJugadoresHtml()}
+      ${encontrados.lista.length ? `
+        <p class="muted mercado-cuantos">${encontrados.total} jugador${encontrados.total === 1 ? '' : 'es'}${
+          encontrados.total > encontrados.lista.length ? `, se muestran los ${encontrados.lista.length} de más valoración` : ''}.</p>
+        <ul class="mercado-lista">${encontrados.lista.map(mercadoJugadorHtml).join('')}</ul>
+      ` : '<p class="muted">Ningún jugador entra en esa búsqueda. Probá aflojando algún filtro.</p>'}
     </div>
   `;
 
-  const buscador = document.getElementById('mercado-buscador');
-  if (buscador) {
-    buscador.addEventListener('input', (ev) => {
-      mercadoBusqueda = ev.target.value;
-      renderMarketPanel();
-      // Escribir no debe hacer perder el foco ni el cursor.
-      const nuevo = document.getElementById('mercado-buscador');
-      if (nuevo) { nuevo.focus(); nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); }
-    });
-  }
+  wireBuscadorDeJugadores(panel);
   wireTuPlantelEnElMercado(panel);
-  panel.querySelectorAll('[data-mercado-club]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      mercadoClubId = btn.dataset.mercadoClub === mercadoClubId ? null : btn.dataset.mercadoClub;
-      renderMarketPanel();
-    });
-  });
   panel.querySelectorAll('[data-mercado-consultar]').forEach((btn) => {
-    btn.addEventListener('click', () => { Mercado.consultar(Engine, elegido, btn.dataset.mercadoConsultar); renderMarketPanel(); });
+    btn.addEventListener('click', () => { Mercado.consultar(Engine, btn.dataset.club, btn.dataset.mercadoConsultar); renderMarketPanel(); });
   });
   panel.querySelectorAll('[data-mercado-negociar]').forEach((btn) => {
-    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoNegociar); trasNegociar(); });
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, btn.dataset.club, btn.dataset.mercadoNegociar); trasNegociar(); });
   });
   panel.querySelectorAll('[data-mercado-clausula]').forEach((btn) => {
-    btn.addEventListener('click', () => { Mercado.negociar(Engine, elegido, btn.dataset.mercadoClausula, true); trasNegociar(); });
+    btn.addEventListener('click', () => { Mercado.negociar(Engine, btn.dataset.club, btn.dataset.mercadoClausula, true); trasNegociar(); });
   });
   panel.querySelectorAll('[data-mercado-cancelar]').forEach((btn) => {
     btn.addEventListener('click', () => { Mercado.cancelarAcuerdo(Engine, btn.dataset.mercadoCancelar); renderMarketPanel(); });
@@ -5201,14 +5318,14 @@ function ojeadorHtml() {
     return `
       <div class="ojeador-bloque volvio">
         <h4>El ojeador volvió de ${Engine.nationName(inf.pais)}</h4>
-        <p class="muted">Vio ${inf.jugadores.length} chicos de ${inf.puestos.map((x) => POS_LARGO[x] || x).join(' y ')}. Te podés quedar con uno solo; a los demás no los vas a volver a ver.</p>
+        <p class="muted">Vio chicos de ${inf.puestos.map((x) => POS_LARGO[x] || x).join(' y ')}. Quedate con los que quieras: en inferiores no cuestan nada. Los que dejes pasar no los vas a volver a ver.</p>
         <div class="juvenil-lista">
           ${inf.jugadores.map((p) => `
             ${filaDeJuvenilHtml(p, juvenilSeleccionado === p.id)}
             ${juvenilSeleccionado === p.id ? fichaDeJuvenilHtml(p, { sinAcciones: true }) : ''}
           `).join('')}
         </div>
-        <button class="btn juvenil-btn" data-descartar-informe="1">No me quedo con ninguno</button>
+        <button class="btn juvenil-btn" data-descartar-informe="1">Listo, cerrar el informe</button>
       </div>
     `;
   }

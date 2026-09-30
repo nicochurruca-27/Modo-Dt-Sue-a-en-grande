@@ -2580,3 +2580,50 @@ body[data-fase="creacion"] .center-col { max-width: 640px; width: 100%; }
 
 .ojeo-puestos { display: flex; gap: 4px; margin-top: 3px; }
 .ojeo-puestos .tab-btn { flex: 1; }
+
+/* Plantel corto: es un aviso más urgente que el de "plantel lleno", porque si
+   no lo mirás te quedás sin once. */
+.aviso-plantel.corto {
+  background: #2a1206;
+  border: 1px solid #f97316;
+  color: #fed7aa;
+}
+
+/* ---------- El buscador del mercado ---------- */
+.mercado-buscador {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.mercado-buscador .text-input { flex: 1; min-width: 0; }
+.mercado-filtros-btn { white-space: nowrap; }
+
+.mercado-filtros {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #0f1620;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filtro-campo { display: flex; flex-direction: column; gap: 4px; font-size: 0.85em; }
+.filtro-botones { display: flex; flex-wrap: wrap; gap: 4px; }
+.filtro-botones .tab-btn { flex: 1 1 auto; }
+
+/* Las dos puntas del rango de edad, una arriba de la otra. */
+.filtro-rango { display: flex; flex-direction: column; gap: 2px; }
+.filtro-rango input[type="range"],
+.filtro-campo > input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.mercado-cuantos { margin: 6px 0; }
+
+/* De qué club es cada resultado. */
+.mercado-jugador-club {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

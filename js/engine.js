@@ -149,10 +149,19 @@ const TOTAL_ROUNDS = { D1: 16, D2: 35 };
 // club: si el que dirigís se va a la tercera, la carrera se termina ahí. Es la
 // única manera de perder el juego.
 const DESCENSOS_POR_ZONA_D2 = 2;
-const MAX_SQUAD = 36;
-// A partir de acá el juego empieza a avisar que te estás quedando sin lugar.
-const AVISO_PLANTEL = 3;
-const MIN_SQUAD = 14;
+// ---------- El tamaño del plantel ----------
+//
+// NO hay tope. Antes había uno de 36 y era una regla inventada que solo
+// molestaba: si querés tener 45 jugadores y pagarles el sueldo a los 45, es
+// tu problema y tu plata. Lo que hay es un PISO, y ese sí es de verdad.
+//
+// El piso son once titulares más los doce del banco: la lista que se entrega
+// para un partido. Por debajo de eso el equipo no se puede presentar, así que
+// el juego no te deja bajar de ahí de ninguna manera — ni vendiendo, ni
+// cediendo, ni rescindiendo, ni dejando vencer un contrato. Cuando estás
+// justo en el piso y a alguien se le termina el contrato, renovárselo pasa a
+// ser obligatorio y el juego lo dice con todas las letras.
+const MIN_SQUAD = 11 + 12;
 
 // ---------- Energía ----------
 //
@@ -850,8 +859,14 @@ const Engine = {
     return this.fuerzaDelPlantel(clubId, club) + suDia;
   },
 
+  // El día bueno o malo de un rival. Era ±3, y eso era MUCHÍSIMO: entre dos
+  // clubes vecinos en la tabla de fuerza hay medio punto de diferencia, así
+  // que un sorteo de ±3 los daba vuelta seis veces. Era la mitad del ruido que
+  // hacía que la tabla no significara nada. Con ±1,5 sigue habiendo días malos
+  // —un grande puede perder de visitante contra el último— sin que el sorteo
+  // se coma la diferencia de plantel.
   sortearElDiaDelRival() {
-    return Math.random() * 6 - 3;
+    return Math.random() * 3 - 1.5;
   },
 
   // El nivel del mejor once posible de un club: el arquero y los diez de campo
@@ -1736,10 +1751,37 @@ const Engine = {
   // rinde contra uno bravo (ese mismo 25% arriba les regala más de lo que te
   // da). Con sumas fijas, una formación terminaba siendo siempre la mejor
   // sin importar contra quién jugabas.
+  // ---------- Cuánto pesa ser mejor ----------
+  //
+  // Este divisor es el número más importante del juego, y estaba mal. Con
+  // `diff / 40`, los 17 puntos que separan al mejor plantel de la liga del
+  // peor se traducían en 0,42 goles de diferencia: menos de lo que se mueve
+  // un partido por puro azar. El resultado, medido sobre 14 temporadas
+  // simuladas, era que la tabla final casi no tenía que ver con la calidad de
+  // los planteles (correlación de 0,33) y que el campeón era, en promedio, el
+  // NOVENO plantel más fuerte. Gimnasia salía campeón tres veces.
+  //
+  // O sea: daba igual lo que hicieras. Comprar bien, armar el equipo, subir un
+  // pibe — nada movía la aguja, y salir campeón con un club chico no era un
+  // logro sino una moneda al aire. Eso vacía el juego.
+  //
+  // Con `diff / 14` la correlación sube a 0,65 y el campeón pasa a ser, en
+  // promedio, el segundo o tercer plantel más fuerte. En el fútbol de verdad
+  // esa correlación anda por 0,75, así que sigue habiendo más sorpresas que
+  // en la realidad —que es lo que uno quiere en un juego— pero ahora ser
+  // mejor sirve. En esas mismas 14 temporadas salieron campeones Estudiantes,
+  // Boca, Argentinos y también Belgrano y Unión: los grandes ganan la
+  // mayoría, y al que armó bien un club de medio pelo le puede tocar.
+  //
+  // Los topes se abrieron junto con el divisor. Con los viejos (0,7 y 0,65) un
+  // equipo muy superior chocaba contra el techo enseguida y la diferencia se
+  // perdía igual.
+  DIVISOR_DE_FUERZA: 14,
+
   simulateScore(homeStrength, awayStrength, homeAdvantage, duracion = 1, factorLocal = 1, factorVisitante = 1) {
-    const diff = homeStrength - awayStrength;
-    const baseLocal = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40 + homeAdvantage / 16));
-    const baseVisitante = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40));
+    const diff = (homeStrength - awayStrength) / this.DIVISOR_DE_FUERZA;
+    const baseLocal = Math.max(0.5, Math.min(2.2, 1.25 + diff + homeAdvantage / 16));
+    const baseVisitante = Math.max(0.45, Math.min(2.0, 1.1 - diff));
     return {
       homeGoals: this.sampleGoals(baseLocal * factorLocal * duracion),
       awayGoals: this.sampleGoals(baseVisitante * factorVisitante * duracion),
@@ -1752,9 +1794,9 @@ const Engine = {
   simulateExtraTime(m) {
     const mia = this.squadStrength();
     const suya = this.clubStrength(m.opponentId);
-    const diff = (m.isHome ? mia - suya : suya - mia);
-    const lambdaHome = Math.max(0.7, Math.min(2.1, 1.25 + diff / 40)) / 3;
-    const lambdaAway = Math.max(0.65, Math.min(1.95, 1.1 - diff / 40)) / 3;
+    const diff = (m.isHome ? mia - suya : suya - mia) / this.DIVISOR_DE_FUERZA;
+    const lambdaHome = Math.max(0.5, Math.min(2.2, 1.25 + diff)) / 3;
+    const lambdaAway = Math.max(0.45, Math.min(2.0, 1.1 - diff)) / 3;
     return { homeGoals: this.sampleGoals(lambdaHome), awayGoals: this.sampleGoals(lambdaAway) };
   },
 
@@ -6997,6 +7039,14 @@ const Engine = {
     // posición (por ejemplo, el último arquero: dejarlo ir rompería
     // cualquier pantalla que necesite un arquero, como los penales).
     const soleAtPosition = player && s.squad.filter((p) => p.pos === player.pos).length <= 1;
+    // Si la renovación fue obligatoria, se guarda por qué: el jugador se
+    // queda aunque hayas apretado "dejarlo ir", y eso hay que decirlo.
+    const forzada = player && !renew && (s.squad.length <= MIN_SQUAD || soleAtPosition);
+    s.renovacionForzada = forzada
+      ? (soleAtPosition
+        ? `${player.name} se queda: es el único ${player.pos} del plantel y sin él no podés presentar equipo.`
+        : `${player.name} se queda: tenés ${s.squad.length} jugadores y el mínimo para presentar equipo son ${MIN_SQUAD}. Fichá a alguien si querés poder dejar ir a otro.`)
+      : null;
     if (player && (renew || s.squad.length <= MIN_SQUAD || soleAtPosition)) {
       // Lo que cuesta renovar sale de la categoría económica del club (ver
       // Economia.costoRenovacion): no es lo mismo renovarle a un titular en
@@ -7102,7 +7152,7 @@ const Engine = {
     const lista = Mercado.libres(s);
     const guardado = lista[indice];
     if (!guardado) return false;
-    if (s.squad.length >= MAX_SQUAD) return false;
+
     const j = Mercado.jugadorLibre(this, guardado);
     s.squad.push({
       id: j.id,
@@ -7616,6 +7666,10 @@ const Engine = {
     // libres. Es la contracara de que tenerlos en la cantera sea gratis.
     if (typeof Juveniles !== 'undefined') {
       s.lastSeasonSummary.juveniles = Juveniles.cerrarTemporada(this).map((a) => a.texto);
+      // Y si después de todo eso el plantel quedó corto, el club sube pibes
+      // solo: no se presenta a jugar con once.
+      s.lastSeasonSummary.subidosDeUrgencia = Juveniles
+        .reponerPlantelDelUsuario(this).map((a) => a.texto);
     }
     s.screen = 'season-end';
     this.save();
