@@ -437,7 +437,17 @@ const Juveniles = {
     const faltan = MIN_SQUAD - (s.squad || []).length;
     if (faltan <= 0) return [];
     const disponibles = this.camada(engine, s.clubId);
-    const suben = disponibles.slice(0, faltan);
+    // Si al club no le quedó arquero, el primero que sube es arquero: sin
+    // nadie al arco no se puede jugar, por más jugadores de campo que haya.
+    const suben = [];
+    if (!engine.cuantosArqueros(s.squad)) {
+      const arquero = disponibles.find((p) => p.pos === 'POR');
+      if (arquero) suben.push(arquero);
+    }
+    disponibles.forEach((p) => {
+      if (suben.length >= faltan) return;
+      if (!suben.includes(p)) suben.push(p);
+    });
     const avisos = [];
     suben.forEach((p) => {
       // Sube gratis: es una urgencia del club, no un fichaje que decidiste. El
@@ -492,8 +502,10 @@ const Juveniles = {
   // tenga hasta llegar al piso de plantel. Un club al que se le retiraron
   // tres veteranos sube tres pibes; uno que está completo no sube a ninguno.
   // Así los planteles no se vacían y, al mismo tiempo, no se inflan.
-  egresados(engine, clubId, cuantosFaltan) {
-    if (cuantosFaltan <= 0) return [];
+  // `sinArquero` lo pasa Mercado.plantel cuando al club no le quedó ninguno:
+  // en ese caso sube un arquero sí o sí, aunque el plantel ya esté completo.
+  egresados(engine, clubId, cuantosFaltan, sinArquero) {
+    if (cuantosFaltan <= 0 && !sinArquero) return [];
     const club = engine.getClub(clubId);
     if (!club) return [];
     const temporada = engine.state.season ? engine.state.season.year : 1;
@@ -512,7 +524,20 @@ const Juveniles = {
     // Los mejores primero: un club sube al que más promete, no al primero que
     // encuentra.
     candidatos.sort((a, b) => b.projection - a.projection || b.rating - a.rating);
-    return candidatos.slice(0, cuantosFaltan).map((p) => {
+    // ...con una excepción: si al club no le quedó ningún arquero, el primero
+    // que sube es un arquero aunque haya pibes mejores en otros puestos. Un
+    // club sin nadie al arco no puede jugar, y es la necesidad más urgente
+    // que puede tener. Es lo único que la cantera mira del puesto.
+    const elegidos = [];
+    if (sinArquero) {
+      const arquero = candidatos.find((p) => p.pos === 'POR');
+      if (arquero) elegidos.push(arquero);
+    }
+    candidatos.forEach((p) => {
+      if (elegidos.length >= cuantosFaltan) return;
+      if (!elegidos.includes(p)) elegidos.push(p);
+    });
+    return elegidos.slice(0, Math.max(cuantosFaltan, elegidos.length ? 1 : 0)).map((p) => {
       // Ya no es un juvenil: es un jugador de Primera que entró por la cantera
       // y que envejeció y creció desde que subió.
       const edadAlSubir = this.EDAD_MAXIMA + 1;

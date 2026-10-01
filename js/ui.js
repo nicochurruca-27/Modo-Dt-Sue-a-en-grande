@@ -85,14 +85,15 @@ function nationFlag(code, height = 12) {
 
 // Convierte el contador de días (s.calendar.dayCount, un simple entero
 // que sobrevive bien al save/load) en una fecha legible, sumando días
-// sobre el almanaque fijo de DAYS_IN_MONTH — sin usar el objeto Date del
-// navegador, para no depender de nada más que aritmética simple.
+// sobre el almanaque real (ver diasDelMes en data.js, que sabe de años
+// bisiestos) — sin usar el objeto Date del navegador, para no depender de
+// nada más que aritmética simple.
 function formatCalendarDate(dayCount, temporada, conAnio = true) {
   let day = CALENDAR_START_DAY + dayCount;
   let month = CALENDAR_START_MONTH;
   let anio = anioDeTemporada(temporada || (Engine.state.season && Engine.state.season.year));
-  while (day > DAYS_IN_MONTH[month]) {
-    day -= DAYS_IN_MONTH[month];
+  while (day > diasDelMes(month, anio)) {
+    day -= diasDelMes(month, anio);
     month = (month + 1) % 12;
     // Una temporada arranca el 1° de enero y termina en noviembre, así que
     // esto no debería pasar nunca; queda por las dudas, para que un

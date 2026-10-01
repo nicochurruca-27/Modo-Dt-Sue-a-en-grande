@@ -2,7 +2,42 @@
 // nombres de jugadores por país y decisiones posibles.
 
 const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+// ---------- El almanaque ----------
+//
+// Esta tabla es la de un año COMÚN. Febrero de verdad depende del año, así
+// que nadie la lee derecho para preguntar cuántos días tiene un mes: para eso
+// está diasDelMes(mes, anio), que es la única fuente de verdad del juego.
+//
+// Antes no existía esa función y todo el mundo leía DAYS_IN_MONTH[mes] a
+// secas. Consecuencia medida: parseFechaDeNacimiento aceptaba 2025-02-29,
+// 2025-04-31, 2025-06-31, 2025-09-31, 2025-11-31 y hasta 1900-02-29, porque
+// validaba contra un 31 fijo para todos los meses. Y el almanaque del juego
+// se salteaba el 29 de febrero en los años bisiestos.
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+// La regla gregoriana completa: divisible por 4, salvo los divisibles por
+// 100, salvo que además sean divisibles por 400. Por eso 2024 y 2000 son
+// bisiestos y 2025 y 1900 no lo son.
+function esBisiesto(anio) {
+  return anio % 4 === 0 && (anio % 100 !== 0 || anio % 400 === 0);
+}
+
+// Cuántos días tiene un mes (0 = enero) en un año concreto. Si no se pasa el
+// año se contesta con el año común, que es lo correcto para quien solo quiere
+// el largo nominal del mes.
+function diasDelMes(mes, anio) {
+  if (mes < 0 || mes > 11) return 0;
+  if (mes === 1 && anio != null && esBisiesto(anio)) return 29;
+  return DAYS_IN_MONTH[mes];
+}
+
+// ¿Existe este día en el almanaque? Es la pregunta que hay que hacerle a
+// cualquier fecha que entre al juego desde afuera.
+function fechaExiste(anio, mes, dia) {
+  if (!Number.isInteger(anio) || !Number.isInteger(mes) || !Number.isInteger(dia)) return false;
+  if (mes < 0 || mes > 11) return false;
+  return dia >= 1 && dia <= diasDelMes(mes, anio);
+}
 // El calendario de la carrera arranca el 1° de enero y avanza de a un día
 // (ver Engine.avanzarUnDia). Enero entero es la PRETEMPORADA: el torneo
 // todavía no empezó y el mercado de verano está abierto, como en la realidad.

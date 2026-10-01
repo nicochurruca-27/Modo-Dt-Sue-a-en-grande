@@ -286,8 +286,12 @@ const Engine = {
     let dia = CALENDAR_START_DAY + ((s && s.calendar ? s.calendar.dayCount : 0) || 0);
     let mes = CALENDAR_START_MONTH;
     let corridoDeAnio = 0;
-    while (dia > DAYS_IN_MONTH[mes]) {
-      dia -= DAYS_IN_MONTH[mes];
+    // El largo de febrero depende del año, así que hay que preguntárselo al
+    // año en el que estamos parados mientras se camina, no a una tabla fija.
+    // Con la tabla fija el juego se salteaba el 29 de febrero y a partir de
+    // ahí el almanaque quedaba corrido un día en cada año bisiesto.
+    while (dia > diasDelMes(mes, anio + corridoDeAnio)) {
+      dia -= diasDelMes(mes, anio + corridoDeAnio);
       mes = (mes + 1) % 12;
       if (mes === 0) corridoDeAnio++;
     }
@@ -313,7 +317,11 @@ const Engine = {
     const anio = Number(m[1]);
     const mes = Number(m[2]) - 1;
     const dia = Number(m[3]);
-    if (mes < 0 || mes > 11 || dia < 1 || dia > 31) return null;
+    // Antes esto decía `dia > 31` para cualquier mes, y por eso entraban al
+    // juego fechas que no existen: 2025-02-29, 2025-04-31, 2025-06-31,
+    // 2025-09-31, 2025-11-31. fechaExiste mira el mes Y el año, así que el
+    // 29 de febrero pasa en 2024 y en 2000, y no pasa en 2025 ni en 1900.
+    if (!fechaExiste(anio, mes, dia)) return null;
     return { anio, mes, dia };
   },
 
@@ -355,6 +363,10 @@ const Engine = {
     const texto = String(id || '');
     for (let i = 0; i < texto.length; i++) h = (h * 31 + texto.charCodeAt(i)) % 100000;
     const mes = h % 12;
+    // Acá SÍ se usa el año común a propósito, y no diasDelMes(): un jugador
+    // inventado nunca nace un 29 de febrero. Si mirara el año, la fecha de
+    // los jugadores sembrados cambiaría según el año que les tocara y las
+    // partidas ya empezadas verían moverse los cumpleaños de medio plantel.
     const dia = 1 + (Math.floor(h / 12) % DAYS_IN_MONTH[mes]);
     const fecha = hoy || this.fechaDelJuego();
     // Si el cumpleaños de este año ya pasó, nació hace `edad` años; si
@@ -451,6 +463,31 @@ const Engine = {
     return this.edadAlCierreDeTemporada(player, temporada - 1) > this.EDAD_DE_RETIRO;
   },
 
+  // ---------- El arquero es distinto ----------
+  //
+  // Un jugador de campo puede jugar fuera de puesto: un defensor de volante
+  // rinde menos, pero juega. Al arco no. Un club con cero arqueros es un
+  // estado imposible, y el juego llegaba a él: medido sobre 20 temporadas del
+  // mundo rival, 19 veces un club terminó con plantel completo y ningún
+  // arquero (Racing con 26 jugadores y nadie al arco).
+  //
+  // Esta es la pregunta que tienen que hacerse TODAS las salidas antes de
+  // dejar ir a alguien. Mira `pos`, nunca `posDetail`: `posDetail` dice cómo
+  // juega, `pos` dice qué es.
+  esUltimoArquero(plantel, jugador) {
+    if (!jugador || jugador.pos !== 'POR') return false;
+    return (plantel || []).filter((p) => p && p.pos === 'POR').length <= 1;
+  },
+
+  cuantosArqueros(plantel) {
+    return (plantel || []).filter((p) => p && p.pos === 'POR').length;
+  },
+
+  // El aviso, con el mismo texto en todos lados para que se reconozca.
+  avisoDeUltimoArquero(nombre) {
+    return `No se puede: ${nombre} es el último arquero del plantel. Conseguí otro arquero antes de dejarlo salir.`;
+  },
+
   // Los que cuelgan los botines al cerrar la temporada. Devuelve los avisos
   // para la pantalla de fin de año; la noticia se publica acá mismo.
   procesarRetiros() {
@@ -463,6 +500,18 @@ const Engine = {
     //    hueco queda (repairStartingSlots solo reacomoda a los que quedan).
     (s.squad || []).slice().forEach((p) => {
       if (!this.seRetira(p)) return;
+      // El último arquero no cuelga los botines y deja al club sin nadie al
+      // arco: se queda un año más. No es un invento del juego —un arquero
+      // veterano estirando una temporada porque el club no tiene reemplazo
+      // pasa de verdad— y es lo único que evita el estado imposible sin
+      // inventar un jugador de la nada. El club se entera por el aviso.
+      if (this.esUltimoArquero(s.squad, p)) {
+        avisos.push({
+          tono: 'malo',
+          texto: `${p.name} iba a retirarse pero sigue un año más: es el único arquero del plantel y no hay con quién reemplazarlo. Conseguí un arquero este año.`,
+        });
+        return;
+      }
       const edad = this.edadAlCierreDeTemporada(p, temporada);
       s.squad = s.squad.filter((x) => x.id !== p.id);
       s.retirados.push({ id: p.id, name: p.name, pos: p.pos, edad, clubId: s.clubId, temporada });
@@ -6962,7 +7011,16 @@ const Engine = {
       return;
     }
 
-    // La cláusula pagada no se discute: el jugador se va igual.
+    // La cláusula pagada no se discute... salvo que sea el último arquero. Un
+    // club no se puede quedar sin nadie al arco ni aunque le paguen la
+    // cláusula, así que acá la operación no se concreta y se explica por qué.
+    // Igual esto casi no se ve: las ofertas por el último arquero ya no se
+    // generan (ver ofertasPorTusJugadores). Queda como red.
+    if (jugador && oferta.obligatoria && this.esUltimoArquero(s.squad, jugador)) {
+      s.lastDecisionNote = `${oferta.club.nombre} quiso pagar la cláusula de ${jugador.name}, pero el club no lo dejó salir: es el único arquero del plantel.`;
+      this.mostrarSiguienteOferta();
+      return;
+    }
     if (jugador && oferta.obligatoria) {
       Economia.registrar(this, `Cláusula de ${jugador.name} pagada por ${oferta.club.nombre}`, oferta.monto);
       s.squad = s.squad.filter((p) => p.id !== jugador.id);
@@ -6979,6 +7037,11 @@ const Engine = {
 
     // Si el plantel quedó en el mínimo mientras mirabas las ofertas, no se
     // puede vender a nadie más.
+    if (jugador && aceptar && this.esUltimoArquero(s.squad, jugador)) {
+      s.lastDecisionNote = this.avisoDeUltimoArquero(jugador.name);
+      this.mostrarSiguienteOferta();
+      return;
+    }
     if (jugador && aceptar && s.squad.length > MIN_SQUAD) {
       Economia.registrar(this, `Venta de ${jugador.name} a ${oferta.club.nombre}`, oferta.monto);
       s.squad = s.squad.filter((p) => p.id !== jugador.id);
@@ -7222,6 +7285,9 @@ const Engine = {
     const player = (s.squad || []).find((p) => p.id === playerId);
     if (!player) return { ok: false, nota: 'Ese jugador no está en el plantel.' };
     if (s.squad.length <= MIN_SQUAD) return { ok: false, nota: `No podés bajar de ${MIN_SQUAD} jugadores.` };
+    if (this.esUltimoArquero(s.squad, player)) {
+      return { ok: false, nota: this.avisoDeUltimoArquero(player.name) };
+    }
     if (s.squad.filter((p) => p.pos === player.pos).length <= 1) {
       return { ok: false, nota: `Es el único ${player.pos} que te queda.` };
     }
@@ -7267,6 +7333,12 @@ const Engine = {
     const s = this.state;
     const player = (s.squad || []).find((p) => p.id === oferta.playerId);
     if (!player) return false;
+    // Ceder al único arquero deja al club sin nadie al arco igual que
+    // venderlo: el préstamo es una salida más.
+    if (this.esUltimoArquero(s.squad, player)) {
+      s.lastDecisionNote = this.avisoDeUltimoArquero(player.name);
+      return false;
+    }
     if (!s.cedidos) s.cedidos = [];
     s.squad = s.squad.filter((p) => p.id !== player.id);
     s.cedidos.push({

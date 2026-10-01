@@ -134,12 +134,17 @@ const Mercado = {
   // Cuántos meses faltan para que se termine la temporada (y con ella los
   // contratos que vencen). Se calcula sobre el mismo almanaque fijo que usa
   // la fecha del calendario, sin objetos Date.
-  mesesHastaFinDeTemporada(dayCount) {
+  // `anio` hace falta para que febrero mida lo que mide: sin él, en un año
+  // bisiesto el recorrido se corre un día y el cambio de mes puede caer un
+  // día antes de lo que corresponde.
+  mesesHastaFinDeTemporada(dayCount, anio) {
     let day = CALENDAR_START_DAY + (dayCount || 0);
     let month = CALENDAR_START_MONTH;
-    while (day > DAYS_IN_MONTH[month]) {
-      day -= DAYS_IN_MONTH[month];
+    let corrido = 0;
+    while (day > diasDelMes(month, anio == null ? undefined : anio + corrido)) {
+      day -= diasDelMes(month, anio == null ? undefined : anio + corrido);
       month = (month + 1) % 12;
+      if (month === 0) corrido++;
     }
     const faltan = (11 - month + 12) % 12; // hasta diciembre
     return Math.max(1, faltan);
@@ -213,7 +218,13 @@ const Mercado = {
 
     // Los que ofreciste a préstamo van por otro camino: por ellos no llegan
     // ofertas de compra.
-    const enVenta = s.squad.filter((p) => this.estadoPropio(p) !== 'prestamo');
+    // Por el último arquero no llega ninguna oferta. Se corta acá y no solo
+    // al resolverla: un club no va a ir a buscar al único arquero de otro
+    // sabiendo que no se lo van a vender, y así el usuario tampoco ve una
+    // oferta que no puede aceptar.
+    const enVenta = s.squad
+      .filter((p) => this.estadoPropio(p) !== 'prestamo')
+      .filter((p) => !engine.esUltimoArquero(s.squad, p));
     const conAtractivo = (lista) => lista.map((p) => ({ p, atractivo: this.atractivoDe(p) }));
 
     // Los que vos ofreciste se miran aunque no sean figuras: es justamente lo
@@ -510,6 +521,8 @@ const Mercado = {
         // Las dos figuras no se venden: un club no se desarma solo.
         suyas.slice(2).forEach((j) => {
           if (this.estaCedido(j) || j.rating <= nivel) return;
+          // Tampoco entre ellos: ningún club vende a su último arquero.
+          if (engine.esUltimoArquero(plantel, j)) return;
           const ganancia = j.rating - nivel;
           if (!mejor || ganancia > mejor.ganancia) mejor = { jugador: j, vendedor, ganancia };
         });
@@ -595,7 +608,9 @@ const Mercado = {
       const flojos = plantel.slice().sort((a, b) => a.rating - b.rating)
         .slice(0, Math.ceil(plantel.length / 2))
         .filter((j) => !this.estaCedido(j) && j.age >= 30);
-      const candidato = flojos.find((j) => (j.contractYears || 3) <= 1) || flojos.find((j) => j.age >= 33);
+      // Un club no suelta a su último arquero: se quedaría sin nadie al arco.
+      const libera = flojos.filter((j) => !engine.esUltimoArquero(plantel, j));
+      const candidato = libera.find((j) => (j.contractYears || 3) <= 1) || libera.find((j) => j.age >= 33);
       if (!candidato) continue;
       tocados.add(club.id);
       this.movimientosDe(s, club.id).fuera.push(candidato.id);
@@ -710,7 +725,7 @@ const Mercado = {
     // temporada a la otra, que es de lo que se trata.
     const rnd = this.generador(this.semilla(clubId));
     const aniosPasados = Math.max(0, anio - 1);
-    const meses = this.mesesHastaFinDeTemporada(s.calendar ? s.calendar.dayCount : 0);
+    const meses = this.mesesHastaFinDeTemporada(s.calendar ? s.calendar.dayCount : 0, anioDeTemporada(anio));
 
     const real = typeof REAL_ROSTERS !== 'undefined' && REAL_ROSTERS[clubId];
     // Los planteles investigados también corren los años: envejecen, crecen
@@ -810,6 +825,23 @@ const Mercado = {
       .filter((p) => !engine.yaSeRetiro(p) && !movimientos.fuera.includes(p.id))
       .concat(movimientos.dentro.map((j) => this.jugadorFichado(engine, j, anio)));
 
+    // ---------- La red del arquero ----------
+    //
+    // Todas las salidas ya se cuidan de no dejar a un club sin arquero, pero
+    // los retiros se acumulan solos con los años y no pasan por ninguna de
+    // ellas: un club con dos arqueros veteranos los pierde a los dos y queda
+    // en cero. Medido antes de esto: 19 veces en 20 temporadas.
+    //
+    // Si pasa, el arquero más joven de los que se habían retirado sigue un
+    // año más, igual que hace tu club (ver procesarRetiros). No se inventa un
+    // jugador: se usa uno que ya existía en el plantel investigado.
+    if (!engine.cuantosArqueros(vivos)) {
+      const arqueroQueVuelve = base
+        .filter((p) => p.pos === 'POR' && !movimientos.fuera.includes(p.id))
+        .sort((a, b) => engine.edadDe(a) - engine.edadDe(b))[0];
+      if (arqueroQueVuelve) vivos.push(arqueroQueVuelve);
+    }
+
     // ---------- El relleno, y por qué NO se hace en los clubes con plantel
     // real ----------
     //
@@ -842,7 +874,8 @@ const Mercado = {
     // repone tres. Sin esto los planteles reales se vaciaban solos: medido,
     // en la temporada 15 el club más chico quedaba con 8 jugadores.
     if (tienePlantelReal && typeof Juveniles !== 'undefined') {
-      const suben = Juveniles.egresados(engine, clubId, Juveniles.pisoDe(clubId) - vivos.length);
+      const suben = Juveniles.egresados(engine, clubId, Juveniles.pisoDe(clubId) - vivos.length,
+        !engine.cuantosArqueros(vivos));
       suben.forEach((p) => { if (!movimientos.fuera.includes(p.id)) vivos.push(p); });
     }
 
@@ -1122,6 +1155,12 @@ const Mercado = {
 
     if (j.acordado) {
       return this.responder(engine, jugadorId, `Ya tenés un acuerdo cerrado por ${j.name}. Se concreta cuando abra el mercado.`, false);
+    }
+    // Ni con la cláusula en la mano: un club no se queda sin nadie al arco.
+    // Vale igual para el usuario que para los rivales entre ellos.
+    if (engine.esUltimoArquero(this.plantel(engine, clubId), j)) {
+      return this.responder(engine, jugadorId,
+        `${club.name} no te lo va a vender: ${j.name} es el único arquero que tienen. Ni por la cláusula.`, false);
     }
     if (m.rechazados.includes(jugadorId)) {
       return this.responder(engine, jugadorId, `${club.name} ya te dijo que no por ${j.name}. Habrá que esperar al próximo mercado para volver a intentarlo.`, false);
