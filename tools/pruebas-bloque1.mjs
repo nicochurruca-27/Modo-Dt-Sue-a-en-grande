@@ -227,14 +227,77 @@ await probar('B1-02/03/04 · Toda partida inválida se rechaza Y deja intacta la
   };
 });
 
-await probar('B1-02 · Una partida recién empezada (sin club todavía) SIGUE siendo válida', () => {
+await probar('B1-02 · Las dos pantallas previas a la carrera siguen siendo válidas', () => {
   // La validación no se puede pasar de estricta: antes de elegir club, una
   // partida legítima es apenas { screen } o { screen, dt }.
+  //
+  // Antes esta prueba también daba por válido { screen: 'calendar', version: 1 },
+  // y eso era el bug que quedaba de B1-04: `calendar` es una pantalla que solo
+  // existe con una carrera andando. Ahora se exige al revés.
+  const aceptadas = GameState.esPartida({ screen: 'dt-create' })
+    && GameState.esPartida({ screen: 'club-select', dt: { name: 'Nico' } });
+  const rechazadas = !GameState.esPartida({ screen: 'calendar', version: 1 });
   return {
-    ok: GameState.esPartida({ screen: 'dt-create' })
-      && GameState.esPartida({ screen: 'club-select', dt: { name: 'Nico' } })
-      && GameState.esPartida({ screen: 'calendar', version: 1 }),
-    detalle: 'las partidas sin carrera empezada se siguen aceptando',
+    ok: aceptadas && rechazadas,
+    detalle: `dt-create y club-select: aceptadas (${aceptadas}) · calendar sin carrera: rechazada (${rechazadas})`,
+  };
+});
+
+await probar('B1-04 · Una pantalla de carrera SIN la carrera se rechaza', () => {
+  // Los cuatro casos exactos del pedido, más las demás pantallas de carrera.
+  const casos = [
+    { screen: 'calendar' },
+    { screen: 'calendar', version: 1 },
+    { screen: 'calendar', squad: [] },
+    { screen: 'calendar', version: 1, squad: [] },
+  ];
+  // Y todas las otras pantallas que solo existen con una carrera armada.
+  ['presentation', 'pre-match', 'partido', 'entretiempo', 'lesion', 'penalty',
+    'match-result', 'contract-renewal', 'transfer', 'fifa-break', 'season-end',
+    'despido', 'oferta-recibida'].forEach((p) => casos.push({ screen: p, version: 1 }));
+  const aceptados = casos.filter((c) => GameState.esPartida(c) !== false);
+  return {
+    ok: !aceptados.length,
+    detalle: aceptados.length ? `ACEPTADOS (mal): ${aceptados.map((c) => c.screen).join(', ')}`
+      : `${casos.length} pantallas de carrera sin la carrera: todas rechazadas`,
+  };
+});
+
+await probar('B1-04 · { screen: "calendar" } no destruye la partida que estabas jugando', () => {
+  // La prueba crítica del pedido: se guarda la huella de los campos
+  // esenciales, se intenta cargar la basura, y se compara uno por uno.
+  window.__carrera('velez');
+  window.__temporada();
+  const s = Engine.state;
+  const antes = {
+    screen: s.screen,
+    clubId: s.clubId,
+    clubs: s.clubs.map((c) => `${c.id}:${c.division}:${c.zone}`).join('|'),
+    squad: s.squad.map((p) => `${p.id}:${p.rating}:${p.age}`).join('|'),
+    season: JSON.stringify(s.season),
+    calendar: JSON.stringify(s.calendar),
+    budget: s.budget,
+  };
+  localStorage.setItem('dt-simulador-save-v3', '{"screen":"calendar"}');
+  let cargo;
+  let revento = null;
+  try { cargo = Engine.load(); } catch (e) { revento = e.message; }
+  const d = Engine.state;
+  const despues = {
+    screen: d.screen,
+    clubId: d.clubId,
+    clubs: Array.isArray(d.clubs) ? d.clubs.map((c) => `${c.id}:${c.division}:${c.zone}`).join('|') : 'NO HAY',
+    squad: Array.isArray(d.squad) ? d.squad.map((p) => `${p.id}:${p.rating}:${p.age}`).join('|') : 'NO HAY',
+    season: JSON.stringify(d.season),
+    calendar: JSON.stringify(d.calendar),
+    budget: d.budget,
+  };
+  const distintos = Object.keys(antes).filter((k) => antes[k] !== despues[k]);
+  localStorage.removeItem('dt-simulador-save-v3');
+  return {
+    ok: cargo === false && !revento && !distintos.length,
+    detalle: distintos.length ? `cambiaron: ${distintos.join(', ')} (clubId quedó en ${despues.clubId})`
+      : `load()=${cargo} · clubId, clubs (${d.clubs.length}), squad (${d.squad.length}), season, calendar, budget y screen: los siete idénticos`,
   };
 });
 

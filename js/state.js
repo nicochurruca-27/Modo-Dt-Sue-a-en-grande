@@ -203,6 +203,14 @@ const GameState = {
   NUMEROS_DE_LA_PARTIDA: ['budget', 'morale', 'confianza', 'escalaSalarial',
     'titulosEnElClub', 'desdeAnio', 'varaSalarial', 'promesa', 'version'],
 
+  // Las ÚNICAS dos pantallas que existen antes de que haya una carrera. No
+  // son una lista inventada: `dt-create` la pone resetGame() (y el arranque
+  // cuando no hay partida guardada) y `club-select` la pone createDT(), que
+  // deja el estado en `{ screen, dt }` y nada más. Cualquier otra pantalla
+  // —empezando por `presentation`, que la asigna newGame()— solo existe con
+  // una carrera ya armada detrás.
+  PANTALLAS_SIN_CARRERA: ['dt-create', 'club-select'],
+
   // ¿Esto que llegó es una partida de este juego?
   //
   // Antes pedía poco a propósito —alcanzaba con que tuviera un `screen` de
@@ -227,10 +235,16 @@ const GameState = {
     if (this.NUMEROS_DE_LA_PARTIDA.some((k) => obj[k] != null
       && (typeof obj[k] !== 'number' || !Number.isFinite(obj[k])))) return false;
 
-    // ¿Es una carrera ya empezada? Si tiene cualquiera de estas piezas, tiene
-    // que tenerlas TODAS y coherentes entre sí: el motor da por hecho que
-    // existen desde la primera línea.
-    const empezada = ['clubId', 'squad', 'clubs', 'season'].some((k) => obj[k] != null);
+    // ¿Es una carrera ya empezada? Se mira por dos lados, y el segundo es el
+    // que faltaba: no alcanza con buscar las piezas de la carrera, porque un
+    // guardado puede no traer ninguna y aun así decir que está en una
+    // pantalla que solo existe con la carrera andando. `{ screen: 'calendar' }`
+    // pasaba por ahí: entraba como si fuera una partida recién abierta y
+    // dejaba el clubId en undefined, borrando la carrera que estabas jugando.
+    const traeLasPiezas = ['clubId', 'squad', 'clubs', 'season'].some((k) => obj[k] != null);
+    const pantallaDeCarrera = typeof obj.screen === 'string'
+      && !this.PANTALLAS_SIN_CARRERA.includes(obj.screen);
+    const empezada = traeLasPiezas || pantallaDeCarrera;
     if (!empezada) return true;
     if (typeof obj.clubId !== 'string' || !obj.clubId) return false;
     if (!Array.isArray(obj.squad)) return false;
