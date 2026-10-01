@@ -172,7 +172,17 @@ await page.evaluate(() => {
         // Sin el motivo, el número no dice nada.
         let motivo = 'SIN EXPLICACIÓN';
         if ((mov.fuera || []).includes(j.id)) motivo = 'después se fue de ese club (está en `fuera`)';
-        else if (retirados.has(j.id)) motivo = 'se retiró';
+        else if (retirados.has(j.id)) motivo = 'se retiró (anotado en state.retirados)';
+        // Un transferido que se retira queda ausente del plantel pero NO se
+        // anota en `state.retirados`: `procesarRetiros` cuenta los retiros de
+        // los rivales leyendo REAL_ROSTERS y salteando a los que están en el
+        // `fuera` de ese club, así que al transferido no lo cuenta nadie. La
+        // ausencia es correcta —es el arreglo de B2-02 haciendo su trabajo—, y
+        // lo que falta es el asiento contable. Se pregunta por la edad, que es
+        // la misma regla que aplica `plantel()`.
+        else if (Engine.yaSeRetiro(Mercado.jugadorFichado(Engine, j, s.season.year))) {
+          motivo = 'se retiró (sin asiento en state.retirados — ver hallazgo)';
+        }
         else if (cedidos.has(j.id)) motivo = 'está cedido';
         else if (libres.has(j.id)) motivo = 'quedó libre';
         else if ((s.squad || []).some((p) => p.id === j.id)) motivo = 'lo fichaste vos';
@@ -387,7 +397,18 @@ await probar('transferencias', 'El mismo jugador real transferido en temporadas 
   window.__carrera('boca');
   const s = Engine.state;
   const clubes = ['newells', 'gimnasialp', 'atleticotucuman', 'aldosivi'];
-  let j = Mercado.plantel(Engine, clubes[0]).find((p) => /-r\d+$/.test(p.id));
+  // Tiene que ser un jugador JOVEN. La primera versión de esta prueba agarraba
+  // el primero de la lista —Gabriel Arias, 38 años— y lo esperaba vivo cuatro
+  // temporadas después. Eso solo pasaba porque el transferido no se retiraba
+  // nunca (B2-02): con el retiro arreglado, Arias cuelga los botines al cerrar
+  // la T2 y es correcto que no esté. Lo que esta prueba mide es el PASE en
+  // temporadas distintas, no el retiro, así que se elige a alguien que llegue
+  // entero al final del recorrido.
+  const candidatos = Mercado.plantel(Engine, clubes[0])
+    .filter((p) => /-r\d+$/.test(p.id)
+      && Engine.edadAlCierreDeTemporada(p, clubes.length) <= Engine.EDAD_DE_RETIRO);
+  let j = candidatos.slice().sort((a, b) => Engine.edadDe(a) - Engine.edadDe(b))[0];
+  if (!j) return { ok: false, detalle: 'no se encontró un jugador joven en newells' };
   const id = j.id;
   const traza = [];
   for (let i = 0; i < clubes.length - 1; i++) {
