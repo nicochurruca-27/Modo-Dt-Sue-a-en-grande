@@ -145,6 +145,12 @@ mundo que se reemplazan por completo cada año.
 
 ### B2-02 — ALTO — Un jugador transferido no se retira nunca
 
+> **CORREGIDO.** Ver `tools/pruebas-b2-02.mjs` (6/6). El control de retiro se
+> aplica ahora a las dos fuentes, después de `jugadorFichado`. José Sosa pasó
+> de `T1:40 … T14:53` a `T1:40 T2:afuera`, y de T2 a T30 no reaparece. Dejó a
+> la vista un hallazgo nuevo, anotado abajo: el retiro de un transferido no se
+> asienta en `state.retirados`.
+
 `js/mercado.js`, en `plantel()`:
 
 ```js
@@ -224,6 +230,32 @@ saque de vuelta cuando ya dejó de hacer falta.
 ---
 
 ## E. HALLAZGOS, COMPORTAMIENTO INTENCIONAL Y FUERA DE ALCANCE
+
+### HALLAZGO — El retiro de un transferido no se asienta en `state.retirados`
+
+Salió a la luz al corregir B2-02. `Engine.procesarRetiros()` cuenta los retiros
+de los rivales recorriendo `REAL_ROSTERS[club]` y salteando a los que están en
+el `fuera` de ese club. Un jugador transferido está justamente en el `fuera` de
+su club de origen, así que cuando se le llega la hora no lo cuenta nadie: deja
+de aparecer en el plantel (correcto) pero no queda anotado en ningún lado.
+
+```
+José Sosa (estudianteslp-r18), transferido a River:
+  T1: activo=true  anotado en retirados=false
+  T2: activo=false anotado en retirados=false   <- se fue y no quedó asiento
+  T3-T5: activo=false anotado en retirados=false
+```
+
+Es la misma contabilidad de los rivales de la que habla B2-04, así que conviene
+hacerlos juntos.
+
+### HALLAZGO — `Juveniles.egresados` no siempre llega al piso del club
+
+Medido con el mercado de los rivales corriendo 20 temporadas: 19 clubes quedan
+por debajo de su propio `Juveniles.pisoDe`, casi todos por uno a tres
+jugadores. **No lo causa el arreglo de B2-02**: con el filtro quitado a
+propósito eran 20, con el filtro puesto son 19. Es un hueco previo. Ningún
+club se queda sin jugadores ni sin arquero.
 
 ### HALLAZGO — `state.mundo` no se poda nunca
 
