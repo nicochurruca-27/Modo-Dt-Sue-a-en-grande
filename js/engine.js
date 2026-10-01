@@ -231,12 +231,25 @@ const Engine = {
   },
 
   load() {
-    const ok = GameState.loadFromLocalStorage();
-    // Una partida guardada antes de que existiera la fecha de nacimiento
-    // trae jugadores sin ella. La edad se calcula igual (ver edadDe) y acá se
-    // pone al día la copia de lectura.
-    if (ok) this.refrescarEdades();
-    return ok;
+    // La red de seguridad. GameState.esPartida ya rechaza lo que no tiene la
+    // forma de una partida, pero cargar es la única puerta por la que entran
+    // datos de afuera, así que acá se guarda con qué se estaba jugando y, si
+    // algo revienta igual, se devuelve eso en vez de dejar al juego con un
+    // estado a medio instalar. Un guardado roto no te puede costar la carrera
+    // que tenías abierta.
+    const anterior = this.state;
+    try {
+      const ok = GameState.loadFromLocalStorage();
+      // Una partida guardada antes de que existiera la fecha de nacimiento
+      // trae jugadores sin ella. La edad se calcula igual (ver edadDe) y acá se
+      // pone al día la copia de lectura.
+      if (ok) this.refrescarEdades();
+      return ok;
+    } catch (e) {
+      console.error('La partida guardada no se pudo abrir:', e);
+      this.state = anterior;
+      return false;
+    }
   },
 
   resetGame() {
@@ -280,32 +293,52 @@ const Engine = {
   // fino, sin tocar una línea de código.
 
   // El día del almanaque en el que está la partida.
+  // Camina `dayCount` días desde el 1° de enero de `anioBase` y devuelve dónde
+  // cae. Es el ÚNICO lugar del motor que recorre el almanaque: el largo de
+  // febrero sale de diasDelMes (ver data.js), así que los años bisiestos
+  // quedan contemplados por construcción y no hay dos reglas distintas dando
+  // vueltas.
+  fechaDelAlmanaque(anioBase, dayCount) {
+    let dia = CALENDAR_START_DAY + (dayCount || 0);
+    let mes = CALENDAR_START_MONTH;
+    let anio = anioBase;
+    while (dia > diasDelMes(mes, anio)) {
+      dia -= diasDelMes(mes, anio);
+      mes = (mes + 1) % 12;
+      if (mes === 0) anio++;
+    }
+    return { dia, mes, anio };
+  },
+
   fechaDelJuego() {
     const s = this.state;
-    const anio = anioDeTemporada(s && s.season ? s.season.year : 1);
-    let dia = CALENDAR_START_DAY + ((s && s.calendar ? s.calendar.dayCount : 0) || 0);
-    let mes = CALENDAR_START_MONTH;
-    let corridoDeAnio = 0;
-    // El largo de febrero depende del año, así que hay que preguntárselo al
-    // año en el que estamos parados mientras se camina, no a una tabla fija.
-    // Con la tabla fija el juego se salteaba el 29 de febrero y a partir de
-    // ahí el almanaque quedaba corrido un día en cada año bisiesto.
-    while (dia > diasDelMes(mes, anio + corridoDeAnio)) {
-      dia -= diasDelMes(mes, anio + corridoDeAnio);
-      mes = (mes + 1) % 12;
-      if (mes === 0) corridoDeAnio++;
-    }
-    return { dia, mes, anio: anio + corridoDeAnio };
+    return this.fechaDelAlmanaque(
+      anioDeTemporada(s && s.season ? s.season.year : 1),
+      (s && s.calendar ? s.calendar.dayCount : 0) || 0,
+    );
   },
 
   // El mismo día del almanaque, pero en el año de otra temporada. Sirve para
   // ponerle fecha de nacimiento a un jugador del que sabemos la edad que
   // tenía en una temporada concreta (por ejemplo, la 1).
+  // El mismo punto del almanaque, pero de otra temporada.
+  //
+  // Antes esto restaba años sobre el año que devuelve fechaDelJuego(), y ese
+  // año YA puede haber avanzado si el almanaque cruzó el 31 de diciembre. En
+  // la temporada 3, día 400 (4/2/2029), contestaba que el mismo punto de la
+  // temporada 1 había sido el 4/2/2027, cuando en realidad fue el 5/2/2027:
+  // se perdía justo el día que 2028 tiene de más por ser bisiesto.
+  //
+  // Ahora no se restan años: se camina el mismo contador de días desde el 1°
+  // de enero del año de ESA temporada, con la misma función que usa el resto
+  // del juego. Los años bisiestos quedan contemplados solos y no hace falta
+  // suponer que una temporada mide 365 días.
   fechaDeJuegoDeLaTemporada(temporada) {
-    const hoy = this.fechaDelJuego();
     const s = this.state;
-    const actual = s && s.season ? s.season.year : 1;
-    return { dia: hoy.dia, mes: hoy.mes, anio: hoy.anio - (actual - (temporada || 1)) };
+    return this.fechaDelAlmanaque(
+      anioDeTemporada(temporada || 1),
+      (s && s.calendar ? s.calendar.dayCount : 0) || 0,
+    );
   },
 
   // 'AAAA-MM-DD' -> { anio, mes (0-11), dia }. Devuelve null si no hay fecha
@@ -4525,6 +4558,14 @@ const Engine = {
     // De paso, esto también arregla los contratos: Mercado calcula los meses
     // que faltan hasta fin de año sobre este mismo contador.
     if (s.calendar) s.calendar.dayCount = 0;
+    // Cambió el año del almanaque, así que la copia de lectura de la edad
+    // quedó vieja. Se pone al día ACÁ, antes que nada, porque lo que viene
+    // abajo ya la lee: Economia.renegociarPresupuestoDeSueldos pasa por la
+    // curva salarial, que cobra por edad. Sin esto, el primer día de cada
+    // temporada el plantel figuraba con la edad del año anterior hasta que
+    // algo la refrescara de casualidad (medido: Braian Cufré en 29 cuando
+    // edadDe decía 30).
+    this.refrescarEdades();
     // La pretemporada deja a todos enteros, por cansados que hayan terminado.
     if (s.squad) s.squad.forEach((p) => { p.energia = ENERGIA_MAXIMA; });
     // Y el club se sienta a renegociar cuánto puede gastar en sueldos: el

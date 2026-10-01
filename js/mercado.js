@@ -821,9 +821,20 @@ const Mercado = {
     // guarda en la partida — el resto del plantel sigue saliendo de la
     // semilla, así que el guardado no engorda por más años que pasen.
     const movimientos = this.movimientosDe(s, clubId);
+    // `fuera` tiene que filtrar las DOS fuentes, no solo la sembrada. Un
+    // jugador que llegó por transferencia entra por `dentro`; si después lo
+    // transfieren de nuevo, su id se anota en el `fuera` de este club, pero
+    // seguía estando en su `dentro` y por eso aparecía en los dos clubes a la
+    // vez. En una cadena A -> B -> C -> D quedaba en B, en C y en D.
+    //
+    // Medido antes del arreglo: 60 jugadores en dos clubes a la vez después
+    // de 12 temporadas, y creciendo.
+    const seFue = (id) => movimientos.fuera.includes(id);
     const vivos = base
-      .filter((p) => !engine.yaSeRetiro(p) && !movimientos.fuera.includes(p.id))
-      .concat(movimientos.dentro.map((j) => this.jugadorFichado(engine, j, anio)));
+      .filter((p) => !engine.yaSeRetiro(p) && !seFue(p.id))
+      .concat(movimientos.dentro
+        .filter((j) => !seFue(j.id))
+        .map((j) => this.jugadorFichado(engine, j, anio)));
 
     // ---------- La red del arquero ----------
     //

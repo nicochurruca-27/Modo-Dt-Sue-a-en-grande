@@ -115,6 +115,9 @@ await page.evaluate(() => {
           anotar('jugadores', 'fecha de nacimiento inválida', `${p.name} (${clubId}): ${p.birthDate}`);
         }
         if (!esNumeroSano(p.rating)) anotar('jugadores', 'rating no numérico', `${p.name} (${clubId}): ${p.rating}`);
+        if (p.birthDate && p.age !== edad) {
+          anotar('edades', 'p.age no coincide con edadDe(p)', `${p.name} (${clubId}): p.age=${p.age} edadDe=${edad}`);
+        }
         if (propio && p.out && (!esNumeroSano(p.out.matches) || p.out.matches < 0)) {
           anotar('lesiones', 'partidos de baja imposibles', `${p.name}: ${JSON.stringify(p.out)}`);
         }

@@ -139,8 +139,27 @@ const GameState = {
       console.error('La partida guardada está rota:', e);
       return false;
     }
+    // El orden importa, y antes no se respetaba del todo: el estado se
+    // instalaba apenas pasaba una validación floja, así que un guardado roto
+    // te borraba la partida que estabas jugando (medido: el clubId quedaba en
+    // undefined). Ahora nada toca el estado vivo hasta que TODO validó.
+    //
+    //   1. leer   2. parsear   3. validar lo que vino
+    //   4. migrar 5. validar lo migrado   6. recién ahí, instalar
+    //
+    // Y si algo falla, se devuelve false y la partida en memoria queda como
+    // estaba. No se usa resetGame(): un save roto no tiene por qué costarte
+    // la carrera que tenías abierta.
     if (!this.esPartida(estado)) return false;
-    this.set(this.migrar(estado));
+    let migrado;
+    try {
+      migrado = this.migrar(estado);
+    } catch (e) {
+      console.error('La partida guardada no se pudo convertir:', e);
+      return false;
+    }
+    if (!this.esPartida(migrado)) return false;
+    this.set(migrado);
     return true;
   },
 
@@ -168,12 +187,57 @@ const GameState = {
     return estado;
   },
 
-  // ¿Esto que llegó es una partida de este juego? Se pide poco a propósito:
-  // lo mínimo para saber que no es otro archivo cualquiera.
+  // Los campos del estado que el motor recorre con forEach/map/filter. Si
+  // alguno llega con otra cosa adentro, el juego revienta en cuanto lo toca
+  // (medido: `squad: 'no soy un array'` pasaba la validación y después
+  // Engine.load() tiraba "(s.squad || []).forEach is not a function").
+  LISTAS_DE_LA_PARTIDA: ['squad', 'clubs', 'startingSlots', 'noticias', 'historialDT',
+    'ofertasRecibidas', 'cedidos', 'notasMercado', 'ultimasCopas', 'retirados',
+    'libres', 'contractQueue', 'lastDevelopmentNotes', 'log'],
+
+  // Los que tienen que ser objetos (no arrays, no strings).
+  OBJETOS_DE_LA_PARTIDA: ['season', 'calendar', 'mercado', 'finanzas', 'mundo',
+    'historialPuntos', 'juveniles', 'copaBracket', 'copasInter', 'dt', 'objective'],
+
+  // Los que tienen que ser números.
+  NUMEROS_DE_LA_PARTIDA: ['budget', 'morale', 'confianza', 'escalaSalarial',
+    'titulosEnElClub', 'desdeAnio', 'varaSalarial', 'promesa', 'version'],
+
+  // ¿Esto que llegó es una partida de este juego?
+  //
+  // Antes pedía poco a propósito —alcanzaba con que tuviera un `screen` de
+  // texto— y por eso entraban cosas que no eran una partida: un objeto sin
+  // clubId ni clubs, o con el plantel en un string. Ahora se mira la
+  // estructura REAL que arma el juego (ver newGame), con una distinción que
+  // importa: antes de elegir club, una partida legítima es apenas
+  // `{ screen }` o `{ screen, dt }`, así que esas siguen siendo válidas.
   esPartida(obj) {
-    if (!obj || typeof obj !== 'object') return false;
-    if (obj.version && obj.version > SAVE_VERSION) return false;
-    return typeof obj.screen === 'string' || !!obj.dt || !!obj.clubId;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+    if (obj.version != null) {
+      if (typeof obj.version !== 'number' || !Number.isFinite(obj.version)) return false;
+      if (obj.version > SAVE_VERSION) return false;
+    }
+    if (typeof obj.screen !== 'string' && !obj.dt && !obj.clubId) return false;
+
+    // Tipos, para todo lo que esté presente. Un campo ausente no molesta: el
+    // juego lo crea cuando hace falta. Uno presente con el tipo equivocado sí.
+    const esObjeto = (v) => v && typeof v === 'object' && !Array.isArray(v);
+    if (this.LISTAS_DE_LA_PARTIDA.some((k) => obj[k] != null && !Array.isArray(obj[k]))) return false;
+    if (this.OBJETOS_DE_LA_PARTIDA.some((k) => obj[k] != null && !esObjeto(obj[k]))) return false;
+    if (this.NUMEROS_DE_LA_PARTIDA.some((k) => obj[k] != null
+      && (typeof obj[k] !== 'number' || !Number.isFinite(obj[k])))) return false;
+
+    // ¿Es una carrera ya empezada? Si tiene cualquiera de estas piezas, tiene
+    // que tenerlas TODAS y coherentes entre sí: el motor da por hecho que
+    // existen desde la primera línea.
+    const empezada = ['clubId', 'squad', 'clubs', 'season'].some((k) => obj[k] != null);
+    if (!empezada) return true;
+    if (typeof obj.clubId !== 'string' || !obj.clubId) return false;
+    if (!Array.isArray(obj.squad)) return false;
+    if (!Array.isArray(obj.clubs) || !obj.clubs.length) return false;
+    // El club que dirigís tiene que ser uno de los que están en la partida.
+    if (!obj.clubs.some((c) => c && c.id === obj.clubId)) return false;
+    return true;
   },
 
   // ---------- Llevarse la partida a otro aparato ----------
