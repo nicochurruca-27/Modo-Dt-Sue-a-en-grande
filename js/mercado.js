@@ -829,12 +829,25 @@ const Mercado = {
     //
     // Medido antes del arreglo: 60 jugadores en dos clubes a la vez después
     // de 12 temporadas, y creciendo.
+    //
+    // Y el retiro tiene que filtrar las DOS fuentes, por lo mismo. Antes el
+    // control estaba solo arriba, sobre `base`: el que llegaba por
+    // transferencia no pasaba por ninguno y envejecía para siempre. Medido:
+    // José Sosa, transferido con 40 años, seguía jugando con 53.
+    //
+    // El filtro va DESPUÉS de `jugadorFichado` y no sobre la entrada cruda de
+    // `dentro`, porque la entrada cruda no guarda `age` sino `edadBase` y
+    // `desdeAnio`: preguntarle la edad a eso daría cero y no se retiraría
+    // nunca ninguno. `jugadorFichado` es el que resuelve la edad, y lo que
+    // devuelve tiene la misma forma que un jugador de `base`, así que la
+    // pregunta es exactamente la misma para los dos lados.
     const seFue = (id) => movimientos.fuera.includes(id);
     const vivos = base
       .filter((p) => !engine.yaSeRetiro(p) && !seFue(p.id))
       .concat(movimientos.dentro
         .filter((j) => !seFue(j.id))
-        .map((j) => this.jugadorFichado(engine, j, anio)));
+        .map((j) => this.jugadorFichado(engine, j, anio))
+        .filter((p) => !engine.yaSeRetiro(p)));
 
     // ---------- La red del arquero ----------
     //
