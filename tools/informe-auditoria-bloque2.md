@@ -84,6 +84,13 @@ T3: allboys-c3-18, ...
 
 ### B2-01 — ALTO — El id del relleno es una posición, no una identidad
 
+> **CORREGIDO.** Ver `tools/pruebas-b2-01.mjs` (9/9). El id pasó a ser un
+> número de orden fijo (`${clubId}-c${orden}`) y todo el jugador sale de ese id
+> con su propio generador sembrado, la misma convención que los `-gN` ya
+> tenían. Las doce preguntas de la sección C se recontestaron solas: el
+> transferido ya no sigue en el origen, la camada sobrevive de una temporada a
+> la otra y no hay dos personas con el mismo id.
+
 `js/mercado.js`, el bucle del relleno:
 
 ```js
@@ -359,10 +366,9 @@ Orden sugerido para cuando digas que arranque la corrección:
 
 1. ~~**B2-02**~~ — hecho.
 2. ~~**B2-04**~~ — hecho.
-3. **B2-01** (el id tiene que ser una identidad: sin `${anio}` y sin
-   `vivos.length`). Es el único que todavía produce un jugador en dos clubes
-   a la vez.
-4. **B2-03** (completar lo que copia `transferir`).
-5. El hallazgo de la poda de `mundo`, que conviene hacer junto con B2-01.
+3. ~~**B2-01**~~ — hecho.
+4. **B2-03** (completar lo que copia `transferir`). Es el último bug confirmado
+   que queda abierto.
+5. El hallazgo de la poda de `mundo`.
 
 **No empecé ninguna corrección y no empecé el Bloque 3.**
