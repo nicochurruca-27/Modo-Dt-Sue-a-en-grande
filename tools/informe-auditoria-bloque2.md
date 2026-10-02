@@ -199,6 +199,13 @@ No es cosmético, los cuatro se usan:
 
 ### B2-04 — MEDIO — Un arquero rival se retira y vuelve para siempre
 
+> **CORREGIDO.** Ver `tools/pruebas-b2-04.mjs` (7/7). `procesarRetiros` ya no
+> adivina quién sigue jugando: le pregunta a `Mercado.plantel()` qué plantel va
+> a tener cada club la temporada siguiente y anota solo al que no esté. La red
+> del arquero, además, prefiere rescatar a uno que no esté anunciado como
+> retirado, y el asiento que igual quede mal se borra al cerrar. Soak de 15
+> temporadas: `arrastrados: 0` en las quince, contra 14 antes del arreglo.
+
 La red del arquero de `Mercado.plantel()` (Bloque 0) devuelve a un arquero
 retirado cuando el club quedaría en cero, y eso está bien. Pero
 `Engine.procesarRetiros()` anota el retiro de los rivales leyendo
@@ -231,7 +238,11 @@ saque de vuelta cuando ya dejó de hacer falta.
 
 ## E. HALLAZGOS, COMPORTAMIENTO INTENCIONAL Y FUERA DE ALCANCE
 
-### HALLAZGO — El retiro de un transferido no se asienta en `state.retirados`
+### ~~HALLAZGO~~ — El retiro de un transferido no se asienta en `state.retirados`
+
+> **CORREGIDO junto con B2-04.** `procesarRetiros` ahora recorre también el
+> `dentro` de cada club, así que el transferido queda anotado en el club donde
+> efectivamente se retira. Caso 4 de `tools/pruebas-b2-04.mjs`.
 
 Salió a la luz al corregir B2-02. `Engine.procesarRetiros()` cuenta los retiros
 de los rivales recorriendo `REAL_ROSTERS[club]` y salteando a los que están en
@@ -346,11 +357,11 @@ plantel investigado.
 
 Orden sugerido para cuando digas que arranque la corrección:
 
-1. **B2-02** (una línea, consecuencia grande y acumulativa).
-2. **B2-01** (el id tiene que ser una identidad: sin `${anio}` y sin
-   `vivos.length`).
-3. **B2-04** (que el retiro del rival consulte la red del arquero, igual que
-   hace tu club).
+1. ~~**B2-02**~~ — hecho.
+2. ~~**B2-04**~~ — hecho.
+3. **B2-01** (el id tiene que ser una identidad: sin `${anio}` y sin
+   `vivos.length`). Es el único que todavía produce un jugador en dos clubes
+   a la vez.
 4. **B2-03** (completar lo que copia `transferir`).
 5. El hallazgo de la poda de `mundo`, que conviene hacer junto con B2-01.
 
