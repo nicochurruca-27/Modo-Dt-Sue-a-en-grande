@@ -555,40 +555,87 @@ const Engine = {
     });
     if (avisos.length) this.repairStartingSlots();
 
-    // 2. Los clubes con plantel real investigado. Sus planteles no se
-    //    guardan (se arman cuando hacen falta, ver Mercado.plantel), así que
-    //    acá no hay nada que borrar: el jugador deja de aparecer solo. Lo
-    //    que sí se hace es contarlo, que es lo que hace que el mundo se
-    //    sienta vivo.
+    // 2. Los clubes rivales. Sus planteles no se guardan (se arman cuando
+    //    hacen falta, ver Mercado.plantel), así que acá no hay nada que
+    //    borrar: el jugador deja de aparecer solo. Lo que sí se hace es
+    //    contarlo, que es lo que hace que el mundo se sienta vivo.
     //
-    //    Se mira el plantel investigado CRUDO y no el que devuelve
-    //    Mercado.plantel, porque ese ya se los sacó: el que se acaba de
-    //    retirar no está más ahí.
-    if (typeof REAL_ROSTERS !== 'undefined') {
-      Object.keys(REAL_ROSTERS).forEach((clubId) => {
-        if (clubId === s.clubId || !this.getClub(clubId)) return;
-        const seFueron = typeof Mercado !== 'undefined'
-          ? new Set(Mercado.movimientosDe(s, clubId).fuera)
-          : new Set();
-        const yaContados = new Set(s.retirados.map((r) => r.id));
-        (REAL_ROSTERS[clubId] || []).forEach((entrada, i) => {
-          const id = `${clubId}-r${i}`;
-          if (seFueron.has(id) || yaContados.has(id)) return;
-          // La misma cuenta que hace Mercado.plantel: se arma el jugador tal
-          // como quedaría y se pregunta qué edad tiene al cerrar el año.
-          const edad = this.edadAlCierreDeTemporada({
-            birthDate: entrada.birthDate,
-            edadAlLlegar: entrada.age,
-            temporadaAlLlegar: 1,
-          }, temporada);
-          // Antes acá decía `edad !== EDAD_DE_RETIRO + 1`: solo avisaba del
-          // que cumplía 40 justo ese año, y los que arrancan el juego con 41
-          // se iban sin que el diario dijera nada. Ahora avisa de cualquiera
-          // que pasó la edad, y el que ya está en `retirados` no se cuenta
-          // dos veces.
-          if (edad <= this.EDAD_DE_RETIRO) return;
-          s.retirados.push({ id, name: entrada.name, pos: entrada.pos, edad, clubId, temporada });
-          if (typeof Noticias !== 'undefined') Noticias.retiro(this, entrada.name, edad, clubId);
+    //    Y contarlo tiene una sola pregunta difícil: ¿este tipo se retira de
+    //    verdad, o sigue jugando? Antes se la contestaba acá a ojo, mirando
+    //    la edad en REAL_ROSTERS, y eso es lo que estaba mal (B2-04): quien
+    //    decide quién juega es Mercado.plantel, que además de la edad aplica
+    //    la red del último arquero. Las dos cuentas no coincidían y salía un
+    //    jugador anunciado como retirado que seguía apareciendo en la cancha:
+    //    Marino Arzamendia se retiró en la T13 y jugó la T14, la T15 y la T16.
+    //
+    //    Así que ya no se adivina: se le PREGUNTA a Mercado.plantel qué
+    //    plantel va a tener cada club la temporada que viene, y el que esté
+    //    ahí no se retiró, por el motivo que sea. Una sola fuente de verdad,
+    //    y si mañana cambia la red del arquero esto la sigue solo.
+    //
+    //    Hay que mirar la temporada que VIENE y no la que cierra: el que
+    //    llega a la edad juega su última temporada entera, así que en la que
+    //    cierra todavía está. Eso es la regla del Bloque 0 y no se toca.
+    if (typeof Mercado !== 'undefined') {
+      const seguiranJugando = {};
+      s.season.year = temporada + 1;
+      try {
+        (s.clubs || []).forEach((c) => {
+          if (c.id === s.clubId) return;
+          seguiranJugando[c.id] = new Set(Mercado.plantel(this, c.id).map((p) => p.id));
+        });
+      } finally {
+        s.season.year = temporada;
+      }
+
+      const yaContados = new Set(s.retirados.map((r) => r.id));
+      const anotar = (clubId, id, name, pos, edad) => {
+        if (yaContados.has(id)) return;
+        // Pasó la edad...
+        if (edad <= this.EDAD_DE_RETIRO) return;
+        // ...pero sigue en el plantel del año que viene: lo retuvo la red del
+        // último arquero. No se lo anota como retirado mientras juegue. El
+        // año que deje de hacer falta va a desaparecer del plantel y recién
+        // ahí se cuenta, que es lo que corresponde.
+        if ((seguiranJugando[clubId] || new Set()).has(id)) return;
+        s.retirados.push({ id, name, pos, edad, clubId, temporada });
+        yaContados.add(id);
+        if (typeof Noticias !== 'undefined') Noticias.retiro(this, name, edad, clubId);
+      };
+
+      // 2a. Los de plantel real investigado, en su club de origen.
+      if (typeof REAL_ROSTERS !== 'undefined') {
+        Object.keys(REAL_ROSTERS).forEach((clubId) => {
+          if (clubId === s.clubId || !this.getClub(clubId)) return;
+          const seFueron = new Set(Mercado.movimientosDe(s, clubId).fuera);
+          (REAL_ROSTERS[clubId] || []).forEach((entrada, i) => {
+            const id = `${clubId}-r${i}`;
+            if (seFueron.has(id)) return;
+            // La misma cuenta que hace Mercado.plantel: se arma el jugador
+            // tal como quedaría y se pregunta qué edad tiene al cerrar.
+            const edad = this.edadAlCierreDeTemporada({
+              birthDate: entrada.birthDate,
+              edadAlLlegar: entrada.age,
+              temporadaAlLlegar: 1,
+            }, temporada);
+            anotar(clubId, id, entrada.name, entrada.pos, edad);
+          });
+        });
+      }
+
+      // 2b. Los que llegaron a un club por transferencia. Antes no los
+      //     contaba nadie: en su club de origen están en `fuera` y se los
+      //     saltea, y en el club nuevo no figuran en REAL_ROSTERS porque no
+      //     son de ahí. Se retiraban en silencio, sin quedar anotados.
+      (s.clubs || []).forEach((c) => {
+        if (c.id === s.clubId) return;
+        const mov = Mercado.movimientosDe(s, c.id);
+        const seFueron = new Set(mov.fuera);
+        (mov.dentro || []).forEach((j) => {
+          if (seFueron.has(j.id)) return;
+          // La edad se la pide a quien sabe calcularla para un fichado.
+          const armado = Mercado.jugadorFichado(this, j, temporada);
+          anotar(c.id, j.id, j.name, j.pos, this.edadAlCierreDeTemporada(armado, temporada));
         });
       });
     }
