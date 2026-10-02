@@ -674,6 +674,17 @@ const Mercado = {
       name: j.name,
       pos: j.pos,
       posDetail: j.posDetail,
+      // Las otras posiciones que sabe jugar son del JUGADOR, no del club: se
+      // usan para ver si puede tapar un casillero (ver Engine.encajeEnCasillero)
+      // y viajan con él, igual que `posDetail`. Antes se perdían en el pase
+      // (B2-03) y un transferido dejaba de poder cubrir fuera de puesto.
+      // Se copia el array y no se pasa la referencia, para que tocar al
+      // jugador reconstruido no llegue nunca al estado guardado.
+      altPosDetail: Array.isArray(j.altPosDetail) ? j.altPosDetail.slice() : undefined,
+      // El sueldo también es del jugador: el plantel base lo conserva sin
+      // condiciones ("se deja como referencia del contrato", más abajo) y
+      // Economia lo lee para saber cuánto gana y cuánto pediría al renovar.
+      salary: j.salary,
       nation: j.nation,
       role: j.role,
       projection: j.projection,
@@ -695,6 +706,12 @@ const Mercado = {
       name: jugador.name,
       pos: jugador.pos,
       posDetail: jugador.posDetail,
+      // Copia, no la referencia: el array del plantel real sale de
+      // REAL_ROSTERS y se comparte entre todos los clubes que lo arman. Si se
+      // guardara esa misma referencia en la partida, tocarla contaminaría los
+      // datos de origen.
+      altPosDetail: Array.isArray(jugador.altPosDetail) ? jugador.altPosDetail.slice() : undefined,
+      salary: jugador.salary,
       nation: jugador.nation,
       role: jugador.role,
       projection: jugador.projection,
