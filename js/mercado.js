@@ -859,10 +859,19 @@ const Mercado = {
     // Si pasa, el arquero más joven de los que se habían retirado sigue un
     // año más, igual que hace tu club (ver procesarRetiros). No se inventa un
     // jugador: se usa uno que ya existía en el plantel investigado.
+    //
+    // Y se prefiere a uno que NO esté anunciado como retirado. Si no se mira
+    // eso, la red termina rescatando a alguien que el diario ya despidió hace
+    // temporadas y queda jugando y retirado a la vez (B2-04). Es solo una
+    // preferencia: si no hubiera ningún otro, vuelve igual, porque un club
+    // con cero arqueros es un estado imposible y eso pesa más. En ese caso el
+    // asiento se limpia al cerrar la temporada (ver Engine.procesarRetiros).
     if (!engine.cuantosArqueros(vivos)) {
-      const arqueroQueVuelve = base
+      const candidatos = base
         .filter((p) => p.pos === 'POR' && !movimientos.fuera.includes(p.id))
-        .sort((a, b) => engine.edadDe(a) - engine.edadDe(b))[0];
+        .sort((a, b) => engine.edadDe(a) - engine.edadDe(b));
+      const anunciados = new Set((s.retirados || []).map((r) => r.id));
+      const arqueroQueVuelve = candidatos.find((p) => !anunciados.has(p.id)) || candidatos[0];
       if (arqueroQueVuelve) vivos.push(arqueroQueVuelve);
     }
 

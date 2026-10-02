@@ -588,6 +588,14 @@ const Engine = {
         s.season.year = temporada;
       }
 
+      // Y antes de anotar a nadie se limpia lo que haya quedado mal. Un
+      // jugador puede haberse retirado bien hace temporadas y volver después
+      // porque el mercado dejó a su club sin arqueros y la red lo rescató.
+      // Pase lo que pase, nadie puede estar anunciado como retirado y jugando
+      // al mismo tiempo: si está en el plantel del año que viene, el asiento
+      // sobra y se borra.
+      s.retirados = s.retirados.filter((r) => !(seguiranJugando[r.clubId] || new Set()).has(r.id));
+
       const yaContados = new Set(s.retirados.map((r) => r.id));
       const anotar = (clubId, id, name, pos, edad) => {
         if (yaContados.has(id)) return;
