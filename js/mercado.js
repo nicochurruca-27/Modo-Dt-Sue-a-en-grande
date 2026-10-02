@@ -912,28 +912,110 @@ const Mercado = {
       suben.forEach((p) => { if (!movimientos.fuera.includes(p.id)) vivos.push(p); });
     }
 
-    const nivel = 44 + club.reputation * 6;
-    while (!tienePlantelReal && vivos.length < PLANTEL_MINIMO) {
-      const pos = SQUAD_POSITIONS[vivos.length % SQUAD_POSITIONS.length];
-      const edad = 17 + Math.floor(rnd() * 4);
+    // ---------- El relleno de los clubes generados ----------
+    //
+    // Un id tiene que ser una IDENTIDAD, no un lugar en la fila. Antes acá
+    // decía `${clubId}-c${anio}-${vivos.length}` y eso rompía las dos cosas
+    // (B2-01): el número era la posición en el array, así que si se iba
+    // cualquier jugador de más arriba todos los ids se corrían uno y pasaban
+    // a nombrar a otra persona; y el año adelante hacía que la camada entera
+    // se tirara y se volviera a acuñar cada temporada, así que a un pibe de
+    // la Nacional no se lo podía seguir de un año al otro. Medido: sacando un
+    // solo jugador sembrado de All Boys, los cuatro ids del relleno cambiaban
+    // de dueño.
+    //
+    // Ahora el relleno sigue la misma convención que los sembrados de acá
+    // arriba, que ya la tenían bien: el id es un número de orden fijo y TODO
+    // el jugador sale de ese id, con su propio generador. Al no tocar el
+    // sorteo compartido, cuántos jugadores haga falta inventar ya no cambia
+    // quiénes son: `allboys-c3` es siempre la misma persona, esté el club
+    // como esté y pase el tiempo que pase.
+    //
+    // Y para no reutilizar nunca el id de alguien, el número de orden saltea
+    // a los que ya se fueron del club y a los que colgaron los botines. Si se
+    // va `-c2`, el que entra en su lugar es `-c4`, no `-c2` otra vez.
+    const RELLENO_DE_ENTRADA = Math.max(0, PLANTEL_MINIMO - SQUAD_POSITIONS.length);
+    const rellenoDe = (orden) => {
+      const id = `${clubId}-c${orden}`;
+      // Generador propio del jugador, sembrado con su id. Es el mismo truco
+      // que usa la fecha de nacimiento de los sembrados, y por el mismo
+      // motivo: no correr la secuencia compartida.
+      const r = this.generador(this.semilla(id));
+      const pos = SQUAD_POSITIONS[orden % SQUAD_POSITIONS.length];
+      // Los primeros son los que el club necesita desde el día uno, así que
+      // son pibes en la temporada 1. De ahí en más entran de a dos por
+      // temporada, como una camada: así el que haga falta en la temporada 12
+      // tiene 18 años en la 12 y no 40, y además envejece y se retira solo,
+      // igual que cualquier otro.
+      const temporadaDeAlta = orden < RELLENO_DE_ENTRADA
+        ? 1
+        : 2 + Math.floor((orden - RELLENO_DE_ENTRADA) / 2);
+      const edad = 17 + Math.floor(r() * 4);
       // El sorteo va centrado en el nivel del club. Si los juveniles entraran
       // por debajo, cada reposición bajaría un poco el promedio y en 30
       // temporadas todos los clubes del juego habrían perdido 4 o 5 puntos
       // mientras el tuyo sube: la diferencia se iría a cualquier lado.
-      const rating = Math.max(35, Math.round(nivel - 5 + rnd() * 10));
-      const nation = this.nacionSembrada(rnd);
-      const idCantera = `${clubId}-c${anio}-${vivos.length}`;
-      vivos.push({
-        id: idCantera,
-        name: this.nombreSembrado(rnd, nation),
-        pos, nation, rating,
-        // Inventado: fecha de nacimiento inventada, del año en que apareció.
-        birthDate: engine.fechaDeNacimientoSembrada(idCantera, edad, engine.fechaDeJuegoDeLaTemporada(anio)),
-        age: edad,
-        projection: engine.computePotential(rating, edad, club, rnd),
-        contractYears: 2 + Math.floor(rnd() * 3),
-        role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(rnd() * 3)] : undefined,
-      });
+      const nivel = 44 + club.reputation * 6;
+      const ratingDeAlta = Math.max(35, Math.round(nivel - 5 + r() * 10));
+      const nation = this.nacionSembrada(r);
+      const nacimiento = engine.fechaDeNacimientoSembrada(
+        id, edad, engine.fechaDeJuegoDeLaTemporada(temporadaDeAlta));
+      const techo = engine.computePotential(ratingDeAlta, edad, club, r);
+      return {
+        id,
+        name: this.nombreSembrado(r, nation),
+        pos, nation,
+        birthDate: nacimiento,
+        age: engine.edadDe({ birthDate: nacimiento }),
+        // Crece con los años hacia su techo, igual que los sembrados.
+        rating: this.ratingConLosAnios(ratingDeAlta, edad, techo,
+          Math.max(0, anio - temporadaDeAlta)),
+        projection: techo,
+        contractYears: 2 + Math.floor(r() * 3),
+        role: pos === 'MED' ? ['contención', 'mixto', 'ofensivo'][Math.floor(r() * 3)] : undefined,
+      };
+    };
+
+    // El tope es una red: con los saltos el orden avanza, y sin un límite un
+    // club al que se le fue y se le retiró todo el mundo giraría para siempre.
+    const TOPE_DE_ORDEN = 120;
+    const sirve = (candidato) => {
+      // De una camada que todavía no llegó: hoy sería un nene. No se lo
+      // adelanta, se pasa al siguiente. Se mira la edad y no la temporada de
+      // alta a propósito, para que el calendario de camadas nunca pueda
+      // dejar a un club por debajo del piso: mientras haya alguien en edad,
+      // entra.
+      if (candidato.age < 16) return false;
+      // Se fue del club: su id es suyo y no se le da a nadie más.
+      if (seFue(candidato.id)) return false;
+      // Colgó los botines: tampoco vuelve ni se recicla su id.
+      if (engine.yaSeRetiro(candidato)) return false;
+      return !vivos.some((p) => p.id === candidato.id);
+    };
+
+    if (!tienePlantelReal) {
+      // Primero el arco, si no quedó nadie. Antes esto salía solo de
+      // casualidad: la posición se sacaba de `vivos.length % 18`, así que
+      // cuando el club estaba corto el índice daba la vuelta y caía en POR
+      // bastante seguido. Con el orden fijo esa casualidad ya no está, y hay
+      // que pedir el arquero, igual que hace Juveniles.egresados con su
+      // bandera `sinArquero` para los clubes de plantel real.
+      if (!engine.cuantosArqueros(vivos)) {
+        for (let o = 0; o < TOPE_DE_ORDEN; o++) {
+          const candidato = rellenoDe(o);
+          if (candidato.pos !== 'POR' || !sirve(candidato)) continue;
+          vivos.push(candidato);
+          break;
+        }
+      }
+      // Y después el resto, en orden. El cursor no vuelve atrás: lo que se
+      // saltea una vez queda salteado para esta misma reconstrucción.
+      let orden = 0;
+      while (vivos.length < PLANTEL_MINIMO && orden < TOPE_DE_ORDEN) {
+        const candidato = rellenoDe(orden);
+        orden++;
+        if (sirve(candidato)) vivos.push(candidato);
+      }
     }
 
     // La posición detallada (lateral derecho, defensor central, extremo

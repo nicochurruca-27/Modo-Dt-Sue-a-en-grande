@@ -730,7 +730,7 @@ await probar('HALLAZGO', 'Los ids del relleno de la Nacional no son estables', (
   window.__carrera('boca');
   const s = Engine.state;
   const relleno = s.clubs.find((c) => !REAL_ROSTERS[c.id]).id;
-  const j = Mercado.plantel(Engine, relleno).find((x) => /-c\d+-\d+$/.test(x.id));
+  const j = Mercado.plantel(Engine, relleno).find((x) => /-c\d+$/.test(x.id));
   if (!j) return { ok: true, detalle: 'ese club no tiene jugadores de relleno ahora mismo' };
   Mercado.transferir(s, j, relleno, 'lanus', s.season.year);
   Engine._fuerzas = {};

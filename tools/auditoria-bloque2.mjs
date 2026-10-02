@@ -106,7 +106,7 @@ await page.evaluate(() => {
   window.__clase = (id) => {
     if (/-r\d+$/.test(id)) return 'real';
     if (/-g\d+$/.test(id)) return 'sembrado';
-    if (/-c\d+-\d+$/.test(id)) return 'relleno';
+    if (/-c\d+$/.test(id)) return 'relleno';
     if (/^p\d+$/.test(id)) return 'tuyo-inicial';
     return 'otro';
   };
@@ -245,8 +245,8 @@ const relleno = await page.evaluate(() => {
   r['1-3. composición del plantel'] = {
     total: a.length,
     sembrados: a.filter((x) => /-g\d+$/.test(x)).length,
-    relleno: a.filter((x) => /-c\d+-\d+$/.test(x)).length,
-    ejemploDeRelleno: a.find((x) => /-c\d+-\d+$/.test(x)),
+    relleno: a.filter((x) => /-c\d+$/.test(x)).length,
+    ejemploDeRelleno: a.find((x) => /-c\d+$/.test(x)),
   };
 
   // (7) ¿qué pasa al cambiar de temporada?
@@ -254,7 +254,7 @@ const relleno = await page.evaluate(() => {
   for (let t = 1; t <= 4; t++) {
     s.season.year = t; Engine._fuerzas = {};
     const ids = Mercado.plantel(Engine, club).map((p) => p.id);
-    porTemporada[`T${t}`] = ids.filter((x) => /-c\d+-\d+$/.test(x));
+    porTemporada[`T${t}`] = ids.filter((x) => /-c\d+$/.test(x));
   }
   r['7. el relleno temporada por temporada'] = porTemporada;
   const t1 = new Set(porTemporada.T1);
@@ -263,7 +263,7 @@ const relleno = await page.evaluate(() => {
   // (4) (5) (6) interacción con movimientos.fuera
   s.season.year = 1; Engine._fuerzas = {};
   const antes = Mercado.plantel(Engine, club);
-  const j = antes.find((p) => /-c\d+-\d+$/.test(p.id));
+  const j = antes.find((p) => /-c\d+$/.test(p.id));
   Mercado.transferir(s, j, club, 'lanus', 1);
   Engine._fuerzas = {};
   r['4-5. transferido: ¿sigue en el origen?'] = Mercado.plantel(Engine, club).some((p) => p.id === j.id);
@@ -318,7 +318,7 @@ const relleno = await page.evaluate(() => {
   const s4 = Engine.state;
   const club4 = s4.clubs.find((c) => c.division === 'D2' && !REAL_ROSTERS[c.id]).id;
   const pl4 = Mercado.plantel(Engine, club4);
-  const j4 = pl4.find((p) => /-c\d+-\d+$/.test(p.id));
+  const j4 = pl4.find((p) => /-c\d+$/.test(p.id));
   Mercado.transferir(s4, j4, club4, 'river', 1);
   Engine._fuerzas = {};
   r['12. reaparece en el club original'] = window.__dondeEsta(j4.id);
