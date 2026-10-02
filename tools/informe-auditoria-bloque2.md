@@ -185,6 +185,15 @@ pero el total se estanca en ~1540.
 
 ### B2-03 — MEDIO — Al transferirse, el jugador pierde datos
 
+> **CORREGIDO.** Ver `tools/pruebas-b2-03.mjs` (9/9). De los cuatro campos,
+> solo dos son del jugador y son los que ahora viajan: `altPosDetail` (las
+> otras posiciones que sabe jugar) y `salary`. Los otros dos no viajan **por
+> diseño**, y las pruebas 7 y 8 lo demuestran ejecutando el código: la
+> cláusula es del contrato —el juego la descarta solo al pasar un año aunque
+> el jugador no se mueva de club, medido 15.800.000 → `undefined`— y
+> `transferState` es la postura del club que lo vendió, que no dice nada del
+> que lo compró.
+
 `Mercado.transferir()` copia una lista fija de campos y `jugadorFichado()`
 tampoco los reconstruye. Medido:
 
@@ -367,8 +376,8 @@ Orden sugerido para cuando digas que arranque la corrección:
 1. ~~**B2-02**~~ — hecho.
 2. ~~**B2-04**~~ — hecho.
 3. ~~**B2-01**~~ — hecho.
-4. **B2-03** (completar lo que copia `transferir`). Es el último bug confirmado
-   que queda abierto.
-5. El hallazgo de la poda de `mundo`.
+4. ~~**B2-03**~~ — hecho. **No queda ningún bug confirmado del Bloque 2 abierto.**
+5. El hallazgo de la poda de `mundo`, que es lo único que sigue en pie junto
+   con los dos hallazgos de contabilidad de retiros.
 
 **No empecé ninguna corrección y no empecé el Bloque 3.**

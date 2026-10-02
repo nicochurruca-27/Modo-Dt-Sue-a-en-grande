@@ -653,14 +653,31 @@ await probar('contratos', 'Al transferirse, ¿el jugador conserva todos sus dato
   // Un jugador de plantel investigado, que es el que más datos trae.
   const j = Mercado.plantel(Engine, 'river').find((p) => p.altPosDetail && p.altPosDetail.length);
   if (!j) return { ok: true, detalle: 'no se encontró uno con posiciones alternativas' };
+  // Dos de estos campos NO tienen que viajar, y eso es el diseño, no un
+  // olvido (ver B2-03 y las pruebas 7 y 8 de tools/pruebas-b2-03.mjs, que lo
+  // demuestran ejecutando el código):
+  //   · `clause` es del CONTRATO. El juego la descarta solo apenas pasa un
+  //     año aunque el jugador no se mueva de club; un pase rompe ese contrato
+  //     más fuerte todavía.
+  //   · `transferState` es la POSTURA DEL CLUB sobre el jugador, no un dato
+  //     suyo. La del que lo vendió no dice nada del que lo compró, y el
+  //     fichado firma contrato nuevo por 3 años, así que heredar un
+  //     'Fin de contrato cercano' sería falso. Mercado.indice ya tiene
+  //     prevista la ausencia y le pone al club nuevo su propia postura.
+  const DEL_CLUB_O_DEL_CONTRATO = ['clause', 'transferState'];
   const antes = { altPosDetail: j.altPosDetail, clause: j.clause, salary: j.salary, transferState: j.transferState, number: j.number };
   Mercado.transferir(s, j, 'river', 'lanus', 1);
   Engine._fuerzas = {};
   const d = Mercado.plantel(Engine, 'lanus').find((p) => p.id === j.id);
-  const perdidos = Object.keys(antes).filter((k) => antes[k] != null && d && d[k] == null);
+  const perdidos = Object.keys(antes)
+    .filter((k) => !DEL_CLUB_O_DEL_CONTRATO.includes(k))
+    .filter((k) => antes[k] != null && d && d[k] == null);
+  const seVanAProposito = DEL_CLUB_O_DEL_CONTRATO.filter((k) => antes[k] != null && d && d[k] == null);
   return {
     ok: !perdidos.length,
-    detalle: perdidos.length ? `${j.name} pierde al cambiar de club: ${perdidos.join(', ')}` : 'conserva todo',
+    detalle: perdidos.length ? `${j.name} pierde al cambiar de club: ${perdidos.join(', ')}`
+      : `${j.name} conserva lo suyo · se van a propósito (son del club o del contrato):`
+        + ` ${seVanAProposito.join(', ') || 'ninguno'}`,
   };
 });
 
