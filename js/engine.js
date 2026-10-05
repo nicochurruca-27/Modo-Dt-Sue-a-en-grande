@@ -7121,7 +7121,7 @@ const Engine = {
       Economia.registrar(this, `Cláusula de ${jugador.name} pagada por ${oferta.club.nombre}`, oferta.monto);
       s.squad = s.squad.filter((p) => p.id !== jugador.id);
       if (!oferta.club.extranjero) {
-        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year);
+        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year, this);
         this._fuerzas = {};
       }
       this.repairStartingSlots();
@@ -7144,7 +7144,7 @@ const Engine = {
       // Si lo compró un club argentino, pasa a jugar ahí de verdad y te lo vas
       // a cruzar. Si se fue afuera, se fue: el juego no modela esas ligas.
       if (!oferta.club.extranjero) {
-        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year);
+        Mercado.transferir(s, jugador, s.clubId, oferta.club.id, s.season.year, this);
         this._fuerzas = {};
       }
       this.repairStartingSlots();
@@ -7189,7 +7189,9 @@ const Engine = {
     this.save();
   },
 
-  resolveContractDecision(renew) {
+  // `anios` es la duración que elegiste (1 a 5). Si no viene, se usa la de
+  // antes para no romper a quien llame sin el parámetro.
+  resolveContractDecision(renew, anios) {
     const s = this.state;
     const playerId = s.contractQueue.shift();
     const player = s.squad.find((p) => p.id === playerId);
@@ -7212,9 +7214,25 @@ const Engine = {
       // Boca que en un club de la Nacional. Antes era rating * 8000 para
       // todos, y como el club no generaba plata en todo el año, el saldo se
       // iba a menos y no volvía nunca.
-      const cost = Economia.costoRenovacion(this, player);
+      // La duración la elegís vos, de 1 a 5 años, y el precio acompaña:
+      // atarlo más tiempo cuesta más. Antes la renovación salía siempre lo
+      // mismo y la duración era un sorteo de 2 o 3 años, así que no había
+      // ninguna decisión que tomar.
+      const duracion = Math.max(Mercado.CONTRATO_MINIMO,
+        Math.min(Mercado.CONTRATO_MAXIMO, Math.round(anios || 3)));
+      const cost = Math.round(Economia.costoRenovacion(this, player) * duracion);
       Economia.registrar(this, `Renovación de ${player.name}`, -cost);
-      player.contractYears = 2 + Math.floor(Math.random() * 2);
+      player.contractYears = duracion;
+      // La cláusula es del contrato. Al firmar uno nuevo se vuelve a mirar:
+      // puede aparecer, cambiar o no estar. No se arrastra la vieja porque
+      // sí.
+      //
+      // PENDIENTE (fuera del alcance de B2-03): acá es donde entraría la
+      // negociación de verdad, con el jugador pidiendo sueldo y cláusula y
+      // vos aceptando o no. Hoy el contrato nuevo lo arma el club.
+      const contrato = Mercado.contratoNuevo(this, player, s.season ? s.season.year : 1, player);
+      player.salary = contrato.salary;
+      player.clause = contrato.clause;
     } else if (player) {
       s.squad = s.squad.filter((p) => p.id !== playerId);
       this.repairStartingSlots();
@@ -7470,7 +7488,7 @@ const Engine = {
       j.age = this.edadDe(j);
       if (c.modalidad === 'compra-obligatoria') {
         Economia.registrar(this, `Venta de ${j.name} a ${c.clubNombre}`, c.compra);
-        Mercado.transferir(s, j, s.clubId, c.clubId, s.season ? s.season.year : 1);
+        Mercado.transferir(s, j, s.clubId, c.clubId, s.season ? s.season.year : 1, this);
         this._fuerzas = {};
         notas.push(`${c.clubNombre} ejecutó la compra obligatoria de ${j.name}: entraron ${Economia.monto(c.compra)}.`);
       } else {
@@ -7824,6 +7842,15 @@ const Engine = {
     // el día del cumpleaños (ver edadDe). Lo que sí corre con la temporada es
     // el contrato.
     s.squad.forEach((p) => { p.contractYears = Math.max(0, p.contractYears - 1); });
+    // En los clubes rivales pasa lo mismo, pero ahí la decisión la toma el
+    // club: a los que se les termina el contrato, o les firman uno nuevo o
+    // quedan libres (ver Mercado.cerrarContratos). Va ANTES de los retiros
+    // para que, cuando procesarRetiros mire el plantel de la temporada que
+    // viene, ya estén aplicadas las salidas.
+    if (typeof Mercado !== 'undefined') {
+      const contratos = Mercado.cerrarContratos(this);
+      s.lastSeasonSummary.contratos = contratos.liberados;
+    }
     // Y los que pasaron la edad cuelgan los botines. No se reemplaza a
     // ninguno: el plantel queda con uno menos.
     const retiros = this.procesarRetiros();

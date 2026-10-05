@@ -606,19 +606,30 @@ await probar('contratos', 'Nadie queda libre y en un club a la vez', () => {
 
 await probar('contratos', 'Nadie tiene contrato en cero o negativo dentro de un plantel', () => {
   window.__carrera('boca');
+  // Desde B2-03 el contrato de un rival BAJA HASTA CERO de verdad: ese es el
+  // vencimiento, y es lo que permite que un jugador quede libre. Lo que no
+  // puede pasar es que se quede clavado ahí, y para verlo hay que correr el
+  // cierre de temporada, que es cuando el club decide si lo renueva o lo
+  // suelta. Sin ese cierre se observa un estado intermedio que en el juego no
+  // se ve nunca. Medido con el cierre corriendo: 0 en cero, doce temporadas
+  // seguidas.
   const malos = [];
   for (let t = 1; t <= 8; t++) {
     Engine.state.season.year = t; Engine._fuerzas = {};
     Engine.state.clubs.forEach((c) => {
       if (c.id === Engine.state.clubId) return;
       Mercado.plantel(Engine, c.id).forEach((p) => {
-        if (p.contractYears != null && (!Number.isFinite(p.contractYears) || p.contractYears < 1)) {
-          malos.push(`T${t} ${p.id}: ${p.contractYears}`);
+        if (p.contractYears != null && (!Number.isFinite(p.contractYears) || p.contractYears < 0)) {
+          malos.push(`T${t} ${p.id}: ${p.contractYears} (negativo)`);
         }
+        if (p.contractYears === 0) malos.push(`T${t} ${p.id}: quedó en cero después del cierre`);
       });
     });
+    Mercado.cerrarContratos(Engine);
+    Engine._fuerzas = {};
   }
-  return { ok: !malos.length, detalle: malos.length ? malos.slice(0, 4).join(' · ') : '8 temporadas: todos los contratos de los rivales son >= 1' };
+  return { ok: !malos.length, detalle: malos.length ? malos.slice(0, 4).join(' · ')
+    : '8 temporadas con el cierre corriendo: ningún contrato queda en cero ni en negativo' };
 });
 
 await probar('contratos', 'Un jugador transferido, ¿se retira alguna vez?', () => {

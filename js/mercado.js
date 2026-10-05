@@ -529,7 +529,7 @@ const Mercado = {
       });
       if (!mejor) continue;
 
-      this.transferir(s, mejor.jugador, mejor.vendedor.id, comprador.id, anio);
+      this.transferir(s, mejor.jugador, mejor.vendedor.id, comprador.id, anio, engine);
       tocados.add(comprador.id);
       tocados.add(mejor.vendedor.id);
       hechas.push({ jugador: mejor.jugador, de: mejor.vendedor, a: comprador });
@@ -655,6 +655,198 @@ const Mercado = {
     return s.mundo[clubId];
   },
 
+  // ---------- EL CONTRATO ----------
+  //
+  // Un contrato es la relación entre UN jugador y UN club, y tiene tres
+  // cosas: cuánto dura, cuánto paga y si tiene cláusula. No es del jugador:
+  // el jugador se lleva su nombre, su puesto y sus piernas, pero el contrato
+  // se termina y el club nuevo firma otro.
+  //
+  // Antes esto no existía como concepto y por eso se perdía de a pedazos
+  // (B2-03): `transferir` copiaba campo por campo y se olvidaba de algunos,
+  // y la cláusula se borraba sola al pasar un año. Ahora hay UN solo lugar
+  // que define un contrato nuevo, y todos los caminos que firman uno pasan
+  // por acá: la transferencia entre rivales, el fichaje tuyo y la renovación
+  // de un club rival.
+  //
+  // El sorteo va sembrado con el id y la temporada, así que el mismo
+  // jugador firmando en el mismo año da siempre el mismo contrato: se puede
+  // guardar y cargar la partida sin que cambie nada.
+  CONTRATO_MINIMO: 1,
+  CONTRATO_MAXIMO: 5,
+  contratoNuevo(engine, jugador, anio, referencia) {
+    const r = this.generador(this.semilla(`${jugador.id}|contrato|${anio}`));
+    const edad = engine.edadDe(jugador) || jugador.age || 25;
+    const rating = jugador.rating || 60;
+
+    // Duración: los pibes firman largo, los veteranos corto. Es lo que pasa
+    // de verdad y además evita que un jugador de 36 firme por cinco años.
+    const largo = edad <= 23 ? 4 : edad <= 30 ? 3 : edad <= 34 ? 2 : 1;
+    const anios = Math.max(this.CONTRATO_MINIMO,
+      Math.min(this.CONTRATO_MAXIMO, largo + (r() < 0.35 ? 1 : 0)));
+
+    // Sueldo: se NEGOCIA, no se copia. La curva dice cuánto debería cobrar
+    // alguien de su nivel y su edad; el sueldo anterior entra solo como
+    // referencia, para que el que ya estaba bien pago no acepte una rebaja
+    // de golpe. Un pibe que creció pide mejora; un veterano que bajó acepta
+    // menos que antes, pero no menos de lo que dice la curva.
+    //
+    // PENDIENTE: esto todavía no es una negociación de verdad (el jugador no
+    // regatea ni se puede ir del arreglo). Cuando se agregue, el punto de
+    // entrada es esta función y nada más.
+    const curva = typeof Economia !== 'undefined'
+      ? Economia.curvaSalarial(rating, edad)
+      : Math.round(150000 * Math.pow(2, (rating - 60) / 5.5));
+    const anterior = referencia && referencia.salary ? referencia.salary : 0;
+    // Entre la curva y lo que ganaba, se queda con lo más alto y le suma la
+    // prima de la firma. Si venía cobrando de más, el techo lo frena.
+    const base = Math.max(curva, Math.min(anterior, curva * 1.6));
+    const salary = Math.round(base * (1.02 + r() * 0.16));
+
+    // Cláusula: es del contrato NUEVO. La vieja no se hereda nunca. No todos
+    // los contratos tienen: la pone el club cuando el jugador vale la pena.
+    //
+    // PENDIENTE: la cifra sale de una regla fija. Cuando haya negociación de
+    // verdad, acá es donde el club y el jugador tendrían que discutirla.
+    const valor = engine.valueOf ? engine.valueOf(jugador) : 0;
+    const mereceClausula = rating >= 68 && r() < 0.55;
+    const clause = mereceClausula && valor ? Math.round(valor * (1.7 + r() * 0.9)) : undefined;
+
+    return { contractYears: anios, salary, clause };
+  },
+
+  // Dónde se guardan los contratos que se firmaron DURANTE la partida. Los
+  // que nunca se renegociaron no están acá: esos siguen saliendo de
+  // REAL_ROSTERS, como siempre. Solo se guarda la diferencia, igual que con
+  // `mundo`, para que el save no engorde.
+  contratos(s) {
+    if (!s.contratos) s.contratos = {};
+    return s.contratos;
+  },
+
+  contratoDe(s, jugadorId) {
+    return this.contratos(s)[jugadorId] || null;
+  },
+
+  firmar(s, jugadorId, contrato, anio) {
+    this.contratos(s)[jugadorId] = {
+      desde: anio,
+      anios: contrato.contractYears,
+      salary: contrato.salary,
+      clause: contrato.clause,
+    };
+    return this.contratos(s)[jugadorId];
+  },
+
+  // Cuántos años le quedan a un contrato guardado, en la temporada que sea.
+  // Llega a 0 y ahí se termina de verdad: ya no vuelve a 5 solo.
+  aniosQueQuedan(contrato, anio) {
+    if (!contrato) return null;
+    return Math.max(0, contrato.anios - Math.max(0, anio - contrato.desde));
+  },
+
+  // ---------- EL CIERRE DE LOS CONTRATOS ----------
+  //
+  // Corre una vez por temporada, al cerrar. A los jugadores de los clubes
+  // rivales que se les termina el contrato, el club decide: les firma uno
+  // nuevo o los deja ir libres. Antes esto no existía —el contrato daba la
+  // vuelta solo y nadie quedaba libre nunca— y por eso no se podía
+  // aprovechar a un jugador al que se le vencía el contrato en otro club.
+  //
+  // La decisión es DETERMINISTA (sembrada con el id y la temporada) y
+  // conservadora a propósito: en la duda, el club renueva. Un mercado que
+  // suelta demasiada gente deja clubes cortos, y eso ya costó caro antes.
+  //
+  // PENDIENTE (fuera del alcance de B2-03): esto no es todavía una IA
+  // contractual. El club no mira su presupuesto, no compara contra el resto
+  // del plantel ni pelea por retener a una figura que quiere irse, y los
+  // rivales tampoco salen a fichar a los que quedan libres. El punto de
+  // entrada para todo eso es `decideRenovar`, acá abajo.
+  LIBERADOS_POR_TEMPORADA: 6,
+
+  decideRenovar(engine, club, jugador, plantel, anio) {
+    // Casos en los que el club renueva sí o sí, por las mismas razones que
+    // valen para tu plantel: no se queda sin arquero, no baja del mínimo, y a
+    // una figura no la suelta. Y al que está a préstamo tampoco lo suelta,
+    // porque no es suyo para soltarlo.
+    if (this.estaCedido(jugador)) return 'está a préstamo: no es del club para dejarlo ir';
+    if (engine.esUltimoArquero(plantel, jugador)) return 'obligado: es el único arquero';
+    if (plantel.length <= MIN_PLANTEL_RIVAL + 1) return 'obligado: el plantel quedaría corto';
+    const ordenados = plantel.slice().sort((a, b) => b.rating - a.rating);
+    const puesto = ordenados.findIndex((p) => p.id === jugador.id);
+    if (puesto >= 0 && puesto < 11) return 'es titular';
+
+    const edad = engine.edadDe(jugador) || jugador.age || 25;
+    // A un pibe con proyección no se lo deja ir.
+    if (edad <= 23 && (jugador.projection || 0) > jugador.rating) return 'es una promesa';
+
+    const r = this.generador(this.semilla(`${jugador.id}|renovar|${anio}`));
+    // Cuanto más grande y más lejos del once, más chance de que lo suelten.
+    let chanceDeSoltarlo = 0.12;
+    if (edad >= 33) chanceDeSoltarlo += 0.35;
+    else if (edad >= 30) chanceDeSoltarlo += 0.15;
+    if (puesto >= ordenados.length - 4) chanceDeSoltarlo += 0.2;
+    return r() < chanceDeSoltarlo ? null : 'el club lo quiere';
+  },
+
+  cerrarContratos(engine) {
+    const s = engine.state;
+    const anio = s.season ? s.season.year : 1;
+    const resumen = { renovados: 0, liberados: [] };
+    const lista = this.libres(s);
+
+    (s.clubs || []).forEach((club) => {
+      // Tu plantel tiene su propio camino: la cola de renovación, donde
+      // decidís vos (ver Engine.resolveContractDecision).
+      if (club.id === s.clubId) return;
+      const plantel = this.plantel(engine, club.id);
+      // Entran TODOS los que están por vencer, también los que figuran a
+      // préstamo. A esos no se los puede soltar —no son del club— pero sí hay
+      // que renovarles: si se los saltea, su contrato cae a cero y se queda
+      // ahí para siempre. Medido antes de arreglarlo: 130 jugadores clavados
+      // en cero, todos con `loanUntil` de la investigación.
+      const porVencer = plantel.filter((p) => (p.contractYears || 0) <= 1);
+      porVencer.forEach((jugador) => {
+        const motivo = this.decideRenovar(engine, club, jugador, plantel, anio);
+        const hayLugarParaMasLibres = lista.length < this.LIBRES_MAXIMO
+          && resumen.liberados.length < this.LIBERADOS_POR_TEMPORADA;
+        if (motivo || !hayLugarParaMasLibres) {
+          // Contrato NUEVO: duración, sueldo y cláusula nuevos. La cláusula
+          // vieja no se hereda; si el contrato nuevo tiene, es otra.
+          this.firmar(s, jugador.id, this.contratoNuevo(engine, jugador, anio + 1, jugador), anio + 1);
+          resumen.renovados++;
+          return;
+        }
+        // No lo renuevan: queda libre. Sale del club por `fuera`, que es el
+        // mismo camino que usa una venta, así que no puede reaparecer solo.
+        this.movimientosDe(s, club.id).fuera.push(jugador.id);
+        delete this.contratos(s)[jugador.id];
+        lista.push({
+          id: jugador.id,
+          name: jugador.name,
+          pos: jugador.pos,
+          posDetail: jugador.posDetail,
+          altPosDetail: Array.isArray(jugador.altPosDetail) ? jugador.altPosDetail.slice() : undefined,
+          nation: jugador.nation,
+          role: jugador.role,
+          projection: jugador.projection,
+          ratingBase: jugador.rating,
+          edadBase: jugador.age,
+          birthDate: jugador.birthDate,
+          edadAlLlegar: jugador.edadAlLlegar,
+          temporadaAlLlegar: jugador.temporadaAlLlegar,
+          contractYears: 1,
+          desdeAnio: anio,
+          desdeClub: club.id,
+          ventanas: 0,
+        });
+        resumen.liberados.push(`${jugador.name} (${club.name})`);
+      });
+    });
+    if (resumen.renovados || resumen.liberados.length) engine._fuerzas = {};
+    return resumen;
+  },
+
   // Un jugador que llegó a un club por transferencia. Se guarda con su
   // valoración y edad del día que llegó, y de ahí en más envejece y evoluciona
   // solo, igual que los sembrados: si se guardara la valoración a secas, el
@@ -693,13 +885,24 @@ const Mercado = {
       temporadaAlLlegar: edad.temporadaAlLlegar,
       age: engine.edadDe(edad),
       rating: this.ratingConLosAnios(j.ratingBase, j.edadBase, j.projection || j.ratingBase, anios),
-      contractYears: Math.max(1, (j.contractYears || 3) - anios),
+      // El contrato sale del contrato que firmó al llegar, no de una cuenta
+      // aparte. Si por lo que sea no hay ninguno guardado (una partida
+      // vieja), se cae en la cuenta de antes para no romper nada.
+      ...(() => {
+        const c = this.contratoDe(engine.state, j.id);
+        if (!c) return { contractYears: Math.max(1, (j.contractYears || 3) - anios) };
+        return {
+          contractYears: this.aniosQueQuedan(c, anio),
+          salary: c.salary,
+          clause: c.clause,
+        };
+      })(),
     };
   },
 
   // Pasa un jugador de un club a otro, dejando anotado el movimiento en los
   // dos lados.
-  transferir(s, jugador, deClubId, aClubId, anio) {
+  transferir(s, jugador, deClubId, aClubId, anio, engine) {
     this.movimientosDe(s, deClubId).fuera.push(jugador.id);
     this.movimientosDe(s, aClubId).dentro.push({
       id: jugador.id,
@@ -711,7 +914,6 @@ const Mercado = {
       // guardara esa misma referencia en la partida, tocarla contaminaría los
       // datos de origen.
       altPosDetail: Array.isArray(jugador.altPosDetail) ? jugador.altPosDetail.slice() : undefined,
-      salary: jugador.salary,
       nation: jugador.nation,
       role: jugador.role,
       projection: jugador.projection,
@@ -722,9 +924,22 @@ const Mercado = {
       birthDate: jugador.birthDate,
       edadAlLlegar: jugador.edadAlLlegar,
       temporadaAlLlegar: jugador.temporadaAlLlegar,
-      contractYears: 3,
       desdeAnio: anio,
     });
+    // El contrato con el club viejo SE TERMINA acá. El club nuevo firma uno
+    // propio: otra duración, otro sueldo y, si corresponde, otra cláusula.
+    // La cláusula vieja no viaja nunca: era del contrato que se acaba de
+    // romper. El sueldo que venía cobrando entra como referencia de la
+    // negociación, no como el sueldo nuevo (ver contratoNuevo).
+    //
+    // Y `transferState` tampoco viaja: no es un dato del jugador sino la
+    // postura del club que lo vendía. El club nuevo arma la suya (ver
+    // Mercado.indice, que la sortea cuando no hay ninguna).
+    // `engine` llega por parámetro desde los caminos del juego; si alguien
+    // llama sin él (una prueba vieja), se usa el global, que en este
+    // proyecto siempre está: no hay módulos, todo es global.
+    const motor = engine || (typeof Engine !== 'undefined' ? Engine : null);
+    if (motor) this.firmar(s, jugador.id, this.contratoNuevo(motor, jugador, anio, jugador), anio);
   },
 
   plantel(engine, clubId) {
@@ -767,14 +982,25 @@ const Mercado = {
         rating: this.ratingConLosAnios(p.rating, p.age, p.projection ?? p.rating, aniosPasados),
         projection: p.projection,
         nation: p.nation,
-        // El contrato corre y, si se venció, el club lo renueva.
-        contractYears: Math.max(1, (p.contractYears || 1) - (aniosPasados % Math.max(1, p.contractYears || 1))),
+        // El contrato CORRE Y SE TERMINA. Antes decía
+        //   Math.max(1, base - (aniosPasados % base))
+        // y eso no era un contrato: era un contador que daba la vuelta solo.
+        // Medido: 5 4 3 2 1 5 4 3 2 1 5... El jugador no se iba nunca y no
+        // había forma de que quedara libre. Ahora baja hasta cero y ahí se
+        // vence de verdad; quién renueva y quién queda libre lo decide
+        // `cerrarContratos` al final de cada temporada.
+        contractYears: Math.max(0, (p.contractYears || 1) - aniosPasados),
         role: p.role, loanFrom: p.loanFrom, loanUntil: p.loanUntil,
-        // El valor y el sueldo investigados valen para el plantel de hoy. Con
-        // los años la valoración cambia, así que el valor se recalcula solo
-        // (ver más abajo) y el sueldo se deja como referencia del contrato.
+        // El valor investigado vale para el plantel de hoy: con los años la
+        // valoración cambia, así que se suelta y lo recalcula `valueOf`.
         value: aniosPasados ? undefined : p.value,
-        salary: p.salary, clause: aniosPasados ? undefined : p.clause,
+        // El sueldo y la cláusula son del CONTRATO, y el contrato sigue
+        // vigente mientras le queden años. Antes la cláusula estaba pegada
+        // al `value` en la misma línea y se borraba con él al pasar un año
+        // (B2-03), pero sin reemplazo: el valor se recalcula y la cláusula
+        // simplemente desaparecía. Medido: 6.100.000 en la T1 y nada en la
+        // T2, con cuatro años de contrato todavía por delante.
+        salary: p.salary, clause: p.clause,
         transferState: p.transferState,
       }))
       : (() => {
@@ -1034,6 +1260,25 @@ const Mercado = {
         if (sirve(candidato)) vivos.push(candidato);
       }
     }
+
+    // ---------- El contrato vigente ----------
+    //
+    // Si el jugador firmó un contrato DURANTE la partida —se lo renovó su
+    // club, o lo firmó al llegar transferido— ese manda sobre el investigado.
+    // Es la única fuente de verdad del contrato de hoy.
+    //
+    // Va acá abajo, con el plantel YA armado, y no sobre `base`: si no, los
+    // que entran después —los que llegaron por transferencia, los egresados
+    // de la cantera y el relleno— renovaban sin que se les aplicara nada y
+    // quedaban con el sueldo sin definir. Medido antes de moverlo: 481 casos
+    // en 15 temporadas.
+    vivos.forEach((p) => {
+      const c = this.contratoDe(s, p.id);
+      if (!c) return;
+      p.contractYears = this.aniosQueQuedan(c, anio);
+      p.salary = c.salary;
+      p.clause = c.clause;
+    });
 
     // La posición detallada (lateral derecho, defensor central, extremo
     // izquierdo...). Los planteles investigados ya la traen; a los generados
@@ -1395,7 +1640,19 @@ const Mercado = {
       birthDate: j.birthDate,
       edadAlLlegar: j.edadAlLlegar,
       temporadaAlLlegar: j.temporadaAlLlegar,
-      contractYears: 3,
+      // Firma un contrato NUEVO con vos, no una copia del que tenía. Antes
+      // acá entraba con `contractYears: 3` y sin sueldo —el jugador llegaba
+      // con `salary` indefinido y Economía tenía que adivinar cuánto gana
+      // (B2-03)—. El sueldo que cobraba en su club anterior entra como
+      // referencia de la negociación.
+      ...(() => {
+        const contrato = this.contratoNuevo(engine, j, engine.state.season ? engine.state.season.year : 1, j);
+        return {
+          contractYears: contrato.contractYears,
+          salary: contrato.salary,
+          clause: contrato.clause,
+        };
+      })(),
       potential: engine.computePotential(j.rating, j.age, engine.getClub(a.clubId)),
       // Llega entero: no viene de jugar.
       energia: ENERGIA_MAXIMA,

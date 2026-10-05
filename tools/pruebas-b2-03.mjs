@@ -1,39 +1,24 @@
-// PRUEBAS DE LA CORRECCIÓN B2-03 — datos que se pierden al cambiar de club.
+// PRUEBAS DE B2-03 — el sistema contractual.
 //
 //     npm install --no-save playwright
-//     node tools/pruebas-b2-03.mjs
+//     node tools/pruebas-b2-03.mjs [temporadasDelSoak]
 //
-// La auditoría del Bloque 2 encontró que un jugador transferido perdía cuatro
-// campos: altPosDetail, clause, salary y transferState. Pero "perder un
-// campo" no es automáticamente un bug: hay que mirar qué significa cada uno.
+// El modelo que se verifica:
 //
-// `Mercado.plantel()` arma a los jugadores de plantel real así (js/mercado.js):
+//   JUGADOR          id, nombre, puesto, altPosDetail, nacimiento, rating,
+//                    proyección...        -> viajan con él siempre
+//   CONTRATO         contractYears, salary, clause
+//                    -> se termina y se firma otro al cambiar de club
+//   ESTADO DEL CLUB  transferState
+//                    -> no viaja: es del club, no del jugador
 //
-//     altPosDetail: p.altPosDetail,                      <- siempre
-//     salary: p.salary,                                  <- siempre
-//     clause: aniosPasados ? undefined : p.clause,       <- SOLO la temporada 1
-//     transferState: p.transferState,                    <- siempre
-//
-// Los dos primeros son del jugador y el código base los conserva sin
-// condiciones: perderlos en un pase es un bug.
-//
-// Los otros dos no. La cláusula es del CONTRATO, y el propio código base la
-// tira apenas pasa un año porque queda vieja; un pase rompe ese contrato de
-// una manera todavía más fuerte, así que no puede viajar. Y `transferState`
-// no es del jugador sino la POSTURA DEL CLUB sobre él ('Intocable',
-// 'Retenido', 'Transferible', 'Fin de contrato cercano'): la postura del club
-// que lo vendió no dice nada del club que lo compró, y como el fichado firma
-// contrato nuevo por 3 años, un 'Fin de contrato cercano' heredado sería
-// directamente falso. `Mercado.indice` ya tiene la salida prevista para
-// cuando no está: sortea la postura del club nuevo.
-//
-// Así que lo que se arregla es altPosDetail y salary, y lo que se verifica de
-// clause y transferState es que se van A PROPÓSITO. Las pruebas 7 y 8 no dan
-// eso por sentado: lo demuestran ejecutando el código base.
+// Esta suite reemplaza a la anterior, que afirmaba el modelo viejo (sueldo
+// copiado tal cual y cláusula que moría al pasar un año).
 
 import path from 'node:path';
 import { chromium } from 'playwright';
 
+const TEMPORADAS = Number(process.argv[2] || 15);
 const raiz = path.resolve(import.meta.dirname, '..');
 const navegador = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const page = await navegador.newPage();
@@ -51,205 +36,397 @@ await page.evaluate(() => {
     Engine._fuerzas = {};
   };
   window.__en = (clubId, id) => Mercado.plantel(Engine, clubId).find((p) => p.id === id) || null;
-  // Un jugador de plantel real que tenga los cuatro campos cargados, para que
-  // la prueba no pase por tener todo vacío de los dos lados.
+  window.__T = (t) => { Engine.state.season.year = t; Engine._fuerzas = {}; };
   window.__conTodo = (clubId) => Mercado.plantel(Engine, clubId).find((p) =>
     Array.isArray(p.altPosDetail) && p.altPosDetail.length && p.salary && p.clause && p.transferState);
-  window.__viajan = (p) => ({
-    altPosDetail: p ? JSON.stringify(p.altPosDetail) : null,
-    salary: p ? p.salary : null,
-  });
+  window.__contratoValido = (p) => p
+    && Number.isFinite(p.contractYears) && p.contractYears >= 0 && p.contractYears <= Mercado.CONTRATO_MAXIMO
+    && Number.isFinite(p.salary) && p.salary > 0
+    && (p.clause === undefined || (Number.isFinite(p.clause) && p.clause > 0));
 });
 
 let pasaron = 0;
 const total = [];
-async function probar(nombre, fn) {
+async function probar(nombre, fn, arg) {
   total.push(nombre);
   let r;
-  try { r = await page.evaluate(fn); } catch (e) { r = { ok: false, detalle: 'EXCEPCIÓN: ' + e.message }; }
+  try { r = await page.evaluate(fn, arg); } catch (e) { r = { ok: false, detalle: 'EXCEPCIÓN: ' + e.message }; }
   console.log(`  ${r.ok ? '✓' : '✗'} ${total.length}. ${nombre}`);
   console.log(`      ${r.detalle}`);
   if (r.ok) pasaron++;
 }
 
-console.log('\n========== PRUEBAS B2-03 ==========\n');
+console.log('\n========== PRUEBAS B2-03 — SISTEMA CONTRACTUAL ==========');
 
-await probar('Transferencia simple: altPosDetail y salary quedan iguales', () => {
+console.log('\n--- A. LA CLÁUSULA ---');
+
+await probar('Un rival con cláusula en T1 la conserva en T2', () => {
   window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  if (!j) return { ok: false, detalle: 'no se encontró un jugador con los cuatro campos' };
-  const antes = window.__viajan(j);
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
-  Engine._fuerzas = {};
-  const despues = window.__viajan(window.__en('river', j.id));
-  const faltan = Object.keys(antes).filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(despues[k]));
+  const j = Mercado.plantel(Engine, 'estudianteslp').find((p) => p.clause && p.contractYears >= 4);
+  window.__T(1); const t1 = window.__en('estudianteslp', j.id);
+  window.__T(2); const t2 = window.__en('estudianteslp', j.id);
   return {
-    ok: !faltan.length,
-    detalle: `${j.name} (${j.id}) · altPosDetail ${antes.altPosDetail} -> ${despues.altPosDetail}`
-      + ` · salary ${antes.salary} -> ${despues.salary}`
-      + (faltan.length ? ` · SE PIERDEN: ${faltan.join(', ')}` : ''),
+    ok: !!t2 && t2.clause === t1.clause,
+    detalle: `${j.name}: T1 contrato ${t1.contractYears} cláusula ${t1.clause}`
+      + ` · T2 contrato ${t2.contractYears} cláusula ${t2.clause}`,
   };
 });
 
-await probar('Reconstruir el plantel muchas veces no los borra', () => {
+await probar('La cláusula dura lo que dura el contrato', () => {
   window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  const antes = window.__viajan(j);
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
-  const fallos = [];
-  for (let i = 0; i < 20; i++) {
-    Engine._fuerzas = {};
-    const d = window.__viajan(window.__en('river', j.id));
-    if (JSON.stringify(d) !== JSON.stringify(antes)) fallos.push(`vuelta ${i}`);
-  }
-  return {
-    ok: !fallos.length,
-    detalle: fallos.length ? `cambió en: ${fallos.slice(0, 3).join(', ')}`
-      : `${j.name}: 20 reconstrucciones y los dos campos siguen iguales`,
-  };
-});
-
-await probar('Segunda transferencia: siguen iguales', () => {
-  window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  const antes = window.__viajan(j);
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
-  Engine._fuerzas = {};
-  const enRiver = window.__en('river', j.id);
-  Mercado.transferir(Engine.state, enRiver, 'river', 'lanus', 1);
-  Engine._fuerzas = {};
-  const despues = window.__viajan(window.__en('lanus', j.id));
-  return {
-    ok: JSON.stringify(antes) === JSON.stringify(despues),
-    detalle: `${j.name}: estudianteslp -> river -> lanus ·`
-      + ` altPosDetail ${antes.altPosDetail} -> ${despues.altPosDetail} · salary ${antes.salary} -> ${despues.salary}`,
-  };
-});
-
-await probar('Después de avanzar de temporada siguen iguales', () => {
-  window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  const antes = window.__viajan(j);
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
+  const j = Mercado.plantel(Engine, 'estudianteslp').find((p) => p.clause && p.contractYears >= 4);
   const traza = [];
-  const fallos = [];
-  for (let t = 1; t <= 6; t++) {
-    Engine.state.season.year = t; Engine._fuerzas = {};
-    const d = window.__viajan(window.__en('river', j.id));
-    traza.push(`T${t}: salary=${d.salary} alt=${d.altPosDetail ? 'sí' : 'no'}`);
-    if (JSON.stringify(d) !== JSON.stringify(antes)) fallos.push(`T${t}`);
+  let fallo = null;
+  for (let t = 1; t <= 5; t++) {
+    window.__T(t);
+    const p = window.__en('estudianteslp', j.id);
+    traza.push(`T${t}: ${p.contractYears}a/${p.clause === undefined ? 'sin cláusula' : p.clause}`);
+    if (p.contractYears >= 1 && p.clause !== j.clause) fallo = `en T${t} perdió la cláusula con el contrato vigente`;
   }
+  return { ok: !fallo, detalle: fallo || traza.join(' · ') };
+});
+
+await probar('Un contrato nuevo no hereda la cláusula vieja', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  const j = window.__conTodo('estudianteslp');
+  const vieja = j.clause;
+  Mercado.transferir(s, j, 'estudianteslp', 'river', 1, Engine);
+  Engine._fuerzas = {};
+  const d = window.__en('river', j.id);
   return {
-    ok: !fallos.length,
-    detalle: fallos.length ? `cambió en ${fallos.join(',')} · ${traza.join(' · ')}` : traza.join(' · '),
+    ok: d.clause !== vieja,
+    detalle: `${j.name}: cláusula vieja ${vieja} · cláusula del contrato nuevo ${d.clause === undefined ? 'ninguna' : d.clause}`
+      + ' (lo que no puede es ser la misma de antes)',
   };
 });
 
-await probar('Varios transferidos: nadie recibe los datos de otro', () => {
+console.log('\n--- B. TRANSFERENCIA ---');
+
+await probar('El transferido conserva altPosDetail', () => {
   window.__carrera('boca');
-  const candidatos = Mercado.plantel(Engine, 'estudianteslp')
-    .filter((p) => Array.isArray(p.altPosDetail) && p.altPosDetail.length && p.salary)
-    .slice(0, 8);
-  if (candidatos.length < 4) return { ok: false, detalle: 'pocos candidatos' };
-  const esperado = {};
-  candidatos.forEach((p) => { esperado[p.id] = window.__viajan(p); });
-  candidatos.forEach((p) => Mercado.transferir(Engine.state, p, 'estudianteslp', 'river', 1));
+  const j = window.__conTodo('estudianteslp');
+  const antes = JSON.stringify(j.altPosDetail);
+  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1, Engine);
   Engine._fuerzas = {};
-  const cruzados = [];
-  candidatos.forEach((p) => {
-    const d = window.__viajan(window.__en('river', p.id));
-    if (JSON.stringify(d) !== JSON.stringify(esperado[p.id])) {
-      // ¿Le tocaron los datos de otro?
-      const deQuien = Object.keys(esperado).find((id) => id !== p.id
-        && JSON.stringify(esperado[id]) === JSON.stringify(d));
-      cruzados.push(`${p.id}: ${deQuien ? `tiene los datos de ${deQuien}` : 'no coincide con los suyos'}`);
+  const d = window.__en('river', j.id);
+  return { ok: JSON.stringify(d.altPosDetail) === antes, detalle: `${j.name}: ${antes} -> ${JSON.stringify(d.altPosDetail)}` };
+});
+
+await probar('transferState del club anterior no viaja', () => {
+  window.__carrera('boca');
+  const j = window.__conTodo('estudianteslp');
+  const viejo = j.transferState;
+  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1, Engine);
+  Engine._fuerzas = {};
+  const d = window.__en('river', j.id);
+  const fila = Mercado.indice(Engine).find((x) => x.id === j.id);
+  return {
+    ok: d.transferState === undefined && !!fila && !!fila.estado,
+    detalle: `era "${viejo}" en su club · en river transferState=${d.transferState}`
+      + ` y el club nuevo arma la suya: "${fila ? fila.estado : 'SIN FILA'}"`,
+  };
+});
+
+await probar('El contrato anterior no se copia como contrato nuevo', () => {
+  window.__carrera('boca');
+  const j = window.__conTodo('estudianteslp');
+  const antes = { anios: j.contractYears, salary: j.salary, clause: j.clause };
+  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1, Engine);
+  Engine._fuerzas = {};
+  const d = window.__en('river', j.id);
+  const esElMismo = d.contractYears === antes.anios && d.salary === antes.salary && d.clause === antes.clause;
+  return {
+    ok: !esElMismo,
+    detalle: `${j.name}: viejo ${antes.anios}a/${antes.salary}/${antes.clause}`
+      + ` -> nuevo ${d.contractYears}a/${d.salary}/${d.clause === undefined ? 'sin cláusula' : d.clause}`,
+  };
+});
+
+await probar('El contrato nuevo tiene estructura válida', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  const malos = [];
+  Mercado.plantel(Engine, 'estudianteslp').slice(0, 10).forEach((j) => {
+    Mercado.transferir(s, j, 'estudianteslp', 'river', 1, Engine);
+  });
+  Engine._fuerzas = {};
+  Mercado.plantel(Engine, 'river').forEach((p) => {
+    if (Mercado.contratoDe(s, p.id) && !window.__contratoValido(p)) {
+      malos.push(`${p.id}: ${p.contractYears}a/${p.salary}/${p.clause}`);
     }
   });
+  const nuevos = Mercado.plantel(Engine, 'river').filter((p) => Mercado.contratoDe(s, p.id));
   return {
-    ok: !cruzados.length,
-    detalle: cruzados.length ? cruzados.slice(0, 3).join(' · ')
-      : `${candidatos.length} transferidos a la vez: cada uno conservó lo suyo y ninguno recibió datos de otro`,
+    ok: !malos.length && nuevos.length >= 10,
+    detalle: malos.length ? malos.slice(0, 3).join(' · ')
+      : `${nuevos.length} contratos nuevos, todos con duración 1-${Mercado.CONTRATO_MAXIMO}, sueldo > 0 y cláusula válida o ausente`,
   };
 });
 
-await probar('Guardar y cargar no los pierde', () => {
+await probar('El sueldo del contrato nuevo se negocia, no se copia', () => {
   window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  const antes = window.__viajan(j);
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
+  const s = Engine.state;
+  const casos = [];
+  Mercado.plantel(Engine, 'estudianteslp').slice(0, 12).forEach((j) => {
+    const antes = j.salary;
+    Mercado.transferir(s, j, 'estudianteslp', 'river', 1, Engine);
+    Engine._fuerzas = {};
+    const d = window.__en('river', j.id);
+    casos.push({ copiado: antes != null && d.salary === antes, bajo: d.salary <= 0 });
+  });
+  const copiados = casos.filter((c) => c.copiado).length;
+  return {
+    ok: !copiados && !casos.filter((c) => c.bajo).length,
+    detalle: `${casos.length} pases: ${copiados} con el sueldo copiado tal cual (tiene que ser 0),`
+      + ' todos con sueldo > 0',
+  };
+});
+
+console.log('\n--- C. RENOVACIÓN DEL USUARIO ---');
+
+await probar('Podés elegir la duración de 1 a 5 años', () => {
+  const resultados = [];
+  for (const anios of [1, 2, 3, 4, 5]) {
+    window.__carrera('estudianteslp');
+    const s = Engine.state;
+    const j = s.squad.find((p) => p.clause);
+    j.contractYears = 1;
+    s.contractQueue = [j.id];
+    s.screen = 'contract-decision';
+    Engine.resolveContractDecision(true, anios);
+    const d = s.squad.find((p) => p.id === j.id);
+    resultados.push(`pedí ${anios} -> ${d ? d.contractYears : 'se fue'}`);
+  }
+  const ok = resultados.every((x, i) => x === `pedí ${i + 1} -> ${i + 1}`);
+  return { ok, detalle: resultados.join(' · ') };
+});
+
+await probar('La renovación deja un contrato coherente, no un agujero', () => {
+  window.__carrera('estudianteslp');
+  const s = Engine.state;
+  const j = s.squad.find((p) => p.clause);
+  const antes = { salary: j.salary, clause: j.clause };
+  j.contractYears = 1;
+  s.contractQueue = [j.id];
+  s.screen = 'contract-decision';
+  Engine.resolveContractDecision(true, 4);
+  const d = s.squad.find((p) => p.id === j.id);
+  return {
+    ok: window.__contratoValido(d) && d.contractYears === 4,
+    detalle: `${j.name}: antes ${antes.salary}/${antes.clause} -> renovado 4 años,`
+      + ` sueldo ${d.salary}, cláusula ${d.clause === undefined ? 'ninguna' : d.clause}`,
+  };
+});
+
+await probar('Al renovar, la cláusula es la del contrato nuevo (puede estar o no)', () => {
+  window.__carrera('estudianteslp');
+  const s = Engine.state;
+  let con = 0; let sin = 0; let igualALaVieja = 0;
+  s.squad.slice(0, 20).forEach((j) => {
+    const vieja = j.clause;
+    j.contractYears = 1;
+    s.contractQueue = [j.id];
+    s.screen = 'contract-decision';
+    Engine.resolveContractDecision(true, 3);
+    const d = s.squad.find((p) => p.id === j.id);
+    if (!d) return;
+    if (d.clause === undefined) sin++; else con++;
+    if (vieja != null && d.clause === vieja) igualALaVieja++;
+  });
+  return {
+    ok: (con + sin) > 0 && !igualALaVieja,
+    detalle: `20 renovaciones: ${con} con cláusula nueva, ${sin} sin cláusula,`
+      + ` ${igualALaVieja} que arrastraron la vieja (tiene que ser 0)`,
+  };
+});
+
+console.log('\n--- D. CONTRATOS DE LOS RIVALES ---');
+
+await probar('No hay rollover silencioso 1 -> 5', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  const j = Mercado.plantel(Engine, 'estudianteslp').find((p) => p.contractYears >= 4 && p.clause);
+  const traza = [];
+  const subidasSinContrato = [];
+  let anterior = null;
+  for (let t = 1; t <= 10; t++) {
+    window.__T(t);
+    const p = window.__en('estudianteslp', j.id);
+    if (!p) { traza.push(`T${t}: ya no está`); break; }
+    if (anterior != null && p.contractYears > anterior && !Mercado.contratoDe(s, j.id)) {
+      subidasSinContrato.push(`T${t}: ${anterior} -> ${p.contractYears} sin contrato nuevo`);
+    }
+    traza.push(`T${t}:${p.contractYears}`);
+    anterior = p.contractYears;
+  }
+  return { ok: !subidasSinContrato.length, detalle: subidasSinContrato.join(' · ') || traza.join(' ') };
+});
+
+await probar('El contrato de un rival llega de verdad a cero', () => {
+  window.__carrera('boca');
+  const conCero = [];
+  for (let t = 1; t <= 6 && !conCero.length; t++) {
+    window.__T(t);
+    Engine.state.clubs.slice(0, 20).forEach((c) => {
+      if (c.id === Engine.state.clubId) return;
+      Mercado.plantel(Engine, c.id).forEach((p) => {
+        if (p.contractYears === 0 && !Mercado.contratoDe(Engine.state, p.id)) conCero.push(`${p.id} en T${t}`);
+      });
+    });
+  }
+  return {
+    ok: conCero.length > 0,
+    detalle: conCero.length ? `${conCero.length} contratos vencidos, por ejemplo ${conCero[0]}`
+      : 'ningún contrato llegó a 0 en 6 temporadas',
+  };
+});
+
+await probar('Un club rival puede renovar, y otro puede dejar ir', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  let renovados = 0; const liberados = [];
+  for (let t = 1; t <= 6; t++) {
+    s.season.year = t; Engine._fuerzas = {};
+    const r = Mercado.cerrarContratos(Engine);
+    renovados += r.renovados;
+    liberados.push(...r.liberados);
+  }
+  return {
+    ok: renovados > 0 && liberados.length > 0,
+    detalle: `6 temporadas: ${renovados} renovaciones y ${liberados.length} jugadores libres`
+      + (liberados.length ? ` (${liberados.slice(0, 2).join(', ')})` : ''),
+  };
+});
+
+await probar('El que queda libre no reaparece en su club', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  const soltados = [];
+  for (let t = 1; t <= 6; t++) {
+    s.season.year = t; Engine._fuerzas = {};
+    Mercado.cerrarContratos(Engine);
+  }
+  (s.libres || []).forEach((l) => {
+    if (!l.desdeClub) return;
+    if (Mercado.plantel(Engine, l.desdeClub).some((p) => p.id === l.id)) soltados.push(`${l.id} volvió a ${l.desdeClub}`);
+    s.clubs.forEach((c) => {
+      if (c.id === s.clubId || c.id === l.desdeClub) return;
+      if (Mercado.plantel(Engine, c.id).some((p) => p.id === l.id)) soltados.push(`${l.id} apareció en ${c.id}`);
+    });
+  });
+  return {
+    ok: !soltados.length,
+    detalle: soltados.length ? soltados.slice(0, 3).join(' · ')
+      : `${(s.libres || []).length} libres, ninguno sigue en un plantel`,
+  };
+});
+
+console.log('\n--- E. FICHAJE DEL USUARIO ---');
+
+await probar('El que fichás entra con un contrato completo', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  if (!Engine.mercadoAbierto()) s.calendar.dayCount = 0;
+  const fila = Mercado.indice(Engine).find((x) => x.clausula > 0 && x.altPosDetail && x.altPosDetail.length);
+  if (!fila) return { ok: false, detalle: 'no apareció una fila con cláusula y posiciones alternativas' };
+  const enSuClub = Mercado.plantel(Engine, fila.clubId).find((p) => p.id === fila.id);
+  s.budget = fila.clausula * 3;
+  Mercado.negociar(Engine, fila.clubId, fila.id, true);
+  const mio = s.squad.find((p) => p.id === fila.id);
+  return {
+    ok: !!mio && window.__contratoValido(mio) && JSON.stringify(mio.altPosDetail) === JSON.stringify(enSuClub.altPosDetail),
+    detalle: `${fila.name}: en su club ${enSuClub.contractYears}a/${enSuClub.salary}`
+      + ` -> fichado ${mio ? `${mio.contractYears}a/${mio.salary}/${mio.clause === undefined ? 'sin cláusula' : mio.clause}` : 'NO LLEGÓ'}`
+      + ` · altPosDetail ${mio ? JSON.stringify(mio.altPosDetail) : '-'}`,
+  };
+});
+
+await probar('Ningún fichado queda con el sueldo sin definir', () => {
+  window.__carrera('boca');
+  const s = Engine.state;
+  if (!Engine.mercadoAbierto()) s.calendar.dayCount = 0;
+  s.budget = 999999999999;
+  const sinSueldo = [];
+  Mercado.indice(Engine).slice(0, 10).forEach((fila) => {
+    Mercado.negociar(Engine, fila.clubId, fila.id, !!fila.clausula);
+    const mio = s.squad.find((p) => p.id === fila.id);
+    if (mio && !(mio.salary > 0)) sinSueldo.push(`${mio.name}: ${mio.salary}`);
+  });
+  const fichados = s.squad.filter((p) => Mercado.init(s).fichados.includes(p.id));
+  return {
+    ok: !sinSueldo.length,
+    detalle: sinSueldo.length ? sinSueldo.slice(0, 3).join(' · ')
+      : `${fichados.length} fichajes, todos con sueldo definido`,
+  };
+});
+
+console.log('\n--- F. INTEGRIDAD (no romper B2-01, B2-02 ni B2-04) ---');
+
+await probar(`SOAK de ${TEMPORADAS} temporadas`, (n) => {
+  window.__carrera('aldosivi');
+  const s = Engine.state;
+  const problemas = { dobles: [], retiradosActivos: [], sinArquero: [], contratoInvalido: [] };
+  const filas = [];
+  for (let t = 1; t <= n; t++) {
+    s.season.year = t; Engine._fuerzas = {};
+    if (typeof Mercado.mercadoDeLosRivales === 'function') Mercado.mercadoDeLosRivales(Engine);
+    Engine._fuerzas = {};
+    Mercado.cerrarContratos(Engine);
+    Engine._fuerzas = {};
+    Engine.procesarRetiros();
+    Engine._fuerzas = {};
+
+    const dueno = new Map();
+    const retiradosDeAntes = new Set((s.retirados || []).filter((r) => r.temporada < t).map((r) => r.id));
+    let conClausula = 0; let jugadores = 0;
+    s.clubs.forEach((c) => {
+      const pl = c.id === s.clubId ? (s.squad || []) : Mercado.plantel(Engine, c.id);
+      if (pl.length && !Engine.cuantosArqueros(pl)) problemas.sinArquero.push(`T${t}: ${c.id}`);
+      pl.forEach((p) => {
+        jugadores++;
+        if (p.clause) conClausula++;
+        if (dueno.has(p.id)) problemas.dobles.push(`T${t}: ${p.id} en ${dueno.get(p.id)} y ${c.id}`);
+        dueno.set(p.id, c.id);
+        if (retiradosDeAntes.has(p.id)) problemas.retiradosActivos.push(`T${t}: ${p.id}`);
+        if (Mercado.contratoDe(s, p.id) && !window.__contratoValido(p)) {
+          problemas.contratoInvalido.push(`T${t}: ${p.id} ${p.contractYears}a/${p.salary}`);
+        }
+      });
+    });
+    filas.push({ t, jugadores, conClausula, libres: (s.libres || []).length, contratos: Object.keys(s.contratos || {}).length });
+  }
+  const totalProblemas = Object.values(problemas).reduce((a, x) => a + x.length, 0);
+  return {
+    ok: !totalProblemas,
+    detalle: Object.entries(problemas).map(([k, v]) => `${k}: ${v.length}`).join(' · ')
+      + ` · T1: ${filas[0].jugadores} jugadores, ${filas[0].conClausula} con cláusula`
+      + ` · T${n}: ${filas[n - 1].jugadores} jugadores, ${filas[n - 1].conClausula} con cláusula,`
+      + ` ${filas[n - 1].contratos} contratos firmados, ${filas[n - 1].libres} libres`
+      + (totalProblemas ? ` · ${Object.values(problemas).flat().slice(0, 2).join(' · ')}` : ''),
+  };
+}, TEMPORADAS);
+
+await probar('Guardar y cargar conserva los contratos', () => {
+  const s = Engine.state;
+  const antes = JSON.stringify(s.contratos || {});
+  const planAntes = JSON.stringify(s.clubs.map((c) => {
+    const pl = c.id === s.clubId ? (s.squad || []) : Mercado.plantel(Engine, c.id);
+    return pl.map((p) => `${p.id}:${p.contractYears}:${p.salary}:${p.clause}`).join(',');
+  }));
   Engine.save();
   const cargo = Engine.load();
   Engine._fuerzas = {};
-  const despues = window.__viajan(window.__en('river', j.id));
+  const despues = JSON.stringify(Engine.state.contratos || {});
+  const planDespues = JSON.stringify(Engine.state.clubs.map((c) => {
+    const pl = c.id === Engine.state.clubId ? (Engine.state.squad || []) : Mercado.plantel(Engine, c.id);
+    return pl.map((p) => `${p.id}:${p.contractYears}:${p.salary}:${p.clause}`).join(',');
+  }));
   return {
-    ok: cargo && JSON.stringify(antes) === JSON.stringify(despues),
-    detalle: `load()=${cargo} · altPosDetail ${despues.altPosDetail} · salary ${despues.salary}`,
-  };
-});
-
-await probar('DEMOSTRACIÓN: el código base tira la cláusula al pasar un año', () => {
-  // Si el propio juego descarta la cláusula de un jugador que NO se movió de
-  // club apenas pasa una temporada, entonces la cláusula no es un dato del
-  // jugador: es una foto del contrato de hoy. Y un pase rompe ese contrato
-  // más fuerte que el paso del tiempo.
-  window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  Engine.state.season.year = 1; Engine._fuerzas = {};
-  const enT1 = window.__en('estudianteslp', j.id);
-  Engine.state.season.year = 2; Engine._fuerzas = {};
-  const enT2 = window.__en('estudianteslp', j.id);
-  return {
-    ok: !!enT1.clause && enT2.clause === undefined,
-    detalle: `${j.name} SIN moverse de club: cláusula en T1 = ${enT1.clause},`
-      + ` en T2 = ${enT2.clause} · el diseño la descarta solo, así que no viaja en un pase`,
-  };
-});
-
-await probar('DEMOSTRACIÓN: sin transferState el club nuevo fija su propia postura', () => {
-  // `transferState` no es del jugador: es lo que opina SU club de él. El
-  // fichado firma contrato nuevo por 3 años, así que heredar un
-  // 'Fin de contrato cercano' sería falso. Se comprueba que `Mercado.indice`
-  // tiene prevista la ausencia y le pone una postura al club nuevo.
-  window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  const estadoViejo = j.transferState;
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
-  Engine._fuerzas = {};
-  const fichado = window.__en('river', j.id);
-  const fila = Mercado.indice(Engine).find((x) => x.id === j.id);
-  return {
-    ok: fichado.transferState === undefined && !!fila && !!fila.estado && fichado.contractYears === 3,
-    detalle: `${j.name}: en estudianteslp era "${estadoViejo}" · en river no hereda nada`
-      + ` (transferState=${fichado.transferState}, contrato nuevo de ${fichado.contractYears} años)`
-      + ` y el mercado le asigna "${fila ? fila.estado : 'SIN FILA'}"`,
-  };
-});
-
-await probar('altPosDetail no comparte referencia con nadie', () => {
-  window.__carrera('boca');
-  const j = window.__conTodo('estudianteslp');
-  Mercado.transferir(Engine.state, j, 'estudianteslp', 'river', 1);
-  Engine._fuerzas = {};
-  const uno = window.__en('river', j.id);
-  const otro = window.__en('river', j.id);
-  if (!uno || !uno.altPosDetail) return { ok: false, detalle: 'el fichado no tiene altPosDetail' };
-  // Dos reconstrucciones no pueden compartir el array, y tocarlo no puede
-  // llegar ni al estado guardado ni a REAL_ROSTERS.
-  const guardadoAntes = JSON.stringify(Mercado.movimientosDe(Engine.state, 'river').dentro
-    .find((x) => x.id === j.id).altPosDetail);
-  const originalAntes = JSON.stringify(REAL_ROSTERS['estudianteslp']
-    .find((x) => x.name === j.name).altPosDetail);
-  uno.altPosDetail.push('INVENTADO');
-  const guardadoDespues = JSON.stringify(Mercado.movimientosDe(Engine.state, 'river').dentro
-    .find((x) => x.id === j.id).altPosDetail);
-  const originalDespues = JSON.stringify(REAL_ROSTERS['estudianteslp']
-    .find((x) => x.name === j.name).altPosDetail);
-  return {
-    ok: uno.altPosDetail !== otro.altPosDetail
-      && guardadoAntes === guardadoDespues && originalAntes === originalDespues,
-    detalle: `dos reconstrucciones comparten el array: ${uno.altPosDetail === otro.altPosDetail}`
-      + ` (tiene que ser false) · al tocarlo, el estado guardado quedó ${guardadoAntes === guardadoDespues ? 'intacto' : 'CONTAMINADO'}`
-      + ` y REAL_ROSTERS quedó ${originalAntes === originalDespues ? 'intacto' : 'CONTAMINADO'}`,
+    ok: cargo && antes === despues && planAntes === planDespues,
+    detalle: `load()=${cargo} · ${Object.keys(JSON.parse(antes)).length} contratos`
+      + ` · contratos ${antes === despues ? 'idénticos' : 'DISTINTOS'}`
+      + ` · planteles ${planAntes === planDespues ? 'idénticos' : 'DISTINTOS'}`,
   };
 });
 

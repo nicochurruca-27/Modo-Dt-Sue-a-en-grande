@@ -4460,7 +4460,10 @@ function renderContractRenewal() {
   const s = Engine.state;
   const playerId = s.contractQueue[0];
   const player = s.squad.find((p) => p.id === playerId);
-  const renewCost = Math.round(player.rating * 8000);
+  // El precio que se muestra es el que se cobra de verdad: sale de
+  // Economia.costoRenovacion, igual que en resolveContractDecision. Antes
+  // acá decía `rating * 8000` y el cartel mentía.
+  const costoPorAnio = Economia.costoRenovacion(Engine, player);
   const soleAtPosition = s.squad.filter((p) => p.pos === player.pos).length <= 1;
   const canRelease = s.squad.length > MIN_SQUAD && !soleAtPosition;
   const porQueNo = soleAtPosition
@@ -4472,15 +4475,23 @@ function renderContractRenewal() {
     <div class="card">
       <h2>Contrato por vencer</h2>
       <p>El contrato de <strong>${player.name}</strong> (${player.pos}, ${player.rating}, ${player.age} años) termina a fin de esta temporada.</p>
+      <p class="muted">Elegí por cuánto tiempo lo atás. Cuanto más largo, más caro${player.clause ? `, y la cláusula se renegocia (hoy tiene ${money(player.clause)})` : ''}.</p>
       <div class="options">
-        <button class="option-btn" id="renew-btn">Renovar por ${money(renewCost)}</button>
+        ${[1, 2, 3, 4, 5].map((anios) => `
+          <button class="option-btn" data-renovar="${anios}">${anios} ${anios === 1 ? 'año' : 'años'} · ${money(Math.round(costoPorAnio * anios))}</button>
+        `).join('')}
         <button class="option-btn danger" id="release-btn" ${canRelease ? '' : 'disabled'}>Dejarlo ir a fin de año</button>
         ${canRelease ? '' : `<p class="aviso-plantel corto">Renovarle es obligatorio. ${porQueNo}</p>`}
       </div>
       ${!canRelease ? `<p class="muted">No podés dejarlo ir: ${soleAtPosition ? 'es el único que te queda en esa posición' : 'el plantel ya está en el mínimo jugable'}.</p>` : ''}
     </div>
   `;
-  document.getElementById('renew-btn').addEventListener('click', () => { Engine.resolveContractDecision(true); render(); });
+  app.querySelectorAll('[data-renovar]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Engine.resolveContractDecision(true, Number(btn.dataset.renovar));
+      render();
+    });
+  });
   if (canRelease) {
     document.getElementById('release-btn').addEventListener('click', () => { Engine.resolveContractDecision(false); render(); });
   }

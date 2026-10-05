@@ -197,7 +197,9 @@ const GameState = {
 
   // Los que tienen que ser objetos (no arrays, no strings).
   OBJETOS_DE_LA_PARTIDA: ['season', 'calendar', 'mercado', 'finanzas', 'mundo',
-    'historialPuntos', 'juveniles', 'copaBracket', 'copasInter', 'dt', 'objective'],
+    'historialPuntos', 'juveniles', 'copaBracket', 'copasInter', 'dt', 'objective',
+    // Los contratos que se firmaron durante la partida (ver Mercado.contratos).
+    'contratos'],
 
   // Los que tienen que ser números.
   NUMEROS_DE_LA_PARTIDA: ['budget', 'morale', 'confianza', 'escalaSalarial',
