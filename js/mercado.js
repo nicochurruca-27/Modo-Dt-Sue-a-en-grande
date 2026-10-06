@@ -844,7 +844,58 @@ const Mercado = {
       });
     });
     if (resumen.renovados || resumen.liberados.length) engine._fuerzas = {};
+    resumen.contratosPodados = this.podarContratos(engine);
     return resumen;
+  },
+
+  // ---------- LA PODA DE CONTRATOS MUERTOS ----------
+  //
+  // `state.contratos` solo crecía: se firma un contrato y nadie lo borra
+  // nunca, ni cuando el jugador se retira, ni cuando lo compra otro club, ni
+  // cuando el relleno que lo tenía deja de existir. Medido a 30 temporadas:
+  // 2577 contratos guardados para 1500 jugadores vivos, 1873 de gente que ya
+  // no existe en ningún lado (el 73%), y 150 KB, el 44% del save.
+  //
+  // Se poda UNA vez por temporada, acá, con todos los movimientos del año ya
+  // resueltos. No hay estructura nueva: se pregunta por los jugadores que
+  // existen hoy y se tira lo que no le sirve a nadie.
+  //
+  // La regla es conservadora a propósito: se CONSERVA salvo prueba en
+  // contrario. Un contrato sobrevive si su jugador está en algún plantel del
+  // mundo —el tuyo incluido—, o está libre, o está cedido. No se usa
+  // `state.retirados` como criterio: la auditoría mostró que puede haber
+  // anotados como retirados que siguen jugando de verdad porque los sostiene
+  // la red del último arquero, y esos están en su plantel, así que la regla
+  // de arriba ya los cubre sin mirar el asiento.
+  podarContratos(engine) {
+    const s = engine.state;
+    const guardados = this.contratos(s);
+    const ids = Object.keys(guardados);
+    if (!ids.length) return 0;
+
+    const vivos = new Set();
+    (s.clubs || []).forEach((c) => {
+      const plantel = c.id === s.clubId ? (s.squad || []) : this.plantel(engine, c.id);
+      plantel.forEach((p) => vivos.add(p.id));
+    });
+    // El que está libre todavía puede ser fichado con su contrato, y el que
+    // está cedido vuelve: ninguno de los dos aparece en un plantel del mundo
+    // (ver la cabecera del archivo) y los dos lo necesitan.
+    (s.libres || []).forEach((j) => vivos.add(j.id));
+    (s.cedidos || []).forEach((c) => { if (c && c.jugador) vivos.add(c.jugador.id); });
+    // Y lo que esté a medio camino de una operación tuya: un acuerdo cerrado
+    // que se concreta cuando abre el mercado todavía no está en ningún
+    // plantel, pero el jugador va a llegar.
+    const m = this.init(s);
+    (m.acuerdos || []).forEach((a) => { if (a && a.jugador) vivos.add(a.jugador.id); });
+
+    let podados = 0;
+    ids.forEach((id) => {
+      if (vivos.has(id)) return;
+      delete guardados[id];
+      podados++;
+    });
+    return podados;
   },
 
   // Un jugador que llegó a un club por transferencia. Se guarda con su
@@ -1420,8 +1471,23 @@ const Mercado = {
   // movimientos del mundo.
   indice(engine) {
     const s = engine.state;
+    // La clave tiene que cambiar con CUALQUIER cosa que mueva el índice.
+    // Antes contaba `Object.keys(s.mundo).length`, que son los clubes con
+    // entrada y no los movimientos: desde la primera temporada los 65 ya
+    // tienen una, así que ese número no cambiaba más y un pase entre dos
+    // clubes dejaba la clave igual. El índice seguía mostrando al jugador en
+    // el club que lo vendió hasta que cambiara el año, ficharas a alguien o
+    // apareciera un libre.
+    //
+    // Ahora se cuentan los movimientos en sí, y también los contratos: el
+    // estado que muestra el buscador sale del contrato (si le queda un año
+    // figura como fin de contrato, y la cláusula habilita el botón de
+    // pagarla), así que una renovación también tiene que invalidar.
+    const movimientos = Object.values(s.mundo || {})
+      .reduce((a, mov) => a + (mov.fuera || []).length + (mov.dentro || []).length, 0);
     const clave = `${s.season ? s.season.year : 1}|${(s.mercado && s.mercado.fichados || []).length}`
-      + `|${Object.keys(s.mundo || {}).length}|${(s.libres || []).length}`;
+      + `|${movimientos}|${(s.libres || []).length}`
+      + `|${Object.keys(s.contratos || {}).length}`;
     if (this._indice && this._indice.clave === clave) return this._indice.lista;
     const lista = [];
     this.clubes(engine).forEach((c) => {
