@@ -280,6 +280,65 @@ await probar('La pantalla de lesión no deja seguir con el arco vacío', async (
   };
 });
 
+// Las dos que siguen salieron de jugar el caso 2 en el navegador con el MCP
+// de Playwright: la pantalla decía "No te queda ningún arquero en el banco"
+// y el motor metía igual al tercer arquero del plantel, que no era suplente.
+
+await probar('Un arquero sano que NO está en el banco no puede entrar: el arco queda vacío', () => {
+  window.__carrera('boca');
+  if (!window.__hastaUnPartido()) return { ok: false, detalle: 'no se llegó a un partido' };
+  const s = Engine.state;
+  const arquero = Engine.getStartingXI().starters.find((e) => e.slot === 'POR');
+  // El estado que se vio jugando con Lanús: hay otro arquero sano en el
+  // plantel, pero no quedó entre los doce del banco. Se arma con un banco
+  // COMPLETO de jugadores de campo: así asegurarBanco lo da por cerrado y no
+  // mete un arquero para tapar el hueco (solo lo hace cuando falta gente).
+  const deCampoDisponibles = Engine.getBench().filter((j) => j.pos !== 'POR');
+  s.banco = deCampoDisponibles.slice(0, Engine.BANCO_SUPLENTES).map((j) => j.id);
+  const suplentesArqueros = s.squad.filter((j) => j.pos === 'POR' && j.id !== arquero.id
+    && Engine.isAvailable(j));
+  window.__lesionarA(arquero.id);
+  const ofrecidos = Engine.arquerosQuePuedenEntrar();
+  const obligatorio = Engine.cambioObligatorioPorLesion();
+  Engine.seguirDespuesDeLaLesion();
+  const alArco = window.__alArco();
+  return {
+    ok: suplentesArqueros.length > 0 && ofrecidos.length === 0 && !obligatorio
+      && s.screen === 'partido' && alArco === null,
+    detalle: `hay ${suplentesArqueros.length} arquero(s) sano(s) fuera del banco`
+      + ` (${suplentesArqueros.map((j) => j.name).join(', ') || 'ninguno'})`
+      + ` · el motor ofrece ${ofrecidos.length} (tiene que ser 0)`
+      + ` · ¿obligatorio?: ${!!obligatorio} (tiene que ser false)`
+      + ` · al arco queda ${alArco ? `${alArco.name} (${alArco.pos})` : 'NADIE, como corresponde'}`,
+  };
+});
+
+await probar('El aviso del cambio forzado se ve en el partido y no sobrevive a la lesión siguiente', () => {
+  window.__carrera('boca');
+  if (!window.__hastaUnPartido()) return { ok: false, detalle: 'no se llegó a un partido' };
+  const s = Engine.state;
+  const arquero = Engine.getStartingXI().starters.find((e) => e.slot === 'POR');
+  window.__lesionarA(arquero.id);
+  Engine.seguirDespuesDeLaLesion();
+  const aviso = s.avisoDeLesion;
+  // Se llama al render concreto, como en la prueba 9: render() se va a la
+  // portada porque las pruebas manejan el motor sin pasar por "Empezar".
+  renderPartido();
+  const seVeEnElPartido = s.screen === 'partido' && !!aviso && app.textContent.includes(aviso);
+  // Ahora se rompe otro: el aviso viejo no puede seguir colgado.
+  const otro = Engine.getStartingXI().starters.find((e) => e.slot !== 'POR');
+  window.__lesionarA(otro.id);
+  renderLesion();
+  const quedoColgado = !!s.avisoDeLesion
+    || (aviso ? app.textContent.includes(aviso) : false);
+  return {
+    ok: !!aviso && seVeEnElPartido && !quedoColgado,
+    detalle: `aviso tras el cambio forzado: "${aviso || 'ninguno'}"`
+      + ` · ¿se ve en la pantalla del partido?: ${seVeEnElPartido}`
+      + ` · tras la lesión siguiente, ¿sigue colgado?: ${quedoColgado} (tiene que ser false)`,
+  };
+});
+
 console.log(`\n${pasaron}/${total.length} pruebas pasaron`);
 if (erroresDePagina.length) console.log(`\nerrores de página: ${erroresDePagina.join(' | ')}`);
 await navegador.close();

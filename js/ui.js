@@ -3859,6 +3859,7 @@ function renderPartido() {
       <div class="partido-stats" id="partido-stats">${estadisticasHtml()}</div>
 
       <h3>Lo que va pasando</h3>
+      ${s.avisoDeLesion ? `<p class="aviso-plantel corto">${s.avisoDeLesion}</p>` : ''}
       <ul class="feed-vivo" id="feed-vivo">${feedHtml(p.eventos)}</ul>
 
       <h3>Ajuste táctico al vuelo</h3>
@@ -4212,7 +4213,9 @@ function renderLesion() {
         ? `<p class="contraoferta-respuesta si">Entra ${entro ? entro.entraNombre : ''} por ${les.nombre}.</p>`
         : quedan > 0
           ? `
-            <h3>${arcoVacio ? '¿Qué arquero metés?' : '¿A quién metés?'}</h3>
+            <h3>${arcoVacio
+              ? (obligatorio ? '¿Qué arquero metés?' : 'Te quedaste sin arquero')
+              : '¿A quién metés?'}</h3>
             ${obligatorio
               ? `<p class="aviso-plantel corto">${Engine.avisoDeArcoVacio()}</p>`
               : arcoVacio
@@ -4225,7 +4228,6 @@ function renderLesion() {
             </div>
           `
           : '<p class="muted">Ya usaste los tres cambios: hay que seguir con uno menos.</p>'}
-      ${s.avisoDeLesion && !obligatorio ? `<p class="aviso-plantel corto">${s.avisoDeLesion}</p>` : ''}
       <div class="options">
         <button class="option-btn" id="seguir-lesion">${
           cubierta ? 'Seguir el partido'

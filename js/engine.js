@@ -5382,6 +5382,11 @@ const Engine = {
     const p = s.partido;
     const jugador = s.squad.find((x) => x.id === lesion.id);
     if (!jugador) return;
+    // Una lesión nueva borra el aviso de la anterior: si no, el cartel de
+    // "Fulano entra al arco" sobrevivía al cambio forzado y reaparecía media
+    // hora después, en la lesión siguiente, hablando de un jugador que para
+    // entonces era justo el que se acababa de romper.
+    s.avisoDeLesion = null;
     // `nuevo` evita que updateAvailability le descuente un partido a una
     // lesión que acaba de pasar (ver esa función).
     jugador.out = { reason: 'lesión', detail: lesion.detail, matches: lesion.matches, nuevo: true };
@@ -5434,8 +5439,17 @@ const Engine = {
 
   // Se reanuda el partido con lo que decidiste: vuelve a la cancha y sigue
   // corriendo el reloj desde el minuto en el que se frenó.
-  // Los arqueros que PUEDEN entrar ahora mismo: sanos, en el plantel, que no
+  // Los arqueros que PUEDEN entrar ahora mismo: sanos, EN EL BANCO, que no
   // estén ya en la cancha ni hayan salido antes, y con cambios disponibles.
+  //
+  // Lo del banco no es un detalle: a la cancha solo entra alguien de los doce
+  // suplentes, aunque en el plantel haya otro arquero sano. La primera
+  // versión de esto miraba todo el plantel y el motor terminaba metiendo al
+  // arco a un arquero que la propia pantalla acababa de decir que no estaba
+  // en el banco. Medido jugando con Lanús: la pantalla decía "No te queda
+  // ningún arquero en el banco" y entraba igual Nicólas Claa, que era el
+  // tercer arquero y no estaba entre los suplentes. Si no hay arquero en el
+  // banco, el arco se queda vacío: es la respuesta honesta.
   arquerosQuePuedenEntrar() {
     const s = this.state;
     const p = s.partido;
@@ -5443,7 +5457,11 @@ const Engine = {
     if (this.cambiosQueQuedan() <= 0) return [];
     const salieron = new Set((p.cambios || []).map((c) => c.sale));
     const enCancha = new Set((s.startingSlots || []).map((e) => e.playerId).filter(Boolean));
-    return (s.squad || []).filter((j) => j && j.pos === 'POR'
+    // Se pregunta por getBanco() y no por s.banco: el array crudo puede estar
+    // sin normalizar (es asegurarBanco el que saca a los que pasaron a ser
+    // titulares y completa los doce), así que es la única lectura válida.
+    const banco = new Set(this.getBanco().map((j) => j.id));
+    return (s.squad || []).filter((j) => j && j.pos === 'POR' && banco.has(j.id)
       && this.isAvailable(j) && !enCancha.has(j.id) && !salieron.has(j.id));
   },
 
@@ -5971,6 +5989,9 @@ const Engine = {
     const s = this.state;
     const ctx = s.matchContext;
     const p = s.partido;
+    // El aviso del cambio forzado al arco es de ESTE partido: se apaga al
+    // cerrarlo para que no aparezca en el siguiente.
+    s.avisoDeLesion = null;
     // Quiénes terminaron el partido en la cancha. Se anota ANTES de deshacer
     // los cambios, porque es la lista que decide a quién le puede pasar algo
     // (ver updateAvailability): al que sacaste en el entretiempo no se le

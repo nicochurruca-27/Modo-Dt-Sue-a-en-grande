@@ -3,7 +3,7 @@
 Lo que está hecho se cuenta en el README. Acá va lo que queda por delante, para
 que no se pierda entre una charla y la otra.
 
-Última revisión: 30/9/2026.
+Última revisión: 9/10/2026.
 
 ---
 
@@ -353,3 +353,58 @@ están cargados con país, nivel, estadio y colores, así que Sudamérica es el
 primer paso natural. Cuando se haga, esos clubes van con todo: sus escudos
 (hoy se dibujan con iniciales, ver punto 1) y el diseño de sus camisetas
 (punto 6).
+
+---
+
+## 12. Lo que quedó abierto del Bloque 3
+
+Las tres salieron de probar la corrección de B3-01 en el navegador con el MCP
+de Playwright, jugando a 390x844. Son tareas separadas: ninguna se arregla de
+paso mientras se toca otra cosa.
+
+### B3-03: un jugador aparece en el once y en el banco a la vez
+
+Jugando con Lanús se midió, en el arranque de un partido, un plantel con once
+en la cancha y doce en el banco donde **Franco Petroli figuraba en los dos
+lados**. Era el partido siguiente a una lesión del arquero titular, con
+Petroli ascendido a titular.
+
+Hay que encontrar la causa, pero antes conviene descartar lo más probable: la
+medición leyó `state.banco` crudo, y ese array **no es la fuente de verdad**.
+El que normaliza es `asegurarBanco()` —saca a los que pasaron a ser titulares
+y completa hasta doce—, y se llama desde `getBanco()`. O sea que `state.banco`
+puede estar sucio sin que el juego esté roto, porque nadie lo lee directo.
+
+No se pudo reproducir: en los dos partidos siguientes el solape dio vacío con
+las dos lecturas. Así que lo primero es **confirmar o descartar que sea real**,
+midiendo siempre por `getBanco()`. Si es real, el lugar a mirar es en qué
+momento se arma el banco respecto de cerrar el once.
+
+Se numera B3-03 y no B3-02 porque ese número ya está tomado por el gol que no
+se cuenta como remate, de la auditoría del Bloque 3.
+
+### Balance de los partidos con el arco vacío
+
+Desde B3-01 el arco puede quedar legítimamente vacío: si se lesiona el arquero
+y no hay ninguno en el banco, se sigue con uno menos y sin nadie ahí. Falta
+saber **cuánto cuesta eso de verdad**.
+
+En la única prueba que se hizo, un partido con el arco vacío desde el minuto 61
+terminó 0-0 contra Flamengo de visitante. Es **una sola observación y no
+alcanza para ninguna conclusión**, pero deja la duda de si el simulador está
+cobrando el arco vacío o si lo trata casi como jugar con diez.
+
+Lo que hay que hacer es simular muchos partidos —cientos, no cinco— comparando
+tres situaciones con el mismo plantel y el mismo rival: once completo, diez con
+arquero, y diez con el arco vacío. Si los goles en contra del tercer caso no se
+despegan del segundo, el arco vacío no se está cobrando y hay que meterle mano
+a `peligroDelPartido`.
+
+### "Terminar carrera" tiene que ir a un menú y pedir confirmación
+
+Hoy el botón rojo de **Terminar carrera** está suelto arriba de la tarjeta del
+partido, entre Sonido, Exportar e Importar. En el celular queda a un toque de
+distancia mientras estás jugando, y borra la carrera entera.
+
+Tiene que irse a un menú (el de ajustes, junto con sonido y exportar/importar)
+y pedir una confirmación explícita antes de borrar nada.
