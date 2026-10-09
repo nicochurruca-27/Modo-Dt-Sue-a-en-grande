@@ -4186,6 +4186,15 @@ function renderLesion() {
   const quedan = Engine.cambiosQueQuedan();
   const cubierta = les.cubierta;
   const entro = cubierta ? (p.cambios || []).slice(-1)[0] : null;
+  // Si la lesión dejó el arco vacío, al arco solo puede ir un arquero (regla
+  // del Bloque 0 aplicada al partido), así que se ofrecen solo arqueros.
+  // Y si hay alguno que pueda entrar, el cambio es OBLIGATORIO: no se puede
+  // seguir jugando sin nadie al arco (B3-01). Si no queda ninguno, se puede
+  // seguir, pero con el arco vacío de verdad y no con un delantero anotado
+  // como arquero.
+  const arcoVacio = !Engine.getStartingXI().starters.some((x) => x.slot === 'POR');
+  const obligatorio = Engine.cambioObligatorioPorLesion();
+  const aQuienesOfrecer = arcoVacio ? banco.filter((j) => j.pos === 'POR') : banco;
 
   app.innerHTML = `
     ${header()}
@@ -4203,17 +4212,25 @@ function renderLesion() {
         ? `<p class="contraoferta-respuesta si">Entra ${entro ? entro.entraNombre : ''} por ${les.nombre}.</p>`
         : quedan > 0
           ? `
-            <h3>¿A quién metés?</h3>
-            <p class="muted">Tocá al que entra. Te ${quedan === 1 ? 'queda 1 cambio' : `quedan ${quedan} cambios`}; si no metés a nadie, seguís con uno menos.</p>
+            <h3>${arcoVacio ? '¿Qué arquero metés?' : '¿A quién metés?'}</h3>
+            ${obligatorio
+              ? `<p class="aviso-plantel corto">${Engine.avisoDeArcoVacio()}</p>`
+              : arcoVacio
+                ? '<p class="aviso-plantel corto">Te quedaste sin nadie al arco y no tenés ningún arquero para meter. Vas a jugar con el arco vacío: un jugador de campo no puede ir al arco.</p>'
+                : `<p class="muted">Tocá al que entra. Te ${quedan === 1 ? 'queda 1 cambio' : `quedan ${quedan} cambios`}; si no metés a nadie, seguís con uno menos.</p>`}
             <div class="cambio-lista">
-              ${banco.length
-                ? banco.map((j) => fichaDeCambioHtml(j, 'banco', amonestados)).join('')
-                : '<p class="muted">No te queda nadie en el banco.</p>'}
+              ${aQuienesOfrecer.length
+                ? aQuienesOfrecer.map((j) => fichaDeCambioHtml(j, 'banco', amonestados)).join('')
+                : `<p class="muted">${arcoVacio ? 'No te queda ningún arquero en el banco.' : 'No te queda nadie en el banco.'}</p>`}
             </div>
           `
           : '<p class="muted">Ya usaste los tres cambios: hay que seguir con uno menos.</p>'}
+      ${s.avisoDeLesion && !obligatorio ? `<p class="aviso-plantel corto">${s.avisoDeLesion}</p>` : ''}
       <div class="options">
-        <button class="option-btn" id="seguir-lesion">${cubierta ? 'Seguir el partido' : 'Seguir con uno menos'}</button>
+        <button class="option-btn" id="seguir-lesion">${
+          cubierta ? 'Seguir el partido'
+            : obligatorio ? 'Meter al arquero y seguir'
+              : 'Seguir con uno menos'}</button>
       </div>
     </div>
   `;
@@ -4224,11 +4241,14 @@ function renderLesion() {
       render();
     });
   });
-  document.getElementById('seguir-lesion').addEventListener('click', () => {
-    Engine.seguirDespuesDeLaLesion();
-    partidoPausado = false;
-    render();
-  });
+  const seguir = document.getElementById('seguir-lesion');
+  if (seguir) {
+    seguir.addEventListener('click', () => {
+      Engine.seguirDespuesDeLaLesion();
+      partidoPausado = false;
+      render();
+    });
+  }
 }
 
 function renderEntretiempo() {

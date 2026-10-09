@@ -5413,6 +5413,14 @@ const Engine = {
     const suyo = s.startingSlots[p.lesion.casillero];
     const hueco = suyo && !suyo.playerId ? suyo : s.startingSlots.find((e) => !e.playerId);
     if (!hueco) return false;
+    // Al arco va un arquero, y punto. Es la regla del Bloque 0 aplicada al
+    // partido: un jugador de campo no cubre el arco. Vale siempre, también
+    // cuando no queda ningún arquero: en ese caso el arco se queda vacío y el
+    // equipo juega con uno menos —que es un estado que el juego ya permite y
+    // que es honesto— en vez de anotar a un delantero como si fuera el
+    // arquero. Antes de B3-01 esto último era lo que pasaba: medido, Adam
+    // Bareiro (DEL) entraba al arco.
+    if (hueco.slot === 'POR' && entra.pos !== 'POR') return false;
 
     hueco.playerId = entraId;
     s.banco = (s.banco || []).filter((id) => id !== entraId);
@@ -5426,10 +5434,72 @@ const Engine = {
 
   // Se reanuda el partido con lo que decidiste: vuelve a la cancha y sigue
   // corriendo el reloj desde el minuto en el que se frenó.
+  // Los arqueros que PUEDEN entrar ahora mismo: sanos, en el plantel, que no
+  // estén ya en la cancha ni hayan salido antes, y con cambios disponibles.
+  arquerosQuePuedenEntrar() {
+    const s = this.state;
+    const p = s.partido;
+    if (!p) return [];
+    if (this.cambiosQueQuedan() <= 0) return [];
+    const salieron = new Set((p.cambios || []).map((c) => c.sale));
+    const enCancha = new Set((s.startingSlots || []).map((e) => e.playerId).filter(Boolean));
+    return (s.squad || []).filter((j) => j && j.pos === 'POR'
+      && this.isAvailable(j) && !enCancha.has(j.id) && !salieron.has(j.id));
+  },
+
+  // ¿El cambio por esta lesión es OBLIGATORIO?
+  //
+  // Jugar con diez porque se rompió un jugador de campo es una decisión
+  // táctica y se respeta: ahí no hay nada obligatorio. Pero quedarse sin
+  // NADIE al arco es el estado imposible que arregló el Bloque 0 —un jugador
+  // de campo no cubre el arco— y hasta ahora el juego lo permitía: si se
+  // lesionaba el arquero y tocabas "Seguir con uno menos", terminabas el
+  // partido con el arco vacío y los suplentes sanos mirando desde el banco
+  // (B3-01, reproducido 6 veces en menos de 3 temporadas).
+  //
+  // Así que es obligatorio solo cuando se dan las dos cosas: el arco quedó
+  // vacío Y hay un arquero que puede entrar. Si no hay ninguno —porque se
+  // lesionaron todos o porque ya usaste los tres cambios— no se inventa
+  // nada: no hay movida legal, y eso sigue igual que antes.
+  cambioObligatorioPorLesion() {
+    const s = this.state;
+    const p = s.partido;
+    if (!p || !p.lesion || p.lesion.cubierta) return null;
+    if (this.cuantosArqueros(this.losQueEstanEnCancha()) > 0) return null;
+    const arqueros = this.arquerosQuePuedenEntrar();
+    if (!arqueros.length) return null;
+    return { arqueros };
+  },
+
+  avisoDeArcoVacio() {
+    return 'Te quedaste sin nadie al arco. Un jugador de campo no puede ir al'
+      + ' arco, así que tenés que meter a un arquero: con el arco vacío no se'
+      + ' puede seguir jugando.';
+  },
+
   seguirDespuesDeLaLesion() {
     const s = this.state;
     const p = s.partido;
     if (!p) { this.cerrarPartidoDelUsuario(); return; }
+    // Si el arco quedó vacío y hay un arquero que puede entrar, el cambio se
+    // HACE acá mismo con el mejor que haya, y después el partido sigue.
+    //
+    // La primera versión de este arreglo se negaba a reanudar para forzarte a
+    // elegir, y estaba mal: dejaba al motor en un estado del que no se sale
+    // sin llamar a `meterPorElLesionado`, así que cualquier código que
+    // resolviera la lesión con `seguirDespuesDeLaLesion` quedaba girando para
+    // siempre. Rompió 8 de las 19 pruebas del Bloque 1 con la pestaña
+    // muerta. Elegir qué arquero entra se sigue pudiendo —la pantalla ofrece
+    // los arqueros antes de tocar el botón—, pero si no elegís, el juego no
+    // se traba: mete uno.
+    s.avisoDeLesion = null;
+    const obligatorio = this.cambioObligatorioPorLesion();
+    if (obligatorio) {
+      const mejor = obligatorio.arqueros.slice().sort((a, b) => b.rating - a.rating)[0];
+      if (this.meterPorElLesionado(mejor.id)) {
+        s.avisoDeLesion = `${mejor.name} entra al arco: no se puede seguir jugando sin nadie ahí.`;
+      }
+    }
     p.lesion = null;
     s.screen = 'partido';
     this.save();
