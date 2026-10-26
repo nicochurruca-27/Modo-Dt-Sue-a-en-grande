@@ -5,3 +5,10 @@ dist
 
 # Ignore the output video from Git but not videos you import into src/.
 out
+
+# El .gitignore de la raíz ignora estos archivos para las pruebas del juego,
+# pero acá son parte del proyecto de Remotion y sí se guardan.
+!package.json
+!package-lock.json
+!*.mjs
+!*.png
